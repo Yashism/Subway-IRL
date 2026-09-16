@@ -72,19 +72,16 @@ export class Calibrator {
   }
 }
 
+const easing = (dtMs: number, tauMs: number) => 1 - Math.exp(-dtMs / tauMs);
+
 /**
  * Slowly follows posture changes (standing taller, stepping nearer) while the player is still.
- * x stays fixed unless `followX` is set: full-body lanes are absolute positions, but small-room
- * mode has no absolute lanes, so its sideways reference may follow the player.
+ * Never touches x: full-body lanes are absolute positions. Small-room mode follows x separately
+ * with `driftBaselineX`.
  */
-export function driftBaseline(base: Baseline, body: Body, dtMs: number, tauMs = 3000, followX = false): void {
-  const a = 1 - Math.exp(-dtMs / tauMs);
+export function driftBaseline(base: Baseline, body: Body, dtMs: number, tauMs = 3000): void {
+  const a = easing(dtMs, tauMs);
   const lerp = (p: number, q: number) => p + (q - p) * a;
-  if (followX) {
-    base.hip.x = lerp(base.hip.x, body.hip.x);
-    base.shoulder.x = lerp(base.shoulder.x, body.shoulder.x);
-    base.nose.x = lerp(base.nose.x, body.nose.x);
-  }
   base.hip.y = lerp(base.hip.y, body.hip.y);
   base.shoulder.y = lerp(base.shoulder.y, body.shoulder.y);
   base.nose.y = lerp(base.nose.y, body.nose.y);
@@ -92,4 +89,22 @@ export function driftBaseline(base: Baseline, body: Body, dtMs: number, tauMs = 
   base.shoulderWidth = lerp(base.shoulderWidth, body.shoulderWidth);
   if (body.kneeL && base.kneeRelL !== null) base.kneeRelL = lerp(base.kneeRelL, body.kneeL.y - body.hip.y);
   if (body.kneeR && base.kneeRelR !== null) base.kneeRelR = lerp(base.kneeRelR, body.kneeR.y - body.hip.y);
+}
+
+/**
+ * Small-room mode only: eases the sideways reference toward the player. That mode has no
+ * absolute lanes, so the reference may follow someone who wanders while playing.
+ */
+export function driftBaselineX(base: Baseline, body: Body, dtMs: number, tauMs = 3000): void {
+  const a = easing(dtMs, tauMs);
+  base.hip.x += (body.hip.x - base.hip.x) * a;
+  base.shoulder.x += (body.shoulder.x - base.shoulder.x) * a;
+  base.nose.x += (body.nose.x - base.nose.x) * a;
+}
+
+/** Small-room mode only: snaps the sideways reference to the player, e.g. on returning after a tracking gap. */
+export function rebaseBaselineX(base: Baseline, body: Body): void {
+  base.hip.x = body.hip.x;
+  base.shoulder.x = body.shoulder.x;
+  base.nose.x = body.nose.x;
 }

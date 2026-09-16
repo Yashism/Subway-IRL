@@ -1,4 +1,4 @@
-import { Calibrator, driftBaseline, type Baseline } from './calibration';
+import { Calibrator, driftBaseline, driftBaselineX, rebaseBaselineX, type Baseline } from './calibration';
 import { GestureDetector } from './gestures';
 import { JogDetector } from './jog';
 import { dist, toBody, VISIBLE, type Body } from './landmarks';
@@ -134,7 +134,8 @@ export class PoseController {
     }
 
     const events: PoseEvent[] = [];
-    if (this.lost) {
+    const found = this.lost;
+    if (found) {
       this.lost = false;
       this.smoother.reset();
       // Keep the baseline, lane and step history; drop state that went stale during the gap.
@@ -159,6 +160,9 @@ export class PoseController {
     }
 
     const base = this.baseline;
+    // Small-room lanes are relative, so a player who comes back somewhere else keeps playing from
+    // there. Full-body mode keeps x: standing position is the lane.
+    if (found && base.mode === 'small') rebaseBaselineX(base, body);
     const sens = this.sensitivity;
     this.jog.update(body, base, t, sens);
     const jogging = this.jog.status(t).active;
@@ -169,7 +173,11 @@ export class PoseController {
       base.mode === 'full'
         ? Math.abs(body.hip.y - base.hip.y) < this.th.driftSettle * base.torso
         : Math.abs(body.shoulder.y - base.shoulder.y) < this.th.driftSettle * base.shoulderWidth;
-    if (prevT !== null && !jogging && moves.idle && settled) driftBaseline(base, body, t - prevT, undefined, base.mode === 'small');
+    if (prevT === null) return events;
+    const dt = t - prevT;
+    // Small-room x follows the player even while jogging, but never during a held lean.
+    if (base.mode === 'small' && this.small.leanReady) driftBaselineX(base, body, dt);
+    if (!jogging && moves.idle && settled) driftBaseline(base, body, dt);
     return events;
   }
 

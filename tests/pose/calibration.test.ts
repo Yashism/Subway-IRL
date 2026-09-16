@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Calibrator, driftBaseline, type Baseline } from '../../src/pose/calibration';
+import { Calibrator, driftBaseline, driftBaselineX, rebaseBaselineX, type Baseline } from '../../src/pose/calibration';
 import { toBody } from '../../src/pose/landmarks';
 import { DEFAULT_THRESHOLDS } from '../../src/pose/thresholds';
 import type { PlayMode } from '../../src/pose/types';
@@ -68,13 +68,29 @@ describe('driftBaseline', () => {
     expect(base.hip.x).toBeCloseTo(STAND.hipX, 6);
   });
 
-  it('also follows x when asked (small-room mode)', () => {
+});
+
+describe('driftBaselineX', () => {
+  it('eases only x toward the current body', () => {
     const base = baselineFor({ lowerVisible: false });
-    const body = toBody(synthPose({ lowerVisible: false, hipX: STAND.hipX + 0.05 }), ASPECT);
-    for (let i = 0; i < 90; i++) driftBaseline(base, body, 1000 / 30, 3000, true);
+    const body = toBody(synthPose({ lowerVisible: false, hipX: STAND.hipX + 0.05, hipY: 0.62 }), ASPECT);
+    for (let i = 0; i < 90; i++) driftBaselineX(base, body, 1000 / 30, 3000);
     const eased = 0.05 * (1 - Math.exp(-1));
     expect(base.hip.x - STAND.hipX).toBeCloseTo(eased, 3);
     expect(base.shoulder.x - STAND.hipX).toBeCloseTo(eased, 3);
     expect(base.nose.x - STAND.hipX).toBeCloseTo(eased, 3);
+    expect(base.hip.y).toBeCloseTo(0.6, 6);
+  });
+});
+
+describe('rebaseBaselineX', () => {
+  it('snaps x to the current body and leaves the rest', () => {
+    const base = baselineFor({ lowerVisible: false });
+    const body = toBody(synthPose({ lowerVisible: false, hipX: STAND.hipX + 0.1, hipY: 0.62 }), ASPECT);
+    rebaseBaselineX(base, body);
+    expect(base.hip.x).toBeCloseTo(body.hip.x, 9);
+    expect(base.shoulder.x).toBeCloseTo(body.shoulder.x, 9);
+    expect(base.nose.x).toBeCloseTo(body.nose.x, 9);
+    expect(base.hip.y).toBeCloseTo(0.6, 6);
   });
 });

@@ -102,6 +102,11 @@ export class SmallRoomMoves {
     return this.leanArmed && this.jump.isArmed && this.roll.isArmed;
   }
 
+  /** The player is back upright after the last lean; until then the x reference must hold still. */
+  get leanReady(): boolean {
+    return this.leanArmed;
+  }
+
   /** The head is still down after a duck. */
   get isDown(): boolean {
     return !this.roll.isArmed;
@@ -114,7 +119,10 @@ export class SmallRoomMoves {
     this.vref.reset();
   }
 
-  /** After a tracking gap: every move must return to rest before it can fire again. */
+  /**
+   * After a tracking gap: every move must return to rest before it can fire again. The controller
+   * re-bases x to where the player came back, so the lean re-arms once they are upright.
+   */
   resetTransient(): void {
     this.leanArmed = false;
     this.jump.reset(false);
