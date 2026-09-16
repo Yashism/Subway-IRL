@@ -27,7 +27,7 @@ describe('BobTracker', () => {
     const b = new BobTracker();
     let steps = 0;
     for (let t = 0; t < ms; t += 1000 / 30) {
-      if (b.update(-amp * Math.cos((2 * Math.PI * t) / 375), t, 0.03, 700)) steps++;
+      if (b.update(-amp * Math.cos((2 * Math.PI * t) / 375), t, 0.03, 700, 0.25)) steps++;
     }
     return { b, steps };
   };

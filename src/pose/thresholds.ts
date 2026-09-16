@@ -29,6 +29,7 @@ export const DEFAULT_THRESHOLDS = {
   bobMinAmp: 0.03,
   bobJumpFactor: 2.5,
   bobMaxStepGapMs: 700,
+  bobMaxSwing: 0.25,
   // gestures, tracking, calibration
   hoverHoldMs: 300,
   startHoldMs: 1500,

@@ -34,8 +34,6 @@ export class TimeWindow {
   }
 }
 
-const MAX_BOB_SWING = 0.25;
-
 /** Follows the up/down bounce of a height signal and reports one step per bounce cycle. */
 export class BobTracker {
   private dir: 'up' | 'down' = 'up';
@@ -59,7 +57,7 @@ export class BobTracker {
     return this.swings.reduce((a, b) => a + b, 0) / this.swings.length / 2;
   }
 
-  update(v: number, t: number, minAmp: number, maxGapMs: number): boolean {
+  update(v: number, t: number, minAmp: number, maxGapMs: number, maxSwing: number): boolean {
     if (Number.isNaN(this.ext)) {
       this.ext = v;
       this.extT = t;
@@ -89,7 +87,7 @@ export class BobTracker {
     this.dir = 'up';
     this.ext = v;
     this.extT = t;
-    if (swing < 2 * minAmp || swing > MAX_BOB_SWING) return false;
+    if (swing < 2 * minAmp || swing > maxSwing) return false;
     const gap = troughT - this.lastTroughT;
     this.lastTroughT = troughT;
     if (gap > maxGapMs) return false;
