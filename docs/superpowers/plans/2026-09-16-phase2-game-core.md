@@ -2881,9 +2881,6 @@ const emptyStats = (): RunStats => ({
   hoverboardsUsed: 0,
 });
 
-/** Extra time the path ahead is cleared for after a rocket, covering the fall back down. */
-const ROCKET_FALL_SECONDS = 1.5;
-
 export class Game {
   state: GameState = 'menu';
   countdown = 0;
@@ -3003,8 +3000,8 @@ export class Game {
 
     const p = this.powerups;
     if (p.update(dt).rocketEnded) {
-      this.track.clearObstacles(this.s, this.s + this.speed * (TUNING.rocketLandingClearSeconds + ROCKET_FALL_SECONDS));
-      p.grace = Math.max(p.grace, TUNING.rocketLandingClearSeconds + ROCKET_FALL_SECONDS);
+      this.track.clearObstacles(this.s, this.s + this.speed * (TUNING.rocketLandingClearSeconds + TUNING.rocketFallSeconds));
+      p.grace = Math.max(p.grace, TUNING.rocketLandingClearSeconds + TUNING.rocketFallSeconds);
       events.push({ type: 'rocketLanding' });
     }
     const r = this.runner;
