@@ -40,6 +40,24 @@ describe('BobTracker', () => {
     expect(b.amplitudeAt(5000)).toBe(0);
   });
 
+  it('forgets the old amplitude when a bob follows a long pause', () => {
+    const b = new BobTracker();
+    const wave = (t: number) => -0.05 * Math.cos((2 * Math.PI * t) / 375);
+    let t = 0;
+    for (; t < 2000; t += 1000 / 30) b.update(wave(t), t, 0.03, 700, 0.25);
+    expect(b.amplitudeAt(t)).toBeGreaterThan(0.03);
+    // Sink slowly to a trough over 1.5 s, then bounce once more: the swing is big enough, but its
+    // trough comes more than 700 ms after the previous one.
+    const from = t;
+    const start = wave(t);
+    const hold = t + 1500;
+    for (; t < hold; t += 1000 / 30) b.update(start + (-0.05 - start) * ((t - from) / 1500), t, 0.03, 700, 0.25);
+    let stepped = false;
+    for (const end = t + 400; t < end; t += 1000 / 30) stepped ||= b.update(wave(t - hold), t, 0.03, 700, 0.25);
+    expect(stepped).toBe(false);
+    expect(b.amplitudeAt(t)).toBe(0);
+  });
+
   it('ignores bobs that are too small or too large', () => {
     expect(run(0.02, 3000).steps).toBe(0);
     const big = run(0.3, 3000);

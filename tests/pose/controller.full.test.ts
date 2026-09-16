@@ -103,4 +103,44 @@ describe('PoseController — full-body mode', () => {
     expect(names(play(ctrl, sc.frames))).toEqual([]);
     expect(ctrl.status.lane).toBe(0);
   });
+
+  it('detects a squat straight out of jogging', () => {
+    const sc = calibrated()
+      .add(3000, (t) => jogParams(t))
+      .add(200, (t) => ({ hipY: STAND.hipY + 0.45 * T * ramp(t, 200) }))
+      .hold(600, { hipY: STAND.hipY + 0.45 * T });
+    expect(events(sc)).toEqual(['roll']);
+  });
+
+  it('scales the lane step with sensitivity', () => {
+    const sc = calibrated()
+      .add(300, (t) => at(0.45 * ramp(t, 300)))
+      .hold(700, at(0.45));
+    expect(names(play(new PoseController(), sc.frames))).toEqual([]);
+    expect(names(play(new PoseController({ sensitivity: 1.25 }), sc.frames))).toEqual(['lane:1']);
+  });
+
+  it('does not roll when the player returns from a tracking gap already crouched', () => {
+    const squat = { hipY: STAND.hipY + 0.45 * T };
+    const sc = calibrated()
+      .add(1500, () => null)
+      .hold(600, squat)
+      .add(200, (t) => ({ hipY: STAND.hipY + 0.45 * T * (1 - ramp(t, 200)) }))
+      .hold(800)
+      .add(200, (t) => ({ hipY: STAND.hipY + 0.45 * T * ramp(t, 200) }))
+      .hold(600, squat);
+    expect(events(sc)).toEqual(['lost', 'found', 'roll']);
+  });
+
+  it('keeps the lane and baseline across a tracking gap', () => {
+    const ctrl = new PoseController();
+    const sc = calibrated()
+      .add(300, (t) => at(0.8 * ramp(t, 300)))
+      .hold(500, at(0.8))
+      .add(1500, () => null)
+      .hold(500, at(0.8));
+    expect(names(play(ctrl, sc.frames))).toEqual(['lane:1', 'lost', 'found']);
+    expect(ctrl.status.calibrated).toBe(true);
+    expect(ctrl.status.lane).toBe(1);
+  });
 });

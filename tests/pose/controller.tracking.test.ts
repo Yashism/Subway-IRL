@@ -35,6 +35,26 @@ describe('PoseController — tracking and gestures', () => {
     expect(ctrl.status.poseFps).toBe(30);
   });
 
+  it('calibrates through a short pose gap but restarts after a long one', () => {
+    const short = new PoseController();
+    play(short, new Scenario().hold(1000).add(200, () => null).hold(1100).frames);
+    expect(short.status.calibrated).toBe(true);
+    const long = new PoseController();
+    play(long, new Scenario().hold(1000).add(400, () => null).hold(1100).frames);
+    expect(long.status.calibrated).toBe(false);
+  });
+
+  it('merges partial thresholds with the defaults and clamps sensitivity', () => {
+    const ctrl = new PoseController({ thresholds: { laneEnter: 0.6 }, sensitivity: 3 });
+    expect(ctrl.th.laneEnter).toBe(0.6);
+    expect(ctrl.th.laneExit).toBe(0.35);
+    expect(ctrl.sensitivity).toBe(1.25);
+    ctrl.sensitivity = 0.1;
+    expect(ctrl.sensitivity).toBe(0.75);
+    ctrl.sensitivity = 1.1;
+    expect(ctrl.sensitivity).toBe(1.1);
+  });
+
   it('recalibrate forgets the baseline', () => {
     const ctrl = new PoseController();
     play(ctrl, new Scenario().hold(2500).frames);

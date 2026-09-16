@@ -90,7 +90,11 @@ export class BobTracker {
     if (swing < 2 * minAmp || swing > maxSwing) return false;
     const gap = troughT - this.lastTroughT;
     this.lastTroughT = troughT;
-    if (gap > maxGapMs) return false;
+    if (gap > maxGapMs) {
+      // Bouncing had stopped: don't let amplitudeAt revive the old swings.
+      this.swings = [];
+      return false;
+    }
     this.swings.push(swing);
     if (this.swings.length > 4) this.swings.shift();
     return true;
@@ -107,8 +111,9 @@ export class JumpDetector {
     return this.armed;
   }
 
-  reset(): void {
-    this.armed = true;
+  /** `armed = false` makes the detector wait for the body to come back down before it can fire. */
+  reset(armed = true): void {
+    this.armed = armed;
     this.prev = null;
     this.vel.clear();
   }
@@ -150,8 +155,9 @@ export class DropDetector {
     return this.since !== null;
   }
 
-  reset(): void {
-    this.armed = true;
+  /** `armed = false` makes the detector wait for the player to stand back up before it can fire. */
+  reset(armed = true): void {
+    this.armed = armed;
     this.since = null;
   }
 

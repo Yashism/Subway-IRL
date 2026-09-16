@@ -46,6 +46,16 @@ export class FullBodyMoves {
     this.vref.reset();
   }
 
+  /**
+   * After a tracking gap: drop stale in-flight state but keep the lane. Jump and roll start
+   * disarmed, so a player who comes back already crouched must stand up before they can roll.
+   */
+  resetTransient(): void {
+    this.jump.reset(false);
+    this.roll.reset(false);
+    this.vref.reset();
+  }
+
   update({ body, base, t, sens, bobAmp, jogging }: MoveContext): PoseEvent[] {
     const th = this.th;
     const T = base.torso;
@@ -101,6 +111,14 @@ export class SmallRoomMoves {
     this.leanArmed = true;
     this.jump.reset();
     this.roll.reset();
+    this.vref.reset();
+  }
+
+  /** After a tracking gap: every move must return to rest before it can fire again. */
+  resetTransient(): void {
+    this.leanArmed = false;
+    this.jump.reset(false);
+    this.roll.reset(false);
     this.vref.reset();
   }
 

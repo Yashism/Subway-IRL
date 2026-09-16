@@ -84,4 +84,12 @@ describe('PoseController — small-room mode', () => {
       .hold(400, at(0.5));
     expect(names(play(new PoseController(), sc.frames))).toEqual(['shift:1', 'shift:1']);
   });
+
+  it('detects a duck straight out of jogging', () => {
+    const sc = calibrated()
+      .add(3000, (t) => jogParams(t, { small: true }))
+      .add(200, (t) => ({ ...SMALL, noseDrop: 0.5 * ramp(t, 200) }))
+      .hold(400, { ...SMALL, noseDrop: 0.5 });
+    expect(names(play(new PoseController(), sc.frames))).toEqual(['roll']);
+  });
 });

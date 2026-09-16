@@ -23,7 +23,7 @@ const statusEl = $<HTMLDListElement>('status');
 const logEl = $<HTMLOListElement>('log');
 const ctx = canvas.getContext('2d')!;
 
-const ctrl = new PoseController({ thresholds: { ...DEFAULT_THRESHOLDS } });
+const ctrl = new PoseController();
 const recorder = new FixtureRecorder();
 let source: PoseSource | null = null;
 let aspect = 4 / 3;
@@ -235,5 +235,5 @@ recordBtn.addEventListener('click', () => {
 
 buildThresholdInputs();
 requestAnimationFrame(render);
-const replay = new URLSearchParams(location.search).get('replay');
+const replay = new URLSearchParams(location.search).get('replay')?.replace(/\.json$/i, '');
 void (replay ? startReplay(replay) : startCamera());
