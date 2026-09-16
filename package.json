@@ -1,0 +1,25 @@
+{
+  "name": "subway-irl",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/fetch-mediapipe.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/fetch-mediapipe.mjs",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "fixtures:synth": "tsx scripts/make-synth-fixtures.ts"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}
