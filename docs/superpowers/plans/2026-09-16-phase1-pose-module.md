@@ -307,6 +307,8 @@ export const DEFAULT_THRESHOLDS = {
   lostMs: 1000,
   calibHoldMs: 2000,
   calibStill: 0.15,
+  calibMinTorso: 0.1,
+  driftSettle: 0.1,
 };
 
 export type Thresholds = typeof DEFAULT_THRESHOLDS;
@@ -1221,7 +1223,7 @@ export class Calibrator {
       return null;
     }
     const distance: DistanceHint =
-      body.torso < 0.1 ? 'closer' : forcedMode === 'full' && !body.lowerBodyVisible ? 'back' : 'ok';
+      body.torso < this.th.calibMinTorso ? 'closer' : forcedMode === 'full' && !body.lowerBodyVisible ? 'back' : 'ok';
     if (distance !== 'ok') {
       this.samples = [];
       this.state = { progress: 0, bodyVisible: true, distance };
@@ -2282,8 +2284,8 @@ export class PoseController {
 
     const settled =
       base.mode === 'full'
-        ? Math.abs(body.hip.y - base.hip.y) < 0.1 * base.torso
-        : Math.abs(body.shoulder.y - base.shoulder.y) < 0.1 * base.shoulderWidth;
+        ? Math.abs(body.hip.y - base.hip.y) < this.th.driftSettle * base.torso
+        : Math.abs(body.shoulder.y - base.shoulder.y) < this.th.driftSettle * base.shoulderWidth;
     if (prevT !== null && !jogging && moves.idle && settled) driftBaseline(base, body, t - prevT);
     return events;
   }
