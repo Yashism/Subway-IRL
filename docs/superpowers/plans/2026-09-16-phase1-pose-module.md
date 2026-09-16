@@ -300,12 +300,15 @@ export const DEFAULT_THRESHOLDS = {
   bobMinAmp: 0.03,
   bobJumpFactor: 2.5,
   bobMaxStepGapMs: 700,
+  bobMaxSwing: 0.25,
   // gestures, tracking, calibration
   hoverHoldMs: 300,
   startHoldMs: 1500,
   lostMs: 1000,
   calibHoldMs: 2000,
   calibStill: 0.15,
+  calibMinTorso: 0.1,
+  driftSettle: 0.1,
 };
 
 export type Thresholds = typeof DEFAULT_THRESHOLDS;
@@ -735,7 +738,7 @@ git commit -m "feat(pose): add One Euro landmark smoothing"
 **Interfaces:**
 - Produces:
   - `class TimeWindow(spanMs)`: `push(t, v)`, `clear()`, `size`, `mean()` (NaN when empty), `max()` (-Infinity when empty), `min()` (Infinity when empty)
-  - `class BobTracker`: `update(v, t, minAmp, maxGapMs): boolean` (true when a trough completes a step cycle), `amplitudeAt(t): number`, `reset()`. `v` is a height where bigger means higher. Hysteresis = `minAmp`; a counted swing must be ≥ `2*minAmp` and ≤ 0.25.
+  - `class BobTracker`: `update(v, t, minAmp, maxGapMs, maxSwing): boolean` (true when a trough completes a step cycle), `amplitudeAt(t): number`, `reset()`. `v` is a height where bigger means higher. Hysteresis = `minAmp`; a counted swing must be ≥ `2*minAmp` and ≤ `maxSwing` (callers pass `th.bobMaxSwing`, unscaled by sensitivity — it is a sanity cap, not a trigger).
   - `class JumpDetector`: `update(v, ref, t, minVel, minRise, rearm): boolean`, `isArmed`, `reset()`
   - `interface DropThresholds { drop; holdMs; headDrop; rearmDrop; rearmHead }`
   - `class DropDetector`: `update(drop, headDrop, t, th: DropThresholds): boolean`, `isArmed`, `isDropping`, `reset()`
@@ -773,7 +776,7 @@ describe('BobTracker', () => {
     const b = new BobTracker();
     let steps = 0;
     for (let t = 0; t < ms; t += 1000 / 30) {
-      if (b.update(-amp * Math.cos((2 * Math.PI * t) / 375), t, 0.03, 700)) steps++;
+      if (b.update(-amp * Math.cos((2 * Math.PI * t) / 375), t, 0.03, 700, 0.25)) steps++;
     }
     return { b, steps };
   };
@@ -892,8 +895,6 @@ export class TimeWindow {
   }
 }
 
-const MAX_BOB_SWING = 0.25;
-
 /** Follows the up/down bounce of a height signal and reports one step per bounce cycle. */
 export class BobTracker {
   private dir: 'up' | 'down' = 'up';
@@ -917,7 +918,7 @@ export class BobTracker {
     return this.swings.reduce((a, b) => a + b, 0) / this.swings.length / 2;
   }
 
-  update(v: number, t: number, minAmp: number, maxGapMs: number): boolean {
+  update(v: number, t: number, minAmp: number, maxGapMs: number, maxSwing: number): boolean {
     if (Number.isNaN(this.ext)) {
       this.ext = v;
       this.extT = t;
@@ -947,7 +948,7 @@ export class BobTracker {
     this.dir = 'up';
     this.ext = v;
     this.extT = t;
-    if (swing < 2 * minAmp || swing > MAX_BOB_SWING) return false;
+    if (swing < 2 * minAmp || swing > maxSwing) return false;
     const gap = troughT - this.lastTroughT;
     this.lastTroughT = troughT;
     if (gap > maxGapMs) return false;
@@ -1222,7 +1223,7 @@ export class Calibrator {
       return null;
     }
     const distance: DistanceHint =
-      body.torso < 0.1 ? 'closer' : forcedMode === 'full' && !body.lowerBodyVisible ? 'back' : 'ok';
+      body.torso < this.th.calibMinTorso ? 'closer' : forcedMode === 'full' && !body.lowerBodyVisible ? 'back' : 'ok';
     if (distance !== 'ok') {
       this.samples = [];
       this.state = { progress: 0, bodyVisible: true, distance };
@@ -1418,7 +1419,7 @@ export class JogDetector {
     const full = base.mode === 'full';
     const unit = full ? base.torso : base.shoulderWidth;
     const height = -(full ? body.hip.y : body.shoulder.y) / unit;
-    const bobStep = this.bob.update(height, t, this.th.bobMinAmp / sens, this.th.bobMaxStepGapMs);
+    const bobStep = this.bob.update(height, t, this.th.bobMinAmp / sens, this.th.bobMaxStepGapMs, this.th.bobMaxSwing);
     const primary = full ? this.kneeStep(body, base, sens) : this.wristStep(body, base, t, sens);
     if (primary) {
       this.lastPrimaryT = t;
@@ -1434,7 +1435,7 @@ export class JogDetector {
     const cadence = n >= 2 ? ((n - 1) / (this.stepTimes[n - 1] - this.stepTimes[0])) * 60000 : 0;
     return {
       active: ms < ACTIVE_MS,
-      cadenceSpm: ms < 1500 ? Math.round(cadence) : 0,
+      cadenceSpm: ms < ACTIVE_MS ? Math.round(cadence) : 0,
       msSinceStep: ms,
       steps: this.total,
     };
@@ -1675,7 +1676,7 @@ export class FullBodyMoves {
     const h = -body.hip.y / T;
     const ref = this.vref.value(h, t, -base.hip.y / T, jogging, !this.idle);
     const minRise = Math.max(th.jumpRise / sens, th.bobJumpFactor * bobAmp);
-    if (this.jump.update(h, ref, t, th.jumpVel / sens, minRise, th.jumpRearm)) events.push({ type: 'jump' });
+    if (this.jump.update(h, ref, t, th.jumpVel / sens, minRise, th.jumpRearm / sens)) events.push({ type: 'jump' });
 
     const refHipY = -ref * T;
     const noseRef = base.nose.y + (refHipY - base.hip.y);
@@ -1685,8 +1686,8 @@ export class FullBodyMoves {
       drop: th.rollDrop / sens,
       holdMs: th.rollHoldMs,
       headDrop: th.rollHeadDrop / sens,
-      rearmDrop: th.rollDrop / 2,
-      rearmHead: th.rollHeadDrop / 2,
+      rearmDrop: th.rollDrop / 2 / sens,
+      rearmHead: th.rollHeadDrop / 2 / sens,
     });
     if (rolled) events.push({ type: 'roll' });
     return events;
@@ -1726,14 +1727,14 @@ export class SmallRoomMoves {
         this.leanArmed = false;
         events.push({ type: 'laneShift', dir: left ? -1 : 1 });
       }
-    } else if (Math.abs(body.tiltDeg) < th.leanRearmDeg && Math.abs(noseShift) < th.noseRearm) {
+    } else if (Math.abs(body.tiltDeg) < th.leanRearmDeg / sens && Math.abs(noseShift) < th.noseRearm / sens) {
       this.leanArmed = true;
     }
 
     const h = -body.shoulder.y / S;
     const ref = this.vref.value(h, t, -base.shoulder.y / S, jogging, !this.idle);
     const minRise = Math.max(th.smallJumpRise / sens, th.bobJumpFactor * bobAmp);
-    if (this.jump.update(h, ref, t, th.smallJumpVel / sens, minRise, th.smallJumpRearm)) events.push({ type: 'jump' });
+    if (this.jump.update(h, ref, t, th.smallJumpVel / sens, minRise, th.smallJumpRearm / sens)) events.push({ type: 'jump' });
 
     const noseRef = base.nose.y + (-ref * S - base.shoulder.y);
     const duck = (body.nose.y - noseRef) / S;
@@ -1742,7 +1743,7 @@ export class SmallRoomMoves {
       holdMs: 0,
       headDrop: th.duckDrop / sens,
       rearmDrop: 1,
-      rearmHead: th.duckDrop / 2,
+      rearmHead: th.duckDrop / 2 / sens,
     });
     if (ducked) events.push({ type: 'roll' });
     return events;
@@ -2283,8 +2284,8 @@ export class PoseController {
 
     const settled =
       base.mode === 'full'
-        ? Math.abs(body.hip.y - base.hip.y) < 0.1 * base.torso
-        : Math.abs(body.shoulder.y - base.shoulder.y) < 0.1 * base.shoulderWidth;
+        ? Math.abs(body.hip.y - base.hip.y) < this.th.driftSettle * base.torso
+        : Math.abs(body.shoulder.y - base.shoulder.y) < this.th.driftSettle * base.shoulderWidth;
     if (prevT !== null && !jogging && moves.idle && settled) driftBaseline(base, body, t - prevT);
     return events;
   }
