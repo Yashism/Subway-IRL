@@ -1676,7 +1676,7 @@ export class FullBodyMoves {
     const h = -body.hip.y / T;
     const ref = this.vref.value(h, t, -base.hip.y / T, jogging, !this.idle);
     const minRise = Math.max(th.jumpRise / sens, th.bobJumpFactor * bobAmp);
-    if (this.jump.update(h, ref, t, th.jumpVel / sens, minRise, th.jumpRearm)) events.push({ type: 'jump' });
+    if (this.jump.update(h, ref, t, th.jumpVel / sens, minRise, th.jumpRearm / sens)) events.push({ type: 'jump' });
 
     const refHipY = -ref * T;
     const noseRef = base.nose.y + (refHipY - base.hip.y);
@@ -1686,8 +1686,8 @@ export class FullBodyMoves {
       drop: th.rollDrop / sens,
       holdMs: th.rollHoldMs,
       headDrop: th.rollHeadDrop / sens,
-      rearmDrop: th.rollDrop / 2,
-      rearmHead: th.rollHeadDrop / 2,
+      rearmDrop: th.rollDrop / 2 / sens,
+      rearmHead: th.rollHeadDrop / 2 / sens,
     });
     if (rolled) events.push({ type: 'roll' });
     return events;
@@ -1727,14 +1727,14 @@ export class SmallRoomMoves {
         this.leanArmed = false;
         events.push({ type: 'laneShift', dir: left ? -1 : 1 });
       }
-    } else if (Math.abs(body.tiltDeg) < th.leanRearmDeg && Math.abs(noseShift) < th.noseRearm) {
+    } else if (Math.abs(body.tiltDeg) < th.leanRearmDeg / sens && Math.abs(noseShift) < th.noseRearm / sens) {
       this.leanArmed = true;
     }
 
     const h = -body.shoulder.y / S;
     const ref = this.vref.value(h, t, -base.shoulder.y / S, jogging, !this.idle);
     const minRise = Math.max(th.smallJumpRise / sens, th.bobJumpFactor * bobAmp);
-    if (this.jump.update(h, ref, t, th.smallJumpVel / sens, minRise, th.smallJumpRearm)) events.push({ type: 'jump' });
+    if (this.jump.update(h, ref, t, th.smallJumpVel / sens, minRise, th.smallJumpRearm / sens)) events.push({ type: 'jump' });
 
     const noseRef = base.nose.y + (-ref * S - base.shoulder.y);
     const duck = (body.nose.y - noseRef) / S;
@@ -1743,7 +1743,7 @@ export class SmallRoomMoves {
       holdMs: 0,
       headDrop: th.duckDrop / sens,
       rearmDrop: 1,
-      rearmHead: th.duckDrop / 2,
+      rearmHead: th.duckDrop / 2 / sens,
     });
     if (ducked) events.push({ type: 'roll' });
     return events;
