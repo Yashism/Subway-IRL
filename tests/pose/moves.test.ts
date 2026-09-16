@@ -66,6 +66,20 @@ describe('FullBodyMoves', () => {
     }));
     expect(ev).toEqual([{ type: 'roll' }]);
   });
+
+  it('scales the jump re-arm height with sensitivity', () => {
+    // After the first jump peaks, the body settles at 0.07 T above rest: that re-arms at sens 1 (0.07 < 0.08)
+    // but not at sens 1.25 (0.07 >= 0.064), so only sens 1 fires the second jump.
+    const height = (t: number) => {
+      if (t < 300) return 0;
+      if (t < 550) return jumpArc(t - 300, 500, 0.35);
+      if (t < 1500) return Math.max(jumpArc(t - 300, 500, 0.35), 0.07);
+      return 0.07 + jumpArc(t - 1500, 500, 0.35);
+    };
+    const scene = (t: number) => ({ hipY: STAND.hipY - height(t) * T });
+    expect(drive(new FullBodyMoves(DEFAULT_THRESHOLDS), baselineFor(), 2500, scene, 1)).toEqual([{ type: 'jump' }, { type: 'jump' }]);
+    expect(drive(new FullBodyMoves(DEFAULT_THRESHOLDS), baselineFor(), 2500, scene, 1.25)).toEqual([{ type: 'jump' }]);
+  });
 });
 
 describe('SmallRoomMoves', () => {
