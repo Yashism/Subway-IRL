@@ -1,0 +1,105 @@
+import type { Baseline } from './calibration';
+import type { Body } from './landmarks';
+import { BobTracker } from './signals';
+import type { Thresholds } from './thresholds';
+import type { JogStatus } from './types';
+
+const MIN_STEP_GAP_MS = 180;
+const FALLBACK_AFTER_MS = 1000;
+const ACTIVE_MS = 1000;
+
+/** Detects jogging in place and reports steps, cadence and time since the last step. */
+export class JogDetector {
+  readonly bob = new BobTracker();
+  private total = 0;
+  private stepTimes: number[] = [];
+  private lastStepT = -Infinity;
+  private lastPrimaryT = -Infinity;
+  private kneeUp = { L: false, R: false };
+  private lastKnee: 'L' | 'R' | null = null;
+  private wristSide: -1 | 0 | 1 = 0;
+  private wristSideT = -Infinity;
+
+  constructor(private th: Thresholds) {}
+
+  reset(): void {
+    this.bob.reset();
+    this.total = 0;
+    this.stepTimes = [];
+    this.lastStepT = -Infinity;
+    this.lastPrimaryT = -Infinity;
+    this.kneeUp = { L: false, R: false };
+    this.lastKnee = null;
+    this.wristSide = 0;
+    this.wristSideT = -Infinity;
+  }
+
+  update(body: Body, base: Baseline, t: number, sens: number): boolean {
+    const full = base.mode === 'full';
+    const unit = full ? base.torso : base.shoulderWidth;
+    const height = -(full ? body.hip.y : body.shoulder.y) / unit;
+    const bobStep = this.bob.update(height, t, this.th.bobMinAmp / sens, this.th.bobMaxStepGapMs, this.th.bobMaxSwing);
+    const primary = full ? this.kneeStep(body, base, sens) : this.wristStep(body, base, t, sens);
+    if (primary) {
+      this.lastPrimaryT = t;
+      return this.addStep(t);
+    }
+    if (bobStep && t - this.lastPrimaryT > FALLBACK_AFTER_MS) return this.addStep(t);
+    return false;
+  }
+
+  status(t: number): JogStatus {
+    const ms = t - this.lastStepT;
+    const n = this.stepTimes.length;
+    const cadence = n >= 2 ? ((n - 1) / (this.stepTimes[n - 1] - this.stepTimes[0])) * 60000 : 0;
+    return {
+      active: ms < ACTIVE_MS,
+      cadenceSpm: ms < ACTIVE_MS ? Math.round(cadence) : 0,
+      msSinceStep: ms,
+      steps: this.total,
+    };
+  }
+
+  private addStep(t: number): boolean {
+    if (t - this.lastStepT < MIN_STEP_GAP_MS) return false;
+    this.lastStepT = t;
+    this.total++;
+    this.stepTimes.push(t);
+    while (this.stepTimes.length && t - this.stepTimes[0] > 3000) this.stepTimes.shift();
+    return true;
+  }
+
+  private kneeStep(body: Body, base: Baseline, sens: number): boolean {
+    let stepped = false;
+    for (const side of ['L', 'R'] as const) {
+      const knee = side === 'L' ? body.kneeL : body.kneeR;
+      const rest = side === 'L' ? base.kneeRelL : base.kneeRelR;
+      if (!knee || rest === null) {
+        this.kneeUp[side] = false;
+        continue;
+      }
+      const lift = (rest - (knee.y - body.hip.y)) / base.torso;
+      if (!this.kneeUp[side] && lift > this.th.kneeLift / sens) {
+        this.kneeUp[side] = true;
+        if (this.lastKnee !== side) {
+          this.lastKnee = side;
+          stepped = true;
+        }
+      } else if (this.kneeUp[side] && lift < this.th.kneeRelease / sens) {
+        this.kneeUp[side] = false;
+      }
+    }
+    return stepped;
+  }
+
+  private wristStep(body: Body, base: Baseline, t: number, sens: number): boolean {
+    const d = (body.wristL.y - body.wristR.y) / base.shoulderWidth;
+    const a = this.th.wristPump / sens;
+    const side = d > a ? 1 : d < -a ? -1 : 0;
+    if (side === 0 || side === this.wristSide) return false;
+    const counted = this.wristSide !== 0 && t - this.wristSideT <= 1000;
+    this.wristSide = side;
+    this.wristSideT = t;
+    return counted;
+  }
+}
