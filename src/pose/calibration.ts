@@ -39,7 +39,7 @@ export class Calibrator {
       return null;
     }
     const distance: DistanceHint =
-      body.torso < 0.1 ? 'closer' : forcedMode === 'full' && !body.lowerBodyVisible ? 'back' : 'ok';
+      body.torso < this.th.calibMinTorso ? 'closer' : forcedMode === 'full' && !body.lowerBodyVisible ? 'back' : 'ok';
     if (distance !== 'ok') {
       this.samples = [];
       this.state = { progress: 0, bodyVisible: true, distance };

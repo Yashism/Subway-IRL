@@ -36,6 +36,8 @@ export const DEFAULT_THRESHOLDS = {
   lostMs: 1000,
   calibHoldMs: 2000,
   calibStill: 0.15,
+  calibMinTorso: 0.1,
+  driftSettle: 0.1,
 };
 
 export type Thresholds = typeof DEFAULT_THRESHOLDS;
