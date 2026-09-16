@@ -67,4 +67,14 @@ describe('driftBaseline', () => {
     expect(base.hip.y).toBeLessThan(0.62);
     expect(base.hip.x).toBeCloseTo(STAND.hipX, 6);
   });
+
+  it('also follows x when asked (small-room mode)', () => {
+    const base = baselineFor({ lowerVisible: false });
+    const body = toBody(synthPose({ lowerVisible: false, hipX: STAND.hipX + 0.05 }), ASPECT);
+    for (let i = 0; i < 90; i++) driftBaseline(base, body, 1000 / 30, 3000, true);
+    const eased = 0.05 * (1 - Math.exp(-1));
+    expect(base.hip.x - STAND.hipX).toBeCloseTo(eased, 3);
+    expect(base.shoulder.x - STAND.hipX).toBeCloseTo(eased, 3);
+    expect(base.nose.x - STAND.hipX).toBeCloseTo(eased, 3);
+  });
 });

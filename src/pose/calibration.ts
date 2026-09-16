@@ -72,10 +72,19 @@ export class Calibrator {
   }
 }
 
-/** Slowly follows posture changes (standing taller, stepping nearer) while the player is still. Never moves x. */
-export function driftBaseline(base: Baseline, body: Body, dtMs: number, tauMs = 3000): void {
+/**
+ * Slowly follows posture changes (standing taller, stepping nearer) while the player is still.
+ * x stays fixed unless `followX` is set: full-body lanes are absolute positions, but small-room
+ * mode has no absolute lanes, so its sideways reference may follow the player.
+ */
+export function driftBaseline(base: Baseline, body: Body, dtMs: number, tauMs = 3000, followX = false): void {
   const a = 1 - Math.exp(-dtMs / tauMs);
   const lerp = (p: number, q: number) => p + (q - p) * a;
+  if (followX) {
+    base.hip.x = lerp(base.hip.x, body.hip.x);
+    base.shoulder.x = lerp(base.shoulder.x, body.shoulder.x);
+    base.nose.x = lerp(base.nose.x, body.nose.x);
+  }
   base.hip.y = lerp(base.hip.y, body.hip.y);
   base.shoulder.y = lerp(base.shoulder.y, body.shoulder.y);
   base.nose.y = lerp(base.nose.y, body.nose.y);

@@ -123,7 +123,7 @@ export class PoseController {
       base.mode === 'full'
         ? Math.abs(body.hip.y - base.hip.y) < this.th.driftSettle * base.torso
         : Math.abs(body.shoulder.y - base.shoulder.y) < this.th.driftSettle * base.shoulderWidth;
-    if (prevT !== null && !jogging && moves.idle && settled) driftBaseline(base, body, t - prevT);
+    if (prevT !== null && !jogging && moves.idle && settled) driftBaseline(base, body, t - prevT, undefined, base.mode === 'small');
     return events;
   }
 

@@ -82,8 +82,9 @@ export class SmallRoomMoves {
 
   constructor(private th: Thresholds) {}
 
+  /** Also requires the lean to be re-armed, so a held lean is never absorbed by baseline drift. */
   get idle(): boolean {
-    return this.jump.isArmed && this.roll.isArmed;
+    return this.leanArmed && this.jump.isArmed && this.roll.isArmed;
   }
 
   reset(): void {
