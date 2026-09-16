@@ -19,8 +19,6 @@ export function jumpHeightAt(t: number, p: JumpProfile): number {
 const gravityOf = (p: JumpProfile) => (8 * p.height) / p.seconds ** 2;
 const launchSpeedOf = (p: JumpProfile) => (4 * p.height) / p.seconds;
 const clampLane = (n: number): Lane => (n < -1 ? -1 : n > 1 ? 1 : n) as Lane;
-/** A runner this far from its lane centre is visibly changing lanes. */
-const SETTLED_X = 0.3;
 
 export class Runner {
   lane: Lane = 0;
@@ -45,7 +43,7 @@ export class Runner {
   }
 
   get changingLane(): boolean {
-    return Math.abs(this.x - laneX(this.lane)) > SETTLED_X;
+    return Math.abs(this.x - laneX(this.lane)) > TUNING.laneSettleDistance;
   }
 
   setLane(lane: Lane): boolean {
@@ -106,7 +104,7 @@ export class Runner {
     }
 
     if (!this.airborne) {
-      if (surface >= this.y - 0.05) {
+      if (surface >= this.y - TUNING.surfaceSnap) {
         this.y = surface;
         return;
       }
