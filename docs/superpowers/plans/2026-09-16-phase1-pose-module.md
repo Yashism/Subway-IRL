@@ -1434,7 +1434,7 @@ export class JogDetector {
     const cadence = n >= 2 ? ((n - 1) / (this.stepTimes[n - 1] - this.stepTimes[0])) * 60000 : 0;
     return {
       active: ms < ACTIVE_MS,
-      cadenceSpm: ms < 1500 ? Math.round(cadence) : 0,
+      cadenceSpm: ms < ACTIVE_MS ? Math.round(cadence) : 0,
       msSinceStep: ms,
       steps: this.total,
     };
