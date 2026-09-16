@@ -29,6 +29,9 @@ export interface Body {
   shoulderR: Vec2;
   wristL: Vec2;
   wristR: Vec2;
+  /** Wrist landmark visibility is at least VISIBLE; a hidden wrist is never treated as raised. */
+  wristLVisible: boolean;
+  wristRVisible: boolean;
   kneeL: Vec2 | null;
   kneeR: Vec2 | null;
   torso: number;
@@ -60,6 +63,8 @@ export function toBody(pose: Pose, aspect: number): Body {
     shoulderR,
     wristL: pt(pose[LM.L_WRIST]),
     wristR: pt(pose[LM.R_WRIST]),
+    wristLVisible: vis(LM.L_WRIST) >= VISIBLE,
+    wristRVisible: vis(LM.R_WRIST) >= VISIBLE,
     kneeL: kneesVisible ? pt(pose[LM.L_KNEE]) : null,
     kneeR: kneesVisible ? pt(pose[LM.R_KNEE]) : null,
     torso: dist(shoulder, hip),

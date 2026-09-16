@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GestureDetector } from '../../src/pose/gestures';
-import { toBody } from '../../src/pose/landmarks';
+import { LM, toBody } from '../../src/pose/landmarks';
 import { DEFAULT_THRESHOLDS } from '../../src/pose/thresholds';
 import type { PoseEvent } from '../../src/pose/types';
 import { ASPECT, synthPose, type SynthParams } from '../helpers/synth';
@@ -36,6 +36,16 @@ describe('GestureDetector', () => {
     const g = new GestureDetector(DEFAULT_THRESHOLDS);
     run(g, 0, 500, 'right-up');
     run(g, 500, 550, 'down');
+    expect(g.startProgress).toBe(0);
+  });
+
+  it('ignores a raised right wrist that the model cannot see', () => {
+    const g = new GestureDetector(DEFAULT_THRESHOLDS);
+    const pose = synthPose({ arms: 'right-up' });
+    pose[LM.R_WRIST] = { ...pose[LM.R_WRIST], visibility: 0.1 };
+    const out: PoseEvent[] = [];
+    for (let t = 0; t < 2000; t += 1000 / 30) out.push(...g.update(toBody(pose, ASPECT), t));
+    expect(out).toEqual([]);
     expect(g.startProgress).toBe(0);
   });
 

@@ -1,7 +1,7 @@
 import { Calibrator, driftBaseline, type Baseline } from './calibration';
 import { GestureDetector } from './gestures';
 import { JogDetector } from './jog';
-import { dist, toBody, type Body } from './landmarks';
+import { dist, toBody, VISIBLE, type Body } from './landmarks';
 import { FullBodyMoves, SmallRoomMoves } from './moves';
 import { PoseSmoother } from './oneEuro';
 import { DEFAULT_THRESHOLDS, type Thresholds } from './thresholds';
@@ -79,7 +79,9 @@ export class PoseController {
     this.now = t;
     this.lastSeenT ??= t;
 
-    const raw = this.pickPose(frame);
+    let raw = this.pickPose(frame);
+    // A pose the model barely believes in is treated as no pose: it must not drive moves.
+    if (raw && toBody(raw, frame.aspect).confidence < VISIBLE) raw = null;
     if (!raw) {
       this.pose = null;
       this.body = null;

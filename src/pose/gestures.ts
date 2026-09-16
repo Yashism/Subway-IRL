@@ -2,7 +2,10 @@ import type { Body } from './landmarks';
 import type { Thresholds } from './thresholds';
 import type { PoseEvent } from './types';
 
-/** Hand gestures: both hands up activates the hoverboard; holding the right hand up means start. */
+/**
+ * Hand gestures: both hands up activates the hoverboard; holding the right hand up means start.
+ * A wrist only counts as raised when the model can see it; a hidden wrist counts as down.
+ */
 export class GestureDetector {
   startProgress = 0;
   private hoverSince: number | null = null;
@@ -22,10 +25,10 @@ export class GestureDetector {
 
   update(b: Body, t: number): PoseEvent[] {
     const events: PoseEvent[] = [];
-    const leftDown = b.wristL.y > b.shoulderL.y;
-    const rightDown = b.wristR.y > b.shoulderR.y;
+    const leftDown = !b.wristLVisible || b.wristL.y > b.shoulderL.y;
+    const rightDown = !b.wristRVisible || b.wristR.y > b.shoulderR.y;
 
-    const bothUp = b.wristL.y < b.nose.y && b.wristR.y < b.nose.y;
+    const bothUp = b.wristLVisible && b.wristRVisible && b.wristL.y < b.nose.y && b.wristR.y < b.nose.y;
     if (!bothUp) {
       this.hoverSince = null;
       if (leftDown || rightDown) this.hoverArmed = true;
