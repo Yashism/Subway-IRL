@@ -26,6 +26,7 @@ export class LivePoseSource implements PoseSource {
   private startedAt = 0;
   private slowSince: number | null = null;
   private fallingBack = false;
+  private switching = false;
 
   constructor(
     private video: HTMLVideoElement,
@@ -165,7 +166,8 @@ export class LivePoseSource implements PoseSource {
   }
 
   private async switchToLite(): Promise<void> {
-    if (this.fallingBack) return;
+    if (this.switching || this.fallingBack || this.abortIfStopped()) return;
+    this.switching = true;
     console.warn(`Pose detection below ${SLOW_FPS} fps; switching to the lite model`);
     this.slowSince = null;
     this.busy = true;
@@ -173,8 +175,10 @@ export class LivePoseSource implements PoseSource {
       if (this.worker) {
         try {
           await this.initWorker('lite');
+          if (this.abortIfStopped()) return;
           this.backend = 'worker-gpu-lite';
         } catch (err) {
+          if (this.abortIfStopped()) return;
           // The worker is unusable; drop to the main thread (CPU lite is acceptable here).
           await this.fallBackToMainThread(err);
         }
@@ -182,13 +186,17 @@ export class LivePoseSource implements PoseSource {
         try {
           this.landmarker?.close();
           this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'GPU' });
+          if (this.abortIfStopped()) return;
           this.backend = 'main-gpu-lite';
         } catch (err) {
+          if (this.abortIfStopped()) return;
           console.warn('GPU lite pose model unavailable, falling back to CPU lite:', err);
           try {
             this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU' });
+            if (this.abortIfStopped()) return;
             this.backend = 'main-cpu-lite';
           } catch (err2) {
+            if (this.abortIfStopped()) return;
             // Both lite attempts failed: don't leave `landmarker` pointing at the closed
             // instance above (grab() would call detectForVideo on it and throw). Surface
             // the failure instead of relabelling a backend that no longer exists.
@@ -200,6 +208,7 @@ export class LivePoseSource implements PoseSource {
       }
     } finally {
       this.busy = false;
+      this.switching = false;
     }
   }
 
@@ -210,7 +219,7 @@ export class LivePoseSource implements PoseSource {
    * instead of silently stalling.
    */
   private async fallBackToMainThread(reason: unknown): Promise<void> {
-    if (this.fallingBack) return;
+    if (this.fallingBack || this.abortIfStopped()) return;
     this.fallingBack = true;
     this.busy = true;
     console.warn('Pose worker failed, falling back to the main thread:', reason);
@@ -219,13 +228,17 @@ export class LivePoseSource implements PoseSource {
     try {
       this.landmarker?.close();
       this.landmarker = await createLandmarker({ variant: 'full', delegate: 'GPU' });
+      if (this.abortIfStopped()) return;
       this.backend = 'main-gpu-full';
     } catch (err) {
+      if (this.abortIfStopped()) return;
       console.warn('GPU pose model unavailable, using CPU lite:', err);
       try {
         this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU' });
+        if (this.abortIfStopped()) return;
         this.backend = 'main-cpu-lite';
       } catch (err2) {
+        if (this.abortIfStopped()) return;
         this.landmarker = null;
         this.backend = 'failed';
         console.error('Pose detection failed on every backend:', err2);
@@ -234,5 +247,19 @@ export class LivePoseSource implements PoseSource {
       this.busy = false;
       this.fallingBack = false;
     }
+  }
+
+  /**
+   * If stop() ran while a backend switch was awaiting an init, undo whatever that await
+   * just produced (a worker or landmarker nothing will otherwise close) instead of letting
+   * it overwrite the null `stop()` left behind. Returns true when the caller should bail.
+   */
+  private abortIfStopped(): boolean {
+    if (this.running) return false;
+    this.worker?.terminate();
+    this.worker = null;
+    this.landmarker?.close();
+    this.landmarker = null;
+    return true;
   }
 }
