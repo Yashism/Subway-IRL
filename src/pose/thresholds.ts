@@ -1,7 +1,9 @@
 /**
  * Detection thresholds. Distances are in torso lengths (full-body mode) or shoulder widths
- * (small-room mode), angles in degrees, times in milliseconds. Magnitudes are divided by the
- * sensitivity setting, so sensitivity > 1 makes moves easier to trigger.
+ * (small-room mode), angles in degrees, times in milliseconds. Move-detection magnitudes (lanes,
+ * jump, roll, lean, duck, jogging) are divided by the sensitivity setting, so sensitivity > 1
+ * makes moves easier to trigger. Calibration (calib*), the baseline drift gate (driftSettle) and
+ * the bob swing sanity cap (bobMaxSwing) are not scaled.
  */
 export const DEFAULT_THRESHOLDS = {
   // full-body
