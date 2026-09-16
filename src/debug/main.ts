@@ -1,7 +1,7 @@
 import { describeCameraError, isIrCamera, listCameras, openCamera, pickDefaultCamera } from '../pose/camera';
 import { PoseController } from '../pose/controller';
 import { FixtureRecorder } from '../pose/fixtures';
-import { LivePoseSource } from '../pose/liveSource';
+import { LivePoseSource, MODEL_LOAD_FAILED } from '../pose/liveSource';
 import type { PoseSource } from '../pose/poseSource';
 import { ReplayPoseSource } from '../pose/replaySource';
 import { DEFAULT_THRESHOLDS, type Thresholds } from '../pose/thresholds';
@@ -143,31 +143,56 @@ async function fillCameras(activeId: string | undefined): Promise<void> {
   );
 }
 
+const stopStream = (s: MediaStream | null) => s?.getTracks().forEach((t) => t.stop());
+/** Bumped by every startCamera call, so an older call that is still awaiting can tell it was superseded. */
+let startGen = 0;
+
 async function startCamera(deviceId?: string): Promise<void> {
+  const gen = ++startGen;
   source?.stop();
-  (video.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop());
+  source = null;
+  stopStream(video.srcObject as MediaStream | null);
+  video.srcObject = null;
+  let stream: MediaStream | null = null;
+  let live: LivePoseSource | null = null;
+  // After every await: if a newer call started, release whatever this call created and give up.
+  const superseded = () => {
+    if (gen === startGen) return false;
+    live?.stop();
+    stopStream(stream);
+    return true;
+  };
   try {
     showBanner('Starting camera…');
-    let stream = await openCamera(deviceId).catch(() => openCamera());
+    stream = await openCamera(deviceId).catch(() => openCamera());
+    if (superseded()) return;
     const cams = await listCameras();
+    if (superseded()) return;
     const pick = pickDefaultCamera(cams, deviceId ?? store.get(CAMERA_KEY));
     const activeId = stream.getVideoTracks()[0]?.getSettings().deviceId;
     if (pick && pick.deviceId !== activeId) {
-      stream.getTracks().forEach((t) => t.stop());
+      stopStream(stream);
+      stream = null;
       stream = await openCamera(pick.deviceId);
+      if (superseded()) return;
     }
     const finalId = stream.getVideoTracks()[0]?.getSettings().deviceId;
     if (finalId) store.set(CAMERA_KEY, finalId);
     video.srcObject = stream;
     await video.play();
+    if (superseded()) return;
     await fillCameras(finalId);
+    if (superseded()) return;
     showBanner('Loading pose model…');
-    const live = new LivePoseSource(video);
+    live = new LivePoseSource(video);
     source = live;
     await live.start(onFrame);
+    if (superseded()) return;
     showBanner(null);
   } catch (err) {
-    showBanner(describeCameraError(err));
+    if (superseded()) return;
+    const message = err instanceof Error ? err.message : '';
+    showBanner(message.startsWith(MODEL_LOAD_FAILED) ? message : describeCameraError(err));
   }
 }
 
