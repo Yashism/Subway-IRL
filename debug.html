@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Subway IRL — Pose Debug</title>
+    <link rel="stylesheet" href="/src/debug/debug.css" />
+  </head>
+  <body>
+    <main class="debug">
+      <section class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div id="banner" class="banner" hidden></div>
+      </section>
+      <aside class="panel">
+        <h1>Pose Debug</h1>
+        <label class="field">Camera <select id="camera"></select></label>
+        <div class="field-row">
+          <label class="field">Mode
+            <select id="mode">
+              <option value="">Auto</option>
+              <option value="full">Full body</option>
+              <option value="small">Small room</option>
+            </select>
+          </label>
+          <label class="field">Sensitivity <output id="sensOut">1.00</output>
+            <input id="sens" type="range" min="0.75" max="1.25" step="0.05" value="1" />
+          </label>
+        </div>
+        <div class="buttons">
+          <button id="recalibrate" type="button">Recalibrate</button>
+          <button id="record" type="button">● Record</button>
+        </div>
+        <dl id="status" class="status"></dl>
+        <details>
+          <summary>Thresholds</summary>
+          <div id="thresholds" class="thresholds"></div>
+        </details>
+        <h2>Events</h2>
+        <ol id="log" class="log"></ol>
+      </aside>
+    </main>
+    <script type="module" src="/src/debug/main.ts"></script>
+  </body>
+</html>
