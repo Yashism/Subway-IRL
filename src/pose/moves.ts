@@ -34,6 +34,11 @@ export class FullBodyMoves {
     return this.jump.isArmed && this.roll.isArmed && !this.roll.isDropping;
   }
 
+  /** Hips are dropped: a squat is building, or the player has not stood back up since a roll. */
+  get isDown(): boolean {
+    return !this.roll.isArmed || this.roll.isDropping;
+  }
+
   reset(): void {
     this.lane = 0;
     this.jump.reset();
@@ -85,6 +90,11 @@ export class SmallRoomMoves {
   /** Also requires the lean to be re-armed, so a held lean is never absorbed by baseline drift. */
   get idle(): boolean {
     return this.leanArmed && this.jump.isArmed && this.roll.isArmed;
+  }
+
+  /** The head is still down after a duck. */
+  get isDown(): boolean {
+    return !this.roll.isArmed;
   }
 
   reset(): void {

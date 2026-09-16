@@ -208,10 +208,11 @@ async function startReplay(name: string): Promise<void> {
   }
 }
 
-$<HTMLButtonElement>('recalibrate').addEventListener('click', () => ctrl.recalibrate());
+const recalibrate = () => ctrl.recalibrate().forEach(log);
+$<HTMLButtonElement>('recalibrate').addEventListener('click', recalibrate);
 modeSel.addEventListener('change', () => {
   ctrl.forcedMode = (modeSel.value || null) as PlayMode | null;
-  ctrl.recalibrate();
+  recalibrate();
 });
 sens.addEventListener('input', () => {
   ctrl.sensitivity = Number(sens.value);

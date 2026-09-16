@@ -55,4 +55,10 @@ export interface PoseStatus {
   startProgress: number;
   calibration: CalibrationState;
   pose: Pose | null;
+  /** Timestamp of the last frame given to update(), with or without a pose; null before the first. Lets the game detect a stalled stream. */
+  lastFrameT: number | null;
+  /** True while the player is down in a squat or duck (a roll in progress, or not yet stood back up). */
+  squatting: boolean;
+  /** Pose fps is below 15 after at least 2 s of frames. */
+  slowPose: boolean;
 }

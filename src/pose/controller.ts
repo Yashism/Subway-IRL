@@ -13,7 +13,16 @@ export interface PoseControllerOptions {
   forcedMode?: PlayMode | null;
 }
 
-/** Turns a stream of pose frames into game-agnostic move events and a status snapshot. */
+const SLOW_POSE_FPS = 15;
+const SLOW_POSE_AFTER_MS = 2000;
+
+/**
+ * Turns a stream of pose frames into game-agnostic move events and a status snapshot.
+ *
+ * `status.jog.msSinceStep` keeps counting through a lost/found gap. Losing tracking must never
+ * count as idle (spec §5.5), so the game should run its own idle clock that restarts on resume
+ * rather than using msSinceStep directly across a pause.
+ */
 export class PoseController {
   readonly th: Thresholds;
   sensitivity: number;
@@ -31,6 +40,7 @@ export class PoseController {
   private lastSeenT: number | null = null;
   private lost = false;
   private lastT: number | null = null;
+  private firstT: number | null = null;
   private fps = 0;
   private now = 0;
 
@@ -45,26 +55,39 @@ export class PoseController {
     this.small = new SmallRoomMoves(this.th);
   }
 
-  recalibrate(): void {
+  /** Forgets the baseline and move state. Returns a `lane: 0` event if the player was in a side lane. */
+  recalibrate(): PoseEvent[] {
+    const events: PoseEvent[] = this.full.lane !== 0 ? [{ type: 'lane', lane: 0 }] : [];
     this.baseline = null;
     this.calibrator.reset();
     this.jog.reset();
     this.full.reset();
     this.small.reset();
+    return events;
   }
 
   get status(): PoseStatus {
+    const poseFps = Math.round(this.fps);
+    const base = this.baseline;
     return {
       tracking: this.body !== null,
       calibrated: this.baseline !== null,
       mode: this.baseline?.mode ?? null,
       lane: this.full.lane,
-      poseFps: Math.round(this.fps),
+      poseFps,
       confidence: this.body?.confidence ?? 0,
       jog: this.jog.status(this.now),
       startProgress: this.gestures.startProgress,
       calibration: { ...this.calibrator.state },
       pose: this.pose,
+      lastFrameT: this.lastT,
+      squatting: base ? (base.mode === 'full' ? this.full : this.small).isDown : false,
+      slowPose:
+        this.firstT !== null &&
+        this.lastT !== null &&
+        this.lastT - this.firstT >= SLOW_POSE_AFTER_MS &&
+        poseFps > 0 &&
+        poseFps < SLOW_POSE_FPS,
     };
   }
 
@@ -76,6 +99,7 @@ export class PoseController {
       this.fps = this.fps ? this.fps * 0.9 + inst * 0.1 : inst;
     }
     this.lastT = t;
+    this.firstT ??= t;
     this.now = t;
     this.lastSeenT ??= t;
 
