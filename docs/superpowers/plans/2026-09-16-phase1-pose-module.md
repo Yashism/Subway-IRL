@@ -300,6 +300,7 @@ export const DEFAULT_THRESHOLDS = {
   bobMinAmp: 0.03,
   bobJumpFactor: 2.5,
   bobMaxStepGapMs: 700,
+  bobMaxSwing: 0.25,
   // gestures, tracking, calibration
   hoverHoldMs: 300,
   startHoldMs: 1500,
@@ -735,7 +736,7 @@ git commit -m "feat(pose): add One Euro landmark smoothing"
 **Interfaces:**
 - Produces:
   - `class TimeWindow(spanMs)`: `push(t, v)`, `clear()`, `size`, `mean()` (NaN when empty), `max()` (-Infinity when empty), `min()` (Infinity when empty)
-  - `class BobTracker`: `update(v, t, minAmp, maxGapMs): boolean` (true when a trough completes a step cycle), `amplitudeAt(t): number`, `reset()`. `v` is a height where bigger means higher. Hysteresis = `minAmp`; a counted swing must be ≥ `2*minAmp` and ≤ 0.25.
+  - `class BobTracker`: `update(v, t, minAmp, maxGapMs, maxSwing): boolean` (true when a trough completes a step cycle), `amplitudeAt(t): number`, `reset()`. `v` is a height where bigger means higher. Hysteresis = `minAmp`; a counted swing must be ≥ `2*minAmp` and ≤ `maxSwing` (callers pass `th.bobMaxSwing`, unscaled by sensitivity — it is a sanity cap, not a trigger).
   - `class JumpDetector`: `update(v, ref, t, minVel, minRise, rearm): boolean`, `isArmed`, `reset()`
   - `interface DropThresholds { drop; holdMs; headDrop; rearmDrop; rearmHead }`
   - `class DropDetector`: `update(drop, headDrop, t, th: DropThresholds): boolean`, `isArmed`, `isDropping`, `reset()`
@@ -773,7 +774,7 @@ describe('BobTracker', () => {
     const b = new BobTracker();
     let steps = 0;
     for (let t = 0; t < ms; t += 1000 / 30) {
-      if (b.update(-amp * Math.cos((2 * Math.PI * t) / 375), t, 0.03, 700)) steps++;
+      if (b.update(-amp * Math.cos((2 * Math.PI * t) / 375), t, 0.03, 700, 0.25)) steps++;
     }
     return { b, steps };
   };
@@ -892,8 +893,6 @@ export class TimeWindow {
   }
 }
 
-const MAX_BOB_SWING = 0.25;
-
 /** Follows the up/down bounce of a height signal and reports one step per bounce cycle. */
 export class BobTracker {
   private dir: 'up' | 'down' = 'up';
@@ -917,7 +916,7 @@ export class BobTracker {
     return this.swings.reduce((a, b) => a + b, 0) / this.swings.length / 2;
   }
 
-  update(v: number, t: number, minAmp: number, maxGapMs: number): boolean {
+  update(v: number, t: number, minAmp: number, maxGapMs: number, maxSwing: number): boolean {
     if (Number.isNaN(this.ext)) {
       this.ext = v;
       this.extT = t;
@@ -947,7 +946,7 @@ export class BobTracker {
     this.dir = 'up';
     this.ext = v;
     this.extT = t;
-    if (swing < 2 * minAmp || swing > MAX_BOB_SWING) return false;
+    if (swing < 2 * minAmp || swing > maxSwing) return false;
     const gap = troughT - this.lastTroughT;
     this.lastTroughT = troughT;
     if (gap > maxGapMs) return false;
@@ -1418,7 +1417,7 @@ export class JogDetector {
     const full = base.mode === 'full';
     const unit = full ? base.torso : base.shoulderWidth;
     const height = -(full ? body.hip.y : body.shoulder.y) / unit;
-    const bobStep = this.bob.update(height, t, this.th.bobMinAmp / sens, this.th.bobMaxStepGapMs);
+    const bobStep = this.bob.update(height, t, this.th.bobMinAmp / sens, this.th.bobMaxStepGapMs, this.th.bobMaxSwing);
     const primary = full ? this.kneeStep(body, base, sens) : this.wristStep(body, base, t, sens);
     if (primary) {
       this.lastPrimaryT = t;
