@@ -25,6 +25,7 @@ export class LivePoseSource implements PoseSource {
   private results: number[] = [];
   private startedAt = 0;
   private slowSince: number | null = null;
+  private fallingBack = false;
 
   constructor(
     private video: HTMLVideoElement,
@@ -55,6 +56,10 @@ export class LivePoseSource implements PoseSource {
     this.worker = null;
     this.landmarker?.close();
     this.landmarker = null;
+    this.busy = false;
+    this.results = [];
+    this.slowSince = null;
+    this.lastSent = 0;
   }
 
   private async initBackend(): Promise<void> {
@@ -92,6 +97,10 @@ export class LivePoseSource implements PoseSource {
         if (e.data.type === 'ready') {
           clearTimeout(timer);
           w.onmessage = (ev: MessageEvent<WorkerOut>) => this.onWorkerMessage(ev.data);
+          // A crash *after* init must not silently vanish: fail() above only rejects
+          // this init call's already-settled promise, so route later crashes through
+          // the same recovery path used for a fatal worker message.
+          w.onerror = (ev) => void this.fallBackToMainThread(ev.message || 'Pose worker crashed');
           resolve();
         } else if (e.data.type === 'error') {
           fail(e.data.message);
@@ -110,7 +119,15 @@ export class LivePoseSource implements PoseSource {
       this.busy = true;
       const worker = this.worker;
       createImageBitmap(this.video).then(
-        (bitmap) => worker.postMessage({ type: 'frame', bitmap, t: now } satisfies WorkerIn, [bitmap]),
+        (bitmap) => {
+          try {
+            worker.postMessage({ type: 'frame', bitmap, t: now } satisfies WorkerIn, [bitmap]);
+          } catch (err) {
+            bitmap.close();
+            this.busy = false;
+            console.warn('Could not send a frame to the pose worker:', err);
+          }
+        },
         () => (this.busy = false),
       );
     } else if (this.landmarker) {
@@ -148,23 +165,74 @@ export class LivePoseSource implements PoseSource {
   }
 
   private async switchToLite(): Promise<void> {
+    if (this.fallingBack) return;
     console.warn(`Pose detection below ${SLOW_FPS} fps; switching to the lite model`);
     this.slowSince = null;
     this.busy = true;
     try {
       if (this.worker) {
-        await this.initWorker('lite');
-        this.backend = 'worker-gpu-lite';
+        try {
+          await this.initWorker('lite');
+          this.backend = 'worker-gpu-lite';
+        } catch (err) {
+          // The worker is unusable; drop to the main thread (CPU lite is acceptable here).
+          await this.fallBackToMainThread(err);
+        }
       } else {
-        this.landmarker?.close();
-        this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'GPU' });
-        this.backend = 'main-gpu-lite';
+        try {
+          this.landmarker?.close();
+          this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'GPU' });
+          this.backend = 'main-gpu-lite';
+        } catch (err) {
+          console.warn('GPU lite pose model unavailable, falling back to CPU lite:', err);
+          try {
+            this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU' });
+            this.backend = 'main-cpu-lite';
+          } catch (err2) {
+            // Both lite attempts failed: don't leave `landmarker` pointing at the closed
+            // instance above (grab() would call detectForVideo on it and throw). Surface
+            // the failure instead of relabelling a backend that no longer exists.
+            this.landmarker = null;
+            this.backend = 'failed';
+            console.error('Pose detection failed on every backend:', err2);
+          }
+        }
       }
-    } catch (err) {
-      console.warn('Could not switch to the lite model:', err);
-      this.backend = this.backend.replace('-full', '-full-slow');
     } finally {
       this.busy = false;
+    }
+  }
+
+  /**
+   * Recovers from a fatal worker failure (a crash, or a failed re-init) by dropping to the
+   * main thread: GPU full, then CPU lite. Guarded against re-entry; leaves `backend` at
+   * 'failed' (and logs an error) if even CPU lite cannot start, so the failure is visible
+   * instead of silently stalling.
+   */
+  private async fallBackToMainThread(reason: unknown): Promise<void> {
+    if (this.fallingBack) return;
+    this.fallingBack = true;
+    this.busy = true;
+    console.warn('Pose worker failed, falling back to the main thread:', reason);
+    this.worker?.terminate();
+    this.worker = null;
+    try {
+      this.landmarker?.close();
+      this.landmarker = await createLandmarker({ variant: 'full', delegate: 'GPU' });
+      this.backend = 'main-gpu-full';
+    } catch (err) {
+      console.warn('GPU pose model unavailable, using CPU lite:', err);
+      try {
+        this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU' });
+        this.backend = 'main-cpu-lite';
+      } catch (err2) {
+        this.landmarker = null;
+        this.backend = 'failed';
+        console.error('Pose detection failed on every backend:', err2);
+      }
+    } finally {
+      this.busy = false;
+      this.fallingBack = false;
     }
   }
 }
