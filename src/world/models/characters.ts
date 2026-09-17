@@ -1431,12 +1431,209 @@ export function createDog(opts: CreateRunnerOptions = {}): CharacterRig {
 }
 
 // ---------------------------------------------------------------------------
-// Optional GLB path (placeholder until wired below)
+// Optional GLB path: CC0 / CC-BY Quaternius models (see public/models/CREDITS.md).
+// The procedural rig is shown (and animated) until the GLB has loaded.
 // ---------------------------------------------------------------------------
 
-function createGlbRig(kind: 'runner' | 'inspector' | 'dog'): CharacterRig {
-  // Filled in by the GLB loader section; falls back to procedural.
-  return kind === 'runner' ? createRunner() : kind === 'inspector' ? createInspector() : createDog();
+type GlbKind = 'runner' | 'inspector' | 'dog';
+
+interface GlbSpec {
+  url: string;
+  height: number;
+  /** Clip-name suffix per action, and how to time it. */
+  clips: Record<CharacterAction, { name: string; mode: 'cycle' | 'once' | 'airborne' | 'loop'; seconds?: number }>;
+  /** Material name -> tint (multiplies nothing: replaces the colour). */
+  tints: Record<string, number>;
+}
+
+const GLB_SPECS: Record<GlbKind, GlbSpec> = {
+  runner: {
+    url: 'models/runner-quaternius.glb',
+    height: 1.8,
+    clips: {
+      idle: { name: 'Idle_Loop', mode: 'loop' },
+      run: { name: 'Sprint_Loop', mode: 'cycle' },
+      jump: { name: 'Jump_Loop', mode: 'airborne' },
+      roll: { name: 'Roll', mode: 'once', seconds: 0.6 },
+      fall: { name: 'Jump_Loop', mode: 'loop' },
+      stumble: { name: 'Hit_Chest', mode: 'once', seconds: 0.35 },
+      caught: { name: 'Hit_Head', mode: 'once', seconds: 0.4 },
+      hover: { name: 'Crouch_Idle_Loop', mode: 'loop' },
+      fly: { name: 'Swim_Fwd_Loop', mode: 'loop' },
+    },
+    tints: { M_Main: C.hoodie, M_Joints: C.jeans },
+  },
+  inspector: {
+    url: 'models/inspector-quaternius.glb',
+    height: 1.85,
+    clips: {
+      idle: { name: 'Man_Idle', mode: 'loop' },
+      run: { name: 'Man_Run', mode: 'cycle' },
+      jump: { name: 'Man_Jump', mode: 'airborne' },
+      roll: { name: 'Man_Jump', mode: 'once', seconds: 0.6 },
+      fall: { name: 'Man_Death', mode: 'once' },
+      stumble: { name: 'Man_Standing', mode: 'once', seconds: 0.35 },
+      caught: { name: 'Man_Punch', mode: 'once' },
+      hover: { name: 'Man_Standing', mode: 'loop' },
+      fly: { name: 'Man_RunningJump', mode: 'loop' },
+    },
+    tints: { Shirt: TC.coat, Pants: TC.trousers, Skin: TC.skin, Hair: TC.grey, Details: TC.gold },
+  },
+  dog: {
+    url: 'models/dog-quaternius.glb',
+    height: 0.62,
+    clips: {
+      idle: { name: 'Idle', mode: 'loop' },
+      run: { name: 'Run', mode: 'cycle' },
+      jump: { name: 'Jump_Loop', mode: 'airborne' },
+      roll: { name: 'Run', mode: 'cycle' },
+      fall: { name: 'Jump_Loop', mode: 'loop' },
+      stumble: { name: 'Run', mode: 'cycle' },
+      caught: { name: 'Headbutt', mode: 'loop' },
+      hover: { name: 'Run', mode: 'cycle' },
+      fly: { name: 'Run', mode: 'cycle' },
+    },
+    tints: { AtlasMaterial: 0xffe2b8 },
+  },
+};
+
+const OUTLINE_COLOR_GLB: Record<GlbKind, number> = { runner: 0x171717, inspector: 0x181818, dog: 0x191919 };
+
+class GlbRig implements CharacterRig {
+  readonly root = new THREE.Group();
+  readonly ready: Promise<void>;
+  private model: THREE.Object3D | null = null;
+  private mixer: THREE.AnimationMixer | null = null;
+  private readonly actions = new Map<CharacterAction, THREE.AnimationAction>();
+  private current: THREE.AnimationAction | null = null;
+  private currentAction: CharacterAction | null = null;
+  private leanS = 0;
+  private lift = 0;
+  private baseY = 0;
+
+  constructor(
+    private readonly kind: GlbKind,
+    private readonly fallback: CharacterRig,
+  ) {
+    this.root.name = `${kind}-glb`;
+    this.root.add(fallback.root);
+    this.ready = this.load().catch((err: unknown) => {
+      console.warn(`[characters] ${kind} GLB failed, keeping the procedural rig`, err);
+    });
+  }
+
+  private async load(): Promise<void> {
+    const spec = GLB_SPECS[this.kind];
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const base = typeof import.meta.env !== 'undefined' ? import.meta.env.BASE_URL : '/';
+    const gltf = await new GLTFLoader().loadAsync(base + spec.url);
+    const model = gltf.scene;
+    // glTF characters face +z; ours face -z.
+    model.rotation.y = Math.PI;
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model, true);
+    const s = spec.height / Math.max(1e-6, box.max.y - box.min.y);
+    model.scale.setScalar(s);
+    model.position.y = this.baseY = -box.min.y * s;
+
+    const mats = new Map<THREE.Material, THREE.Material>();
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const swap = (m: THREE.Material): THREE.Material => {
+        let out = mats.get(m);
+        if (!out) {
+          const src = m as THREE.MeshStandardMaterial;
+          const tint = spec.tints[src.name];
+          out = toonMaterial({
+            color: tint ?? src.color,
+            map: src.map ?? null,
+            vertexColors: !!mesh.geometry.attributes.color,
+          });
+          mats.set(m, out);
+        }
+        return out;
+      };
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
+    });
+    // Skinned vertices live in armature units (often centimetres), so express the
+    // outline thickness in geometry units: world thickness / (world size / geometry size).
+    let geoSize = 0;
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.computeBoundingBox();
+      const g = mesh.geometry.boundingBox!.getSize(new THREE.Vector3());
+      geoSize = Math.max(geoSize, g.x, g.y, g.z);
+    });
+    const worldSize = Math.max(...box.getSize(new THREE.Vector3()).multiplyScalar(s).toArray());
+    const thickness = (this.kind === 'dog' ? OUTLINE_DOG : OUTLINE_HUMAN) * (geoSize / Math.max(1e-6, worldSize));
+    // A distinct colour per kind keeps addOutline's per-colour material cache separate.
+    addOutline(model, thickness, OUTLINE_COLOR_GLB[this.kind]);
+    enableShadows(model, true, false);
+    model.traverse((o) => (o.frustumCulled = false));
+
+    const mixer = new THREE.AnimationMixer(model);
+    const find = (suffix: string) => gltf.animations.find((c) => c.name.split('|').pop() === suffix);
+    for (const action of Object.keys(spec.clips) as CharacterAction[]) {
+      const c = spec.clips[action];
+      const clip = find(c.name) ?? find(spec.clips.run.name);
+      if (!clip) continue;
+      const a = mixer.clipAction(clip);
+      if (c.mode === 'once') {
+        a.setLoop(THREE.LoopOnce, 1);
+        a.clampWhenFinished = true;
+      }
+      if (c.seconds) a.timeScale = clip.duration / c.seconds;
+      this.actions.set(action, a);
+    }
+    this.model = model;
+    this.mixer = mixer;
+    this.root.add(model);
+    this.fallback.root.visible = false;
+  }
+
+  update(dt: number, state: CharacterState): void {
+    if (!(dt > 0)) dt = 0;
+    if (dt > 0.1) dt = 0.1;
+    if (!this.model || !this.mixer) {
+      this.fallback.update(dt, state);
+      return;
+    }
+    const spec = GLB_SPECS[this.kind].clips[state.action] ?? GLB_SPECS[this.kind].clips.run;
+    const next = this.actions.get(state.action) ?? this.actions.get('run');
+    if (next && state.action !== this.currentAction) {
+      next.reset();
+      next.enabled = true;
+      next.setEffectiveWeight(1);
+      next.play();
+      if (this.current && this.current !== next) this.current.crossFadeTo(next, FADE, false);
+      this.current = next;
+      this.currentAction = state.action;
+    }
+    if (next) {
+      if (spec.mode === 'cycle') {
+        next.timeScale = next.getClip().duration * 2.35 * runPlaybackRate(state.speed);
+      } else if (spec.mode === 'airborne') {
+        next.paused = false;
+        next.timeScale = 0;
+        next.time = clamp01(state.airborneT ?? 0.5) * next.getClip().duration;
+      }
+    }
+    this.mixer.update(dt);
+    this.leanS += (clampLean(state.lean) - this.leanS) * (1 - Math.exp(-dt / 0.05));
+    this.model.rotation.z = -this.leanS * 0.3;
+    const lift = state.action === 'hover' ? HOVER_LIFT : 0;
+    this.lift += (lift - this.lift) * (1 - Math.exp(-dt / 0.05));
+    this.model.position.y = this.baseY + this.lift;
+  }
+}
+
+function createGlbRig(kind: GlbKind): CharacterRig {
+  const fallback = kind === 'runner' ? createRunner() : kind === 'inspector' ? createInspector() : createDog();
+  const rig = new GlbRig(kind, fallback);
+  rig.root.userData.rig = rig;
+  return rig;
 }
 
 /** Triangle count of a rig's visible meshes (excluding outline hulls). */

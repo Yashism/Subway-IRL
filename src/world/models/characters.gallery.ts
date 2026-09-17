@@ -9,6 +9,7 @@ const style = params.get('style') === 'glb' ? 'glb' : 'procedural';
 const frozen = params.has('t') ? Number(params.get('t')) : null;
 
 const SPEED = 20;
+let pending = 0;
 type Driver = (t: number) => { action: CharacterAction; lean: number; airborneT?: number; y?: number };
 
 function rigOf(o: THREE.Object3D): CharacterRig {
@@ -34,6 +35,15 @@ function drive(o: THREE.Object3D, t: number, dt: number, fn: Driver): void {
   }
   if (o.userData.frozenDone) return;
   o.userData.frozenDone = true;
+  if (rig.ready && !o.userData.readyHooked) {
+    // Re-simulate once an async (GLB) rig has loaded.
+    o.userData.readyHooked = true;
+    pending++;
+    void rig.ready.then(() => {
+      o.userData.frozenDone = false;
+      if (--pending === 0) (globalThis as { __charactersReady?: boolean }).__charactersReady = true;
+    });
+  }
   const n = Math.round(frozen * 60);
   for (let i = 0; i <= n; i++) step(i / 60, 1 / 60);
 }
