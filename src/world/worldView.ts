@@ -48,8 +48,10 @@ const VIEW_BEHIND = 8;
  * decals, un-outlined detail meshes) are a few pixels and fogged, so skip their draw calls.
  */
 const LOD_FAR = 55;
-/** Parts whose bounding sphere is smaller than this (m) count as small. */
-const SMALL_PART = 0.35;
+/** Parts whose bounding sphere is smaller than this (m) count as small (lamps, plates, meters). */
+const SMALL_PART = 0.55;
+/** Parts smaller than this (m) cast no shadow: a few texels in the shadow map, one draw call each. */
+const SHADOW_MIN_PART = 0.6;
 const FOG_NEAR = 60;
 const FOG_FAR = 170;
 const SCENERY_AHEAD = 175;
@@ -125,13 +127,35 @@ function isMinorPart(o: THREE.Object3D): boolean {
   return !!o.userData.noOutline && mat.vertexColors === true && !mat.map && mat.emissive?.getHex() === 0;
 }
 
-function pooled(object: THREE.Object3D): Pooled {
+/**
+ * Every shadow caster is drawn a second time in the shadow pass, so only parts whose shadow
+ * shows cast: not LOD-minor parts, not tiny ones, and not a train's flush decals (end faces,
+ * lamps), which sit inside the body's own shadow.
+ */
+function castsShadow(o: THREE.Mesh, minor: boolean, train: boolean): boolean {
+  if (!o.castShadow || minor) return false;
+  if (train && o.userData.noOutline) return false;
+  const g = o.geometry;
+  if (!g.boundingSphere) g.computeBoundingSphere();
+  const scale = o.getWorldScale(new THREE.Vector3());
+  return g.boundingSphere!.radius * Math.max(scale.x, scale.y, scale.z) >= SHADOW_MIN_PART;
+}
+
+function pooled(object: THREE.Object3D, train = false): Pooled {
   const root = new THREE.Group();
   root.add(object);
   root.updateMatrixWorld(true);
   const minor: THREE.Object3D[] = [];
   root.traverse((o) => {
-    if (isMinorPart(o)) minor.push(o);
+    const isMinor = isMinorPart(o);
+    if (isMinor) minor.push(o);
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.castShadow = castsShadow(mesh, isMinor, train);
+    // A transparent double-sided material is drawn in two passes (back faces, then front);
+    // for small tinted glass one pass looks the same and saves a draw call.
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) if (m.transparent && m.side === THREE.DoubleSide) m.forceSinglePass = true;
   });
   root.visible = false;
   return { root, minor, near: true };
@@ -285,7 +309,7 @@ export class WorldView {
     scene.add(this.sky, this.skyline);
 
     // Track, overhead wires, side scenery.
-    this.side = createSideScenery(options.seed ?? 1, { behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD });
+    this.side = createSideScenery(options.seed ?? 1, { behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD, lodFar: LOD_FAR });
     this.bed = createTrackBed(SCENERY_BEHIND, SCENERY_AHEAD);
     this.ohe = createCatenary({ behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD, signalFilter: (s) => !this.side.isStation(s) });
     scene.add(this.bed.root, this.ohe.root, this.side.root);
@@ -426,7 +450,7 @@ export class WorldView {
         for (let v = 0; v < n; v++) {
           const key = obstacleKey(kind, v, len);
           // Small props can repeat within one chunk (a row of banners), so keep two ready.
-          this.obstaclePool.warm(key, () => pooled(buildObstacle(kind, v, len)), isTrain(kind) ? 1 : 2);
+          this.obstaclePool.warm(key, () => pooled(buildObstacle(kind, v, len), isTrain(kind)), isTrain(kind) ? 1 : 2);
         }
       }
     }
@@ -578,7 +602,7 @@ export class WorldView {
       if (!a) {
         const variant = obstacleVariant(o.kind, o.id);
         const key = obstacleKey(o.kind, variant, o.length);
-        const item = this.obstaclePool.acquire(key, () => pooled(buildObstacle(o.kind, variant, o.length)));
+        const item = this.obstaclePool.acquire(key, () => pooled(buildObstacle(o.kind, variant, o.length), isTrain(o.kind)));
         item.root.visible = true;
         const sz = o.kind === 'ramp' ? o.length / OBSTACLES.ramp.length : 1;
         item.root.scale.set(1, 1, sz);

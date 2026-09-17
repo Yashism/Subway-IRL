@@ -1500,6 +1500,9 @@ function wallParts(length: number, seed: number): Parts {
   const pl = length / panels;
   const rows = wallRows(seed);
   b.box(cm, 0.25, 2.8, length, -0.245, 1.1, -length / 2, { color: '#a39a8b' });
+  // Baked ground contact (the wall casts no real shadow): grime at its foot, a dark band beside it.
+  b.box(cm, 0.03, 0.42, length, -0.1, 0.21, -length / 2, { color: '#4a4238' });
+  b.box(cm, 0.4, 0.02, length, 0.2, 0.012, -length / 2, { color: '#5e4a36' });
   for (let i = 0; i < panels; i++) {
     b.quad(wallMat(), pl, 2.5, -0.115, 1.25, -(i + 0.5) * pl, HALF_PI, { uv: wallCell(rows[Math.floor(i / 4) % 2], i % 4) });
   }
@@ -2234,8 +2237,12 @@ function partsForKey(key: string): Parts {
   }
 }
 
-const CAST = /^(wall|platform|fob|billboardFrame|tree)/;
 const RECEIVE = /^(wall|platform|fence|fob)/;
+/**
+ * Detail and sign parts are a few pixels and fogged far away: only instances whose near end is
+ * within `lodFar` draw them, so a variant with no nearby placement skips those draw calls.
+ */
+const MINOR_PART = /^(detail|signs)$/;
 
 export interface SideScenery {
   root: THREE.Group;
@@ -2246,18 +2253,23 @@ export interface SideScenery {
 }
 
 interface InstSet {
-  meshes: THREE.InstancedMesh[];
+  major: THREE.InstancedMesh[];
+  minor: THREE.InstancedMesh[];
   count: number;
+  nearCount: number;
   cap: number;
 }
 
 /**
  * Both sides of the corridor from a precomputed plan. Each (piece, variant) is one set
  * of InstancedMeshes (one per material), so draw calls depend on variant count only.
+ * Nothing here casts shadows (each caster would be drawn again in the shadow pass);
+ * ground contact is baked into the pieces instead.
  */
-export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number } = {}): SideScenery {
+export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number; lodFar?: number } = {}): SideScenery {
   const behind = o.behind ?? VIEW_BEHIND;
   const ahead = o.ahead ?? VIEW_AHEAD;
+  const lodFar = o.lodFar ?? Infinity;
   const plan = planCorridor(seed);
   const root = new THREE.Group();
   root.name = 'sideScenery';
@@ -2266,16 +2278,16 @@ export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number
   const keys = [...new Set(plan.placements.flatMap((p) => p.keys))].sort();
   for (const key of keys) {
     const cap = Math.max(1, maxConcurrent(plan, key, behind, ahead));
-    const set: InstSet = { meshes: [], count: 0, cap };
+    const set: InstSet = { major: [], minor: [], count: 0, nearCount: 0, cap };
     for (const part of partsForKey(key)) {
       const mesh = new THREE.InstancedMesh(part.geometry, part.material, cap);
       mesh.name = `${key}:${part.material.name}`;
       mesh.frustumCulled = false;
       mesh.count = 0;
       mesh.visible = false;
-      mesh.castShadow = CAST.test(key);
+      mesh.castShadow = false;
       mesh.receiveShadow = RECEIVE.test(key);
-      set.meshes.push(mesh);
+      (MINOR_PART.test(part.material.name) ? set.minor : set.major).push(mesh);
       meshes.push(mesh);
       root.add(mesh);
     }
@@ -2290,12 +2302,24 @@ export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number
     obj.rotation.set(0, p.rotY, 0);
     obj.scale.setScalar(p.scale);
     obj.updateMatrix();
+    const near = p.s0 + off - runner < lodFar;
     const list = setsFor[p.index];
     for (let i = 0; i < list.length; i++) {
       const set = list[i];
       if (set.count >= set.cap) continue;
-      for (let j = 0; j < set.meshes.length; j++) set.meshes[j].setMatrixAt(set.count, obj.matrix);
+      for (let j = 0; j < set.major.length; j++) set.major[j].setMatrixAt(set.count, obj.matrix);
       set.count++;
+      if (!near) continue;
+      for (let j = 0; j < set.minor.length; j++) set.minor[j].setMatrixAt(set.nearCount, obj.matrix);
+      set.nearCount++;
+    }
+  };
+  const show = (list: THREE.InstancedMesh[], n: number) => {
+    for (let j = 0; j < list.length; j++) {
+      const m = list[j];
+      m.count = n;
+      m.visible = n > 0;
+      if (n > 0) m.instanceMatrix.needsUpdate = true;
     }
   };
   return {
@@ -2304,16 +2328,12 @@ export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number
     meshes,
     update(runnerS: number) {
       runner = runnerS;
-      for (let i = 0; i < setList.length; i++) setList[i].count = 0;
+      for (let i = 0; i < setList.length; i++) setList[i].count = setList[i].nearCount = 0;
       forEachVisible(plan, runnerS - behind, runnerS + ahead, visit);
       for (let i = 0; i < setList.length; i++) {
         const set = setList[i];
-        for (let j = 0; j < set.meshes.length; j++) {
-          const m = set.meshes[j];
-          m.count = set.count;
-          m.visible = set.count > 0;
-          m.instanceMatrix.needsUpdate = true;
-        }
+        show(set.major, set.count);
+        show(set.minor, set.nearCount);
       }
     },
     isStation: (s: number) => isStationAt(plan, s),
