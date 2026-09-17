@@ -43,6 +43,8 @@ export const TUNING = {
   coinHeight: 0.8,
   pickupChance: 0.35,
   obstacleHalfWidth: 0.8,
+  /** A roof holds the runner up to half a lane either side, so neighbouring roofs join up. */
+  roofSupportHalfWidth: LANE_WIDTH / 2,
   stepUp: 0.5,
   rampLevelEarly: 1,
   coinReach: 1,

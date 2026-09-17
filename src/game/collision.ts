@@ -17,7 +17,9 @@ export function overlaps(r: RunnerBox, o: Obstacle): boolean {
   const hd = TUNING.runnerHalfDepth;
   if (r.s + hd <= o.front || r.s - hd >= o.front + o.length) return false;
   if (!nearLane(r.x, o.lane, TUNING.obstacleHalfWidth + TUNING.runnerHalfWidth)) return false;
-  return r.y < info.yMax && r.y + r.height > info.yMin;
+  // A runner a hair below a roof it is stepping onto or off grazes it rather than crashing.
+  const top = info.walkTop === null ? info.yMax : info.yMax - TUNING.surfaceSnap;
+  return r.y < top && r.y + r.height > info.yMin;
 }
 
 /** Height of the highest walkable surface under the runner that it can reach. */
@@ -26,7 +28,8 @@ export function surfaceAt(r: RunnerBox, obstacles: readonly Obstacle[]): number 
   let top = 0;
   for (const o of obstacles) {
     const info = OBSTACLES[o.kind];
-    if (info.walkTop === null || !nearLane(r.x, o.lane, TUNING.obstacleHalfWidth)) continue;
+    // Inclusive, so the support of two neighbouring roofs meets exactly at the lane boundary.
+    if (info.walkTop === null || Math.abs(r.x - laneX(o.lane)) > TUNING.roofSupportHalfWidth) continue;
     let h: number;
     if (o.kind === 'ramp') {
       if (r.s < o.front || r.s > o.front + o.length) continue;

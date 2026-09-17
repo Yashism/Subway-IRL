@@ -32,6 +32,15 @@ describe('overlaps', () => {
     expect(overlaps(box(25), train)).toBe(true);
     expect(overlaps(box(25, 0, TUNING.trainHeight), train)).toBe(false);
   });
+
+  it('lets a runner just below a roof edge graze it without a hit', () => {
+    const train = ob('trainParked', 1, 20, 30);
+    expect(overlaps(box(25, 1.5, TUNING.trainHeight - TUNING.surfaceSnap / 2), train)).toBe(false);
+    expect(overlaps(box(25, 1.5, TUNING.trainHeight - TUNING.surfaceSnap * 2), train)).toBe(true);
+    // Non-walkable obstacles keep the strict top.
+    const auto = ob('auto', 1, 20, 3);
+    expect(overlaps(box(21, 1.5, 2.0 - TUNING.surfaceSnap / 2), auto)).toBe(true);
+  });
 });
 
 describe('surfaceAt', () => {
@@ -49,6 +58,15 @@ describe('surfaceAt', () => {
     expect(surfaceAt(box(30, 0, 3.2), all)).toBe(TUNING.trainHeight);
     expect(surfaceAt(box(48.3, 0, 3.2), all)).toBe(TUNING.trainHeight);
     expect(surfaceAt(box(48.5, 0, 3.2), all)).toBe(0);
+  });
+
+  it('keeps a runner supported all the way across two neighbouring roofs', () => {
+    const next = ob('trainParked', 1, 18, 30);
+    for (let x = 0; x <= 2.5; x += 0.05) {
+      expect(surfaceAt(box(30, x, 3.2), [train, next]), `x=${x.toFixed(2)}`).toBe(TUNING.trainHeight);
+    }
+    expect(surfaceAt(box(30, 1.25, 3.2), [train, next])).toBe(TUNING.trainHeight);
+    expect(surfaceAt(box(30, 1.3, 3.2), [train])).toBe(0);
   });
 
   it('ignores surfaces that are too high or in another lane', () => {

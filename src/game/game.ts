@@ -1,4 +1,5 @@
 import type { ActivityStatus, GameCommand } from '../input/commands';
+import type { Lane } from '../pose/types';
 import type { ChunkDef } from './chunks';
 import { findHit, surfaceAt, type RunnerBox } from './collision';
 import { laneX, TUNING, type Difficulty } from './config';
@@ -82,6 +83,8 @@ export class Game {
   private catchTimer = 0;
   private runs = 0;
   private stepsAtStart = 0;
+  /** Lane the runner is sliding back to after a stumble; one clip gives one stumble. */
+  private bounceLane: Lane | null = null;
 
   constructor(readonly options: GameOptions) {
     this.track = this.newTrack();
@@ -142,6 +145,7 @@ export class Game {
     this.josh.reset();
     this.chaser.reset();
     this.stumbles.reset();
+    this.bounceLane = null;
     this.time = 0;
     this.s = 0;
     this.speed = TUNING.startSpeed;
@@ -280,10 +284,14 @@ export class Game {
   private collide(events: GameEvent[]): void {
     if (this.options.god || this.powerups.invulnerable) return;
     const r = this.runner;
+    if (this.bounceLane !== null && (r.lane !== this.bounceLane || !r.changingLane)) this.bounceLane = null;
     const hit = findHit(this.box(), r.lane, r.changingLane, this.track.obstacles);
     if (!hit) return;
     if (hit.kind === 'side') {
+      // Still sliding back from the last stumble: the same clip, not a new one.
+      if (this.bounceLane !== null) return;
       r.bounceBack();
+      this.bounceLane = r.lane;
       events.push({ type: 'stumble' });
       if (this.stumbles.hit(this.time) === 'caught') this.catchPlayer('stumble', events);
       return;

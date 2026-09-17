@@ -211,6 +211,17 @@ describe('Collisions', () => {
     }
   });
 
+  it('stumbles exactly once on one physical side clip', () => {
+    const g = playing();
+    const front = g.s + 8;
+    place(g, { kind: 'auto', lane: 1, s: front });
+    stepTo(g, front - 0.9);
+    const ev = steps(g, 60, [{ type: 'shiftLane', dir: 1 }]);
+    expect(ev.filter((e) => e.type === 'stumble')).toHaveLength(1);
+    expect(g.state).toBe('playing');
+    expect(g.runner.lane).toBe(0);
+  });
+
   it('ignores obstacles in god mode', () => {
     const g = playing({ god: true });
     place(g, { kind: 'auto', lane: 0, s: g.s + 5 });
@@ -287,4 +298,45 @@ describe('Coins and power-ups', () => {
     }
     expect(top).toBeGreaterThan(3.5);
   });
+});
+
+describe('Lane changes on train roofs', () => {
+  /** A runner standing on a parked-train roof in `from`, with `next` in the neighbouring lane. */
+  function onRoof(from: -1 | 0 | 1, next: 'trainParked' | 'trainMoving', to: -1 | 0 | 1, meetAhead = 0): Game {
+    const g = playing();
+    g.runner.lane = from;
+    g.runner.prevLane = from;
+    g.runner.x = from * 2.5;
+    place(g, { kind: 'trainParked', lane: from, s: g.s - 5 });
+    if (next === 'trainParked') place(g, { kind: 'trainParked', lane: to, s: g.s - 5 });
+    else place(g, { kind: 'trainMoving', lane: to, s: movingFrontAt(g.s + meetAhead, g.s, g.speed) });
+    g.runner.y = TUNING.trainHeight;
+    steps(g, 5);
+    expect(g.runner.y).toBe(TUNING.trainHeight);
+    return g;
+  }
+
+  for (const [from, to] of [[0, 1], [1, 0], [0, -1], [-1, 0]] as const) {
+    it(`walks from one roof to the next (lane ${from} -> ${to})`, () => {
+      const g = onRoof(from, 'trainParked', to);
+      const ev = steps(g, 30, [{ type: 'setLane', lane: to }]);
+      expect(ev.filter((e) => e.type === 'stumble')).toHaveLength(0);
+      expect(g.state).toBe('playing');
+      expect(g.runner.lane).toBe(to);
+      expect(g.runner.x).toBe(to * 2.5);
+      expect(g.runner.y).toBe(TUNING.trainHeight);
+      expect(g.runner.airborne).toBe(false);
+    });
+  }
+
+  // meetAhead 0: the oncoming train is already alongside (side clip); 4: it arrives head-on.
+  for (const [from, to, meetAhead] of [[0, 1, 0], [1, 0, 0], [0, 1, 4], [1, 0, 4]] as const) {
+    it(`stumbles or crashes only once stepping off a roof into an oncoming train (lane ${from} -> ${to}, meets ${meetAhead} m ahead)`, () => {
+      const g = onRoof(from, 'trainMoving', to, meetAhead);
+      const ev = steps(g, 60, [{ type: 'setLane', lane: to }]);
+      expect(ev.filter((e) => e.type === 'stumble').length).toBeLessThanOrEqual(1);
+      if (g.state !== 'playing') expect(g.caughtReason).toBe('crash');
+      expect(ev.filter((e) => e.type === 'stumble' || e.type === 'caught').length).toBe(1);
+    });
+  }
 });
