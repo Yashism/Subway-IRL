@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Autopilot } from '../../src/game/autopilot';
 import type { ChunkDef } from '../../src/game/chunks';
 import { TUNING } from '../../src/game/config';
 import { Game, type GameEvent, type GameOptions } from '../../src/game/game';
@@ -87,14 +88,34 @@ describe('Game states', () => {
   });
 
   it('is deterministic for a seed', () => {
-    const run = () => {
-      const g = new Game({ seed: 9, difficulty: 'cardio' });
-      steps(g, 1, [{ type: 'start' }]);
-      steps(g, 900, [], { ...KEYBOARD });
-      return [g.s, g.state, g.track.obstacles.map((o) => `${o.kind}@${o.front.toFixed(3)}`).join()];
+    const run = (seed: number) => {
+      const g = new Game({ seed, difficulty: 'cardio' });
+      const bot = new Autopilot(g);
+      const log: string[] = [];
+      let tMs = 0;
+      for (let i = 0; i < 60 * TUNING.stepHz; i++) {
+        bot.tick();
+        const ev = g.step(1 / TUNING.stepHz, bot.drain(), bot.activity(tMs));
+        tMs += 1000 / TUNING.stepHz;
+        for (const e of ev) log.push(`${i}:${JSON.stringify(e)}`);
+      }
+      return {
+        events: log,
+        s: g.s,
+        state: g.state,
+        stats: { ...g.stats },
+        obstacles: g.track.obstacles.map((o) => `${o.id}:${o.kind}/L${o.lane}@${o.front.toFixed(6)}+${o.length}`),
+      };
     };
-    expect(run()).toEqual(run());
-  });
+    const a = run(9);
+    const b = run(9);
+    expect(a.s).toBeGreaterThan(500);
+    expect(a.events.filter((e) => e.includes('"lane"')).length).toBeGreaterThan(5);
+    expect(b).toEqual(a);
+    const c = run(10);
+    expect(c.obstacles).not.toEqual(a.obstacles);
+    expect(c.events).not.toEqual(a.events);
+  }, 30_000);
 });
 
 describe('Jog rule', () => {
