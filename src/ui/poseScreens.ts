@@ -50,7 +50,7 @@ const TOAST_STALLED_IDLE: Toast = { level: 'stalled', text: 'Camera stalled — 
 export const warningToast = (slow: boolean, stalled: boolean, running = true): Toast | null =>
   stalled ? (running ? TOAST_STALLED : TOAST_STALLED_IDLE) : slow ? TOAST_SLOW : null;
 
-type CopyScreen = Exclude<FlowScreen, 'menu' | 'playing'>;
+type CopyScreen = Exclude<FlowScreen, 'menu' | 'moveCheck' | 'playing'>;
 const COPY: Record<CopyScreen, { tab: string; title: string; body: string }> = {
   cameraPrompt: {
     tab: 'CAMERA TIME',
@@ -182,6 +182,7 @@ export class PoseScreens {
   private readonly silhouette: SVGElement;
   private readonly checks: Record<'body' | 'distance' | 'light', CheckRow>;
   private readonly modeChip: HTMLButtonElement;
+  private readonly moveCheckBtn: HTMLButtonElement;
   private readonly modeLabel: HTMLElement;
   private readonly calRing: ReturnType<typeof ring>;
   private readonly startRing: ReturnType<typeof ring>;
@@ -284,6 +285,10 @@ export class PoseScreens {
     el('span', 'ps-chip-cycle', this.modeChip, '⟳');
     this.picker(tools, 'ps-picker-side');
     const toolRow = el('div', 'ps-tool-row', tools);
+    // Spec: after the first check the moves are still offered in one click, without recalibrating.
+    this.moveCheckBtn = this.button(toolRow, 'ps-btn ps-btn-small ps-movecheck-ready', 'Check my moves', () =>
+      this.emit({ type: 'checkMoves' }),
+    );
     this.button(toolRow, 'ps-btn ps-btn-small ps-recal-ready', 'Recalibrate', () => this.emit({ type: 'recalibrate' }));
     this.button(toolRow, 'ps-btn ps-btn-small ps-btn-ghost', 'Use keyboard', () => this.emit({ type: 'useKeyboard' }));
 
@@ -354,6 +359,7 @@ export class PoseScreens {
       this.text(this.messageSub, parts.sub);
     }
 
+    this.moveCheckBtn.hidden = !m.showMoveCheck;
     this.text(this.playAgain, m.playAgain);
     this.attr(this.root, 'data-recal', m.showRecalibrate ? 'on' : 'off');
   }

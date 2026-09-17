@@ -1,7 +1,7 @@
 import type { Game, GameEvent } from '../game/game';
 import type { GameCommand } from '../input/commands';
 import type { Baseline } from '../pose/calibration';
-import type { PoseEvent, PoseFrame, PoseStatus } from '../pose/types';
+import type { PlayMode, PoseEvent, PoseFrame, PoseStatus } from '../pose/types';
 import {
   CHANNEL_NAME,
   CONNECTION_TIMEOUT_MS,
@@ -15,6 +15,7 @@ import {
   type GameSnapshot,
   type InputSourceName,
   type MetaMsg,
+  type MoveCheckEvent,
   type SessionMeta,
   type StatusMsg,
 } from './messages';
@@ -153,6 +154,11 @@ export class TelemetryPublisher {
 
   commands(c: readonly GameCommand[], source: InputSourceName, t: number): void {
     if (c.length && this.connected) this.post({ kind: 'commands', t, source, commands: c as GameCommand[] });
+  }
+
+  /** One move-check step start / result, or the tuned values at the end (spec "Telemetry"). */
+  moveCheck(mode: PlayMode, event: MoveCheckEvent, t: number): void {
+    if (this.connected) this.post({ kind: 'moveCheck', t, mode, event });
   }
 
   gameEvents(e: readonly GameEvent[], t: number): void {

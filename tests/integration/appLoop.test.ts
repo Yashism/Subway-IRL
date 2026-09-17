@@ -39,7 +39,7 @@ class ClockSource implements PoseSource {
  */
 function page(sc: Scenario) {
   const game = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY_TRACK });
-  const flow = new SessionFlow({ input: 'webcam' });
+  const flow = new SessionFlow({ input: 'webcam', moveCheckSeen: true });
   const source = new ClockSource(sc.frames);
   const runtime = new PoseRuntime({ replay: async () => source, replayName: 'synth' });
   const keyboard = new KeyboardInput();

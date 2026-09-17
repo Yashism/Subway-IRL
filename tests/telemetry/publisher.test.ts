@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TelemetryPublisher } from '../../src/telemetry/publisher';
-import type { ControlMessage, FrameMsg, GameMsg, MetaMsg, StatusMsg } from '../../src/telemetry/messages';
+import { isGameMessage, type ControlMessage, type FrameMsg, type GameMsg, type MetaMsg, type MoveCheckMsg, type StatusMsg } from '../../src/telemetry/messages';
 import { Game } from '../../src/game/game';
 import { PoseController } from '../../src/pose/controller';
 import { Scenario, synthPose } from '../helpers/synth';
@@ -251,5 +251,25 @@ describe('TelemetryPublisher controls', () => {
     mon.send({ kind: 'recalibrate' });
     clock += 2500;
     expect(pub.connected).toBe(false);
+  });
+});
+
+describe('TelemetryPublisher: move check', () => {
+  it('publishes step starts, results and the tuned values once a monitor is listening', () => {
+    const mon = peer();
+    const pub = new TelemetryPublisher(undefined, now);
+    // Nothing before the handshake.
+    pub.moveCheck('full', { phase: 'start', move: 'jog' }, clock);
+    expect(mon.got).toEqual([]);
+
+    mon.send({ kind: 'hello', id: 'm1', recording: false });
+    pub.moveCheck('full', { phase: 'start', move: 'jump' }, clock);
+    pub.moveCheck('full', { phase: 'result', move: 'jump', result: 'done', peak: 0.32, progress: 1 }, clock);
+    pub.moveCheck('full', { phase: 'done', tuned: { jumpRise: 0.18 }, note: null }, clock);
+    const sent = mon.kinds('moveCheck') as unknown as MoveCheckMsg[];
+    expect(sent.map((m) => m.event.phase)).toEqual(['start', 'result', 'done']);
+    expect(sent.every((m) => m.mode === 'full')).toBe(true);
+    expect(sent[2].event).toEqual({ phase: 'done', tuned: { jumpRise: 0.18 }, note: null });
+    expect(sent.every((m) => isGameMessage(m))).toBe(true);
   });
 });

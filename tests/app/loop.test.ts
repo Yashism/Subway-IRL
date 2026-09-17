@@ -60,7 +60,8 @@ class Recorder implements LoopTelemetry {
 
 function setup(flowOpts: FlowOptions, withPose = true, autopilot = false) {
   const game = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY_TRACK });
-  const flow = new SessionFlow(flowOpts);
+  // Returning player by default: the move check between calibration and ready has its own tests.
+  const flow = new SessionFlow({ moveCheckSeen: true, ...flowOpts });
   const keyboard = new KeyboardInput();
   const pose = withPose ? new FakePose() : null;
   const tel = new Recorder();
@@ -382,5 +383,69 @@ describe('AppLoop: webcam mode', () => {
     expect(r.flow.model.checks.light).toBe('bad');
     r.frame(61);
     expect(r.loop.stalled).toBe(true);
+  });
+});
+
+describe('AppLoop: the move check', () => {
+  /** A first-ever calibration: the flow routes into the move check before the ready screen. */
+  function firstRun() {
+    const r = setup({ input: 'webcam', moveCheckSeen: false });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.frame();
+    return r;
+  }
+
+  it('hands startMoveCheck to the page, which is what builds the check', () => {
+    const r = firstRun();
+    expect(r.flow.screen).toBe('moveCheck');
+    expect(r.effects.at(-1)).toEqual({ type: 'startMoveCheck' });
+  });
+
+  it('Enter finishes the check and tears it down, then starts the run', () => {
+    const r = firstRun();
+    r.key('Enter');
+    r.frame();
+    expect(r.flow.screen).toBe('ready');
+    expect(r.effects.at(-1)).toEqual({ type: 'endMoveCheck' });
+    r.key('Enter');
+    r.frame();
+    expect(r.flow.screen).toBe('playing');
+    expect(r.game.state).toBe('countdown');
+  });
+
+  it('Esc leaves the check for the menu, tearing it down on the way', () => {
+    const r = firstRun();
+    r.key('Escape');
+    r.frame();
+    expect(r.flow.screen).toBe('menu');
+    expect(r.effects.at(-1)).toEqual({ type: 'endMoveCheck' });
+  });
+
+  it('a pose start gesture never drops the check (the hoverboard step is both hands up)', () => {
+    const r = firstRun();
+    r.pose.commands.queue.push({ type: 'start' });
+    r.frame();
+    expect(r.flow.screen).toBe('moveCheck');
+    expect(r.game.state).toBe('menu');
+  });
+
+  it('recalibrating mid-run pauses the run before the check takes the screen', () => {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.frame();
+    r.key('Enter');
+    r.frame(240);
+    expect(r.game.state).toBe('playing');
+    r.loop.dispatch({ type: 'recalibrate' });
+    expect(r.game.state).toBe('paused');
+    r.frame();
+    expect(r.flow.screen).toBe('moveCheck');
+    expect(r.effects.at(-1)).toEqual({ type: 'startMoveCheck' });
+    // Still paused behind the check's scrim, not restarted.
+    expect(r.game.state).toBe('paused');
   });
 });

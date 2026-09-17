@@ -628,10 +628,12 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   flex-direction: column;
   gap: 8px;
 }
-.ps-recal-ready {
+.ps-recal-ready,
+.ps-movecheck-ready {
   display: none;
 }
-.pose-ui[data-screen='ready'] .ps-recal-ready {
+.pose-ui[data-screen='ready'] .ps-recal-ready,
+.pose-ui[data-screen='ready'] .ps-movecheck-ready:not([hidden]) {
   display: block;
 }
 

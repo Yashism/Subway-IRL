@@ -3,6 +3,7 @@ import type { CaughtReason, GameEvent, GameState } from '../game/game';
 import type { IdleLevel } from '../game/rules';
 import type { Baseline } from '../pose/calibration';
 import type { PoseFixture } from '../pose/fixtures';
+import type { MoveId, MoveTuning } from '../pose/moveCheckTypes';
 import type { Lane, PlayMode, Pose, PoseEvent, PoseFrame, PoseStatus } from '../pose/types';
 
 /** BroadcastChannel shared by the game tab and the monitor tab. */
@@ -26,7 +27,10 @@ export interface SessionMeta {
   input: string;
   mode: string | null;
   sensitivity: number;
+  /** The thresholds actually in force, move tuning already applied. A replay plays with these. */
   thresholds: Record<string, number>;
+  /** The move-check record behind those thresholds, when there is one. */
+  moveTuning?: MoveTuning | null;
 }
 
 export interface GameSnapshot {
@@ -104,7 +108,32 @@ export interface ByeMsg {
   t: number;
 }
 
-export type GameMessage = FrameMsg | StatusMsg | PoseEventsMsg | CommandsMsg | GameEventsMsg | GameMsg | MetaMsg | ByeMsg;
+/**
+ * Move-check progress (spec "Telemetry"): each step's start, its result with the peak that was
+ * measured, and the tuned values once the check is over.
+ */
+export type MoveCheckEvent =
+  | { phase: 'start'; move: MoveId }
+  | { phase: 'result'; move: MoveId; result: 'done' | 'skipped'; peak: number | null; progress: number }
+  | { phase: 'done'; tuned: Record<string, number>; note: string | null };
+
+export interface MoveCheckMsg {
+  kind: 'moveCheck';
+  t: number;
+  mode: PlayMode;
+  event: MoveCheckEvent;
+}
+
+export type GameMessage =
+  | FrameMsg
+  | StatusMsg
+  | PoseEventsMsg
+  | CommandsMsg
+  | GameEventsMsg
+  | GameMsg
+  | MetaMsg
+  | MoveCheckMsg
+  | ByeMsg;
 
 // ---- monitor → game -------------------------------------------------------------------------
 
@@ -124,7 +153,7 @@ export type ControlMessage =
 
 export type MonitorMessage = HelloMsg | ControlMessage;
 
-const GAME_KINDS = new Set<string>(['frame', 'status', 'poseEvents', 'commands', 'gameEvents', 'game', 'meta', 'bye']);
+const GAME_KINDS = new Set<string>(['frame', 'status', 'poseEvents', 'commands', 'gameEvents', 'game', 'meta', 'moveCheck', 'bye']);
 
 type Rec = Record<string, unknown>;
 const isObj = (x: unknown): x is Rec => typeof x === 'object' && x !== null;

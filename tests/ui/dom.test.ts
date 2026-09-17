@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FlowInput, ScreenModel } from '../../src/app/flow';
+import { MOVE_ORDER, type MoveCheckSummary } from '../../src/pose/moveCheckTypes';
+import type { PlayMode } from '../../src/pose/types';
 import { Hud, MONITOR_URL, MONITOR_WINDOW } from '../../src/ui/hud';
+import { renderSummaryCard } from '../../src/ui/moveCheckScreen';
 import { PoseScreens } from '../../src/ui/poseScreens';
 
 /** The UI classes only read the model, so a plain literal is enough. */
@@ -21,6 +24,7 @@ const model = (over: Partial<ScreenModel> = {}): ScreenModel => ({
   recheck: false,
   playAgain: '',
   showRecalibrate: false,
+  showMoveCheck: false,
   gameState: 'menu',
   ...over,
 });
@@ -119,5 +123,50 @@ describe('Hud: live monitor link', () => {
     h.link.dispatchEvent(middle);
     expect(h.open).not.toHaveBeenCalled();
     expect(ctrl.defaultPrevented).toBe(false);
+  });
+});
+
+describe('Hud: the pause screen’s Controls card', () => {
+  const summary = (mode: PlayMode = 'full'): MoveCheckSummary => ({
+    mode,
+    steps: MOVE_ORDER.map((id) => ({
+      id,
+      status: 'done' as const,
+      label: id,
+      how: `do ${id}`,
+      hint: null,
+      canSkip: false,
+      canAccept: false,
+      progress: 1,
+      peak: 0.4,
+      steps: null,
+    })),
+    tuned: { laneEnter: 0.3 },
+    asymmetryNote: null,
+  });
+
+  it('shows the cheat sheet on the paused card, and swaps or clears it on demand', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const hud = new Hud(root);
+    const box = root.querySelector<HTMLElement>('.hud-pause-controls')!;
+    expect(box.children).toHaveLength(0);
+
+    const card = renderSummaryCard(summary(), { title: 'Controls' });
+    hud.setControls(card);
+    expect(box.firstElementChild).toBe(card);
+    expect(box.querySelector('.mc-sheet-title')!.textContent).toBe('Controls');
+    expect(box.querySelectorAll('.mc-row')).toHaveLength(MOVE_ORDER.length + 1); // + the start gesture
+
+    // The same element every frame must not be re-attached.
+    const before = box.firstElementChild;
+    hud.setControls(card);
+    expect(box.firstElementChild).toBe(before);
+
+    const other = renderSummaryCard(summary('small'));
+    hud.setControls(other);
+    expect(box.firstElementChild).toBe(other);
+    hud.setControls(null);
+    expect(box.children).toHaveLength(0);
   });
 });

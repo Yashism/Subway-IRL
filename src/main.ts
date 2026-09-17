@@ -1,6 +1,7 @@
 import './ui/hud.css';
-import { SessionFlow, type FlowEffect, type InputMode, type ModeChoice } from './app/flow';
+import { SessionFlow, type FlowEffect, type InputMode, type ModeChoice, type MoveCheckPolicy } from './app/flow';
 import { AppLoop } from './app/loop';
+import { MoveCheckSession } from './app/moveCheckSession';
 import { fixtureReplay, loadSession, PoseRuntime, sessionReplay } from './app/poseRuntime';
 import { ProfileStore, type RunRecord } from './app/profile';
 import { Autopilot } from './game/autopilot';
@@ -14,6 +15,7 @@ import type { PlayMode } from './pose/types';
 import type { SessionRecording } from './telemetry/messages';
 import { TelemetryPublisher } from './telemetry/publisher';
 import { Hud, menuNotice, openMonitorWindow } from './ui/hud';
+import { MoveCheckScreen, renderSummaryCard } from './ui/moveCheckScreen';
 import { PosePip, pipVisibleFromUrl } from './ui/pip';
 import { PoseScreens } from './ui/poseScreens';
 import { isLineId } from './world/stations';
@@ -83,10 +85,31 @@ const runtime = new PoseRuntime({
 });
 const initialInput: InputMode =
   autopilotOn || (params.get('input') === 'keyboard' && !replay && !sessionFile) ? 'keyboard' : 'webcam';
+
+// ---------------------------------------------------------------- move check (?movecheck=skip|force)
+
+const movecheckParam = params.get('movecheck');
+const movecheckPolicy: MoveCheckPolicy = movecheckParam === 'skip' || movecheckParam === 'force' ? movecheckParam : 'auto';
+// A recorded session replays with the thresholds it was played with: its meta wins over any tuning
+// saved on this machine, so the replay shows what the player actually experienced.
+const replayingSession = !!sessionMeta?.thresholds;
+
+const moveCheck = new MoveCheckSession({
+  thresholds: runtime.ctrl.th,
+  onStart: () => loop.dispatch({ type: 'startPressed' }),
+  onTuningChanged: () => {
+    flow.setMoveCheckSeen(moveCheck.seen);
+    sendMeta();
+  },
+  onTelemetry: (mode, event, t) => telemetry.moveCheck(mode, event, t),
+});
+
 const flow = new SessionFlow({
   input: initialInput,
   cameraId: runtime.savedCameraId(),
   modeChoice: (forcedMode ?? 'auto') as ModeChoice,
+  moveCheck: replayingSession && movecheckPolicy !== 'force' ? 'skip' : movecheckPolicy,
+  moveCheckSeen: moveCheck.seen,
 });
 
 // ---------------------------------------------------------------- view
@@ -110,9 +133,27 @@ const screens = new PoseScreens(uiRoot, {
   onInput: (i) => loop.dispatch(i),
   onSaveCamera: (id) => runtime.saveCameraId(id),
 });
+// The move check gets its own layer above the pose UI: it owns the whole screen while it is up.
+const moveCheckRoot = document.body.appendChild(document.createElement('div'));
+const moveCheckLayer = new MoveCheckScreen(moveCheckRoot, moveCheck.handlers);
 const pip = new PosePip(pipRoot, { visible: pipVisibleFromUrl(location.search) });
 pip.attachToggleKey(window);
 runtime.sampleLuma = (t) => pip.sampleLuma(t);
+
+/**
+ * The pause screen's "Controls" cheat sheet: the card this session's check ended on, or one built
+ * from the saved tuning. Rebuilt only when the summary behind it changes.
+ */
+let controlsFrom: unknown = null;
+let controlsEl: HTMLElement | null = null;
+function controlsCard(): HTMLElement {
+  const summary = moveCheck.controls(runtime.ctrl.baseline?.mode ?? runtime.ctrl.forcedMode ?? null);
+  if (summary !== controlsFrom || !controlsEl) {
+    controlsFrom = summary;
+    controlsEl = renderSummaryCard(summary, { title: 'Controls' });
+  }
+  return controlsEl;
+}
 
 /** The PiP holds the camera video only while it is showing; otherwise the video is parked (still playing). */
 let pipHasVideo = false;
@@ -141,11 +182,14 @@ function sendMeta(): void {
     mode: currentMode(),
     sensitivity: ctrl.sensitivity,
     thresholds: { ...(ctrl.th as unknown as Record<string, number>) },
+    moveTuning: moveCheck.tuningInForce(),
   });
 }
 runtime.onFrame = (f, events) => {
   telemetry.frame(f);
   telemetry.poseEvents(events, f.t);
+  // The check measures the same signals the controller just computed, on the same frame.
+  if (runtime.ctrl.baseline) moveCheck.frame(runtime.ctrl, events, f.t);
 };
 
 /** Counts recalibrations the flow asked for, so a monitor request can tell whether the flow handled it. */
@@ -215,6 +259,12 @@ function onEffect(fx: FlowEffect): void {
       runtime.ctrl.forcedMode = fx.mode;
       sendMeta();
       break;
+    case 'startMoveCheck':
+      moveCheck.begin(runtime.ctrl.baseline?.mode ?? runtime.ctrl.forcedMode ?? 'full');
+      break;
+    case 'endMoveCheck':
+      moveCheck.end();
+      break;
     default:
       break;
   }
@@ -274,6 +324,7 @@ Object.assign(window as unknown as Record<string, unknown>, {
   __profile: profile,
   __flow: flow,
   __runtime: runtime,
+  __moveCheck: moveCheck,
   __loop: loop,
   __telemetry: telemetry,
 });
@@ -386,12 +437,19 @@ function frame(now: number): void {
   const webcam = m.input === 'webcam';
   const st = loop.status;
   screens.setWarnings(webcam && flow.cameraReady && !!st?.slowPose, loop.stalled);
+  const checking = m.screen === 'moveCheck';
+  moveCheckLayer.update(checking ? moveCheck.model : null);
+  hud.setControls(game.state === 'paused' ? controlsCard() : null);
+  // The check's scrim owns the screen: the PiP drops to its corner form (the player is copying the
+  // figure, not watching themselves) and goes back to the big stage view afterwards.
   const setup = m.screen === 'calibrating' || m.screen === 'ready';
-  const pipOn = webcam && flow.cameraReady && (setup || m.screen === 'playing');
+  const pipOn = webcam && flow.cameraReady && (setup || checking || m.screen === 'playing');
   pip.setActive(pipOn);
   pip.setLayout(setup ? 'stage' : 'corner');
   syncPipVideo(pipOn);
   if (pipOn && st) pip.update(st, loop.stalled, now, runtime.aspect);
+  // Tuning is per play mode: re-apply whenever the detected (or forced) mode changes.
+  if (!replayingSession) moveCheck.applyFor(runtime.ctrl.baseline?.mode ?? runtime.ctrl.forcedMode ?? null);
 
   if (game.state === 'menu') {
     hud.setInputNotice(

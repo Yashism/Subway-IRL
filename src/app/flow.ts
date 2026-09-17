@@ -10,10 +10,25 @@ import type { CalibrationState, PlayMode } from '../pose/types';
  * the flow only listens (`gameState`) so it can offer "raise hand to play again" and recalibration.
  */
 
-export type FlowScreen = 'menu' | 'cameraPrompt' | 'cameraStarting' | 'cameraError' | 'calibrating' | 'ready' | 'playing';
+export type FlowScreen =
+  | 'menu'
+  | 'cameraPrompt'
+  | 'cameraStarting'
+  | 'cameraError'
+  | 'calibrating'
+  | 'moveCheck'
+  | 'ready'
+  | 'playing';
 export type InputMode = 'webcam' | 'keyboard';
 export type ModeChoice = 'auto' | PlayMode;
 export type CheckState = 'ok' | 'bad' | 'pending';
+
+/**
+ * When the guided move check runs after a calibration (spec "Where it runs"):
+ * `auto` on a recalibration and on the first ever calibration on this machine, `skip` never,
+ * `force` always. `?movecheck=skip|force` picks the last two.
+ */
+export type MoveCheckPolicy = 'auto' | 'skip' | 'force';
 
 /** The parts of PoseStatus the flow needs, plus the frame-luma verdict. */
 export interface PoseSnapshot {
@@ -35,6 +50,8 @@ export type FlowInput =
   | { type: 'chooseCamera'; id: string }
   | { type: 'chooseMode'; mode: ModeChoice }
   | { type: 'recalibrate' }
+  /** "Check my moves" from the ready screen: run the check without recalibrating. */
+  | { type: 'checkMoves' }
   | { type: 'cameraOk' }
   | { type: 'cameraFailed'; message: string }
   | { type: 'pose'; status: PoseSnapshot }
@@ -51,7 +68,11 @@ export type FlowEffect =
   /** Call PoseController.recalibrate(). */
   | { type: 'recalibrate' }
   /** Set PoseController.forcedMode. */
-  | { type: 'setForcedMode'; mode: PlayMode | null };
+  | { type: 'setForcedMode'; mode: PlayMode | null }
+  /** The move-check screen is up: build a MoveCheck and start feeding it pose frames. */
+  | { type: 'startMoveCheck' }
+  /** The move-check screen is gone: stop feeding it (whatever it measured is kept). */
+  | { type: 'endMoveCheck' };
 
 export interface ScreenModel {
   screen: FlowScreen;
@@ -74,6 +95,8 @@ export interface ScreenModel {
   /** Summary hint in webcam mode, '' otherwise. */
   playAgain: string;
   showRecalibrate: boolean;
+  /** The ready screen offers the move check in one click ("Check my moves"). */
+  showMoveCheck: boolean;
   gameState: GameState;
 }
 
@@ -81,6 +104,9 @@ export interface FlowOptions {
   input?: InputMode;
   cameraId?: string | null;
   modeChoice?: ModeChoice;
+  moveCheck?: MoveCheckPolicy;
+  /** True when this machine already has a saved move tuning, so a new player is not taught twice. */
+  moveCheckSeen?: boolean;
 }
 
 export const MSG_HOLD = 'Hold still…';
@@ -90,6 +116,8 @@ export const MSG_STEP_IN = 'Step into view (then raise your RIGHT hand)';
 export const MSG_PLAY_AGAIN = '✋ Raise your right hand to play again';
 
 const NONE: readonly FlowEffect[] = Object.freeze([]);
+const START_CHECK: FlowEffect = Object.freeze({ type: 'startMoveCheck' });
+const END_CHECK: FlowEffect = Object.freeze({ type: 'endMoveCheck' });
 const initialPose = (): PoseSnapshot => ({
   tracking: false,
   calibrated: false,
@@ -116,11 +144,26 @@ export class SessionFlow {
   /** Owned copy of the last pose snapshot (callers may reuse theirs). */
   private readonly pose: PoseSnapshot = initialPose();
   private cached: ScreenModel | null = null;
+  private readonly policy: MoveCheckPolicy;
+  /** This machine has a saved move tuning, so the check is offered rather than run unprompted. */
+  private seenCheck: boolean;
+  /** The calibration now under way should be followed by the move check. */
+  private pendingCheck = false;
 
   constructor(opts: FlowOptions = {}) {
     this.input = opts.input ?? 'webcam';
     this.cameraId = opts.cameraId ?? null;
     this.modeChoice = opts.modeChoice ?? 'auto';
+    this.policy = opts.moveCheck ?? 'auto';
+    this.seenCheck = opts.moveCheckSeen ?? false;
+  }
+
+  /**
+   * Tells the flow whether a saved tuning exists now: true once a check has been saved, false
+   * again after "Reset to defaults", so the next new player is still taught the moves.
+   */
+  setMoveCheckSeen(seen: boolean): void {
+    this.seenCheck = seen;
   }
 
   /** The current screen model. The same object is returned until something visible changes. */
@@ -130,6 +173,14 @@ export class SessionFlow {
 
   /** Applies one input; returns the effects to run, in order. The returned array must not be mutated. */
   dispatch(i: FlowInput): FlowEffect[] {
+    const wasCheck = this.screen === 'moveCheck';
+    const fx = this.route(i);
+    // Every way off the move-check screen tears the check down, so no caller has to remember to.
+    if (!wasCheck || this.screen === 'moveCheck') return fx;
+    return [END_CHECK, ...fx];
+  }
+
+  private route(i: FlowInput): FlowEffect[] {
     if (i.type === 'pose') return this.onPose(i.status);
     this.cached = null;
     if (i.type === 'gameState') {
@@ -155,6 +206,8 @@ export class SessionFlow {
         return this.cameraFailed(i.message);
       case 'recalibrate':
         return this.recalibrate(NONE as FlowEffect[]);
+      case 'checkMoves':
+        return this.checkMoves();
       case 'chooseMode':
         return this.chooseMode(i.mode);
       case 'back':
@@ -198,6 +251,13 @@ export class SessionFlow {
         if (i.type === 'chooseCamera') return this.switchCamera(i.id);
         if (this.screen === 'ready' && (i.type === 'startPressed' || i.type === 'startGesture')) return this.play();
         return NONE as FlowEffect[];
+      case 'moveCheck':
+        if (i.type === 'chooseCamera') return this.switchCamera(i.id);
+        // Enter leaves the check for the ready screen, which teaches the start gesture. The gesture
+        // itself is ignored here: the hoverboard step has both hands up, which is one hand away
+        // from it, and a check must never be dropped by the move it is asking for.
+        if (i.type === 'startPressed') return this.endCheck();
+        return NONE as FlowEffect[];
       case 'playing':
         if (i.type === 'chooseCamera') return this.switchCamera(i.id);
         if (i.type === 'startGesture') {
@@ -217,9 +277,17 @@ export class SessionFlow {
     if (this.input !== 'webcam') return NONE as FlowEffect[];
     if (this.screen === 'calibrating' && p.calibrated) {
       this.recheck = false;
-      this.screen = 'ready';
       this.cached = null;
-    } else if (this.screen === 'ready' && !p.calibrated) {
+      if (this.pendingCheck) {
+        this.pendingCheck = false;
+        this.screen = 'moveCheck';
+        return [START_CHECK];
+      }
+      this.screen = 'ready';
+    } else if ((this.screen === 'ready' || this.screen === 'moveCheck') && !p.calibrated) {
+      // The calibration went away under the check (a recalibration from the monitor, say):
+      // there is nothing to measure against, so go back and offer it again afterwards.
+      this.pendingCheck = this.screen === 'moveCheck' || this.wantsCheck(false);
       this.screen = 'calibrating';
       this.recheck = false;
       this.cached = null;
@@ -228,7 +296,32 @@ export class SessionFlow {
   }
 
   private go(screen: FlowScreen): FlowEffect[] {
+    if (screen === 'calibrating') this.pendingCheck = this.wantsCheck(false);
     this.screen = screen;
+    return NONE as FlowEffect[];
+  }
+
+  /** Does a calibration that is not a recalibration lead into the check? */
+  private wantsCheck(recalibrating: boolean): boolean {
+    if (this.policy === 'skip') return false;
+    if (this.policy === 'force') return true;
+    return recalibrating || !this.seenCheck;
+  }
+
+  /** "Check my moves" on the ready screen: the check without a fresh calibration. */
+  private checkMoves(): FlowEffect[] {
+    if (this.screen !== 'ready' || !this.pose.calibrated || this.policy === 'skip') return NONE as FlowEffect[];
+    this.pendingCheck = false;
+    this.screen = 'moveCheck';
+    this.cached = null;
+    return [START_CHECK];
+  }
+
+  /** Done with the check (however it ended): on to the ready screen, which teaches the start gesture. */
+  private endCheck(): FlowEffect[] {
+    this.screen = 'ready';
+    this.recheck = false;
+    this.cached = null;
     return NONE as FlowEffect[];
   }
 
@@ -289,6 +382,8 @@ export class SessionFlow {
     fx.push(...before, { type: 'recalibrate' });
     this.recheck = false;
     this.screen = 'calibrating';
+    // Spec "Where it runs": the check always follows a recalibration.
+    this.pendingCheck = this.wantsCheck(true);
     return fx;
   }
 
@@ -311,7 +406,8 @@ export class SessionFlow {
 
   /** Calibration needs a running camera and a screen that can show it. */
   private canCalibrate(): boolean {
-    return this.cameraReady && (this.screen === 'calibrating' || this.screen === 'ready' || this.screen === 'playing');
+    const s = this.screen;
+    return this.cameraReady && (s === 'calibrating' || s === 'ready' || s === 'moveCheck' || s === 'playing');
   }
 
   private build(): ScreenModel {
@@ -349,6 +445,7 @@ export class SessionFlow {
       recheck: this.recheck,
       playAgain: webcam && s === 'playing' && this.gameState === 'summary' ? MSG_PLAY_AGAIN : '',
       showRecalibrate: webcam && s === 'playing' && this.cameraReady,
+      showMoveCheck: webcam && s === 'ready' && p.calibrated && this.policy !== 'skip',
       gameState: this.gameState,
     };
   }

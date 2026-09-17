@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SessionFlow, type FlowEffect, type FlowInput, type PoseSnapshot } from '../../src/app/flow';
+import { SessionFlow, type FlowEffect, type FlowInput, type FlowOptions, type PoseSnapshot } from '../../src/app/flow';
 
 const NO_POSE: PoseSnapshot = {
   tracking: false,
@@ -14,9 +14,12 @@ const STANDING = pose({ tracking: true, calibration: { progress: 0.4, bodyVisibl
 const CALIBRATED = pose({ tracking: true, calibrated: true, mode: 'full', calibration: { progress: 0, bodyVisible: false, distance: 'ok' } });
 const types = (fx: FlowEffect[]) => fx.map((e) => e.type);
 
-/** A webcam flow walked to the given screen. */
-function webcamAt(screen: 'cameraPrompt' | 'cameraStarting' | 'cameraError' | 'calibrating' | 'ready' | 'playing'): SessionFlow {
-  const f = new SessionFlow({ input: 'webcam' });
+/** A webcam flow walked to the given screen, as a returning player (a saved tuning exists). */
+function webcamAt(
+  screen: 'cameraPrompt' | 'cameraStarting' | 'cameraError' | 'calibrating' | 'moveCheck' | 'ready' | 'playing',
+  opts: Partial<FlowOptions> = {},
+): SessionFlow {
+  const f = new SessionFlow({ input: 'webcam', moveCheckSeen: true, ...opts });
   f.dispatch({ type: 'startPressed' });
   if (screen === 'cameraPrompt') return f;
   f.dispatch({ type: 'startPressed' });
@@ -28,7 +31,7 @@ function webcamAt(screen: 'cameraPrompt' | 'cameraStarting' | 'cameraError' | 'c
   f.dispatch({ type: 'cameraOk' });
   if (screen === 'calibrating') return f;
   f.dispatch(CALIBRATED);
-  if (screen === 'ready') return f;
+  if (screen === 'moveCheck' || screen === 'ready') return f;
   f.dispatch({ type: 'startPressed' });
   f.dispatch({ type: 'gameState', state: 'countdown' });
   return f;
@@ -338,12 +341,16 @@ describe('SessionFlow: playing', () => {
     expect(f.screen).toBe('calibrating');
   });
 
-  it('after recalibrating mid-run, a raised hand resumes', () => {
+  it('after recalibrating mid-run, the move check runs and then a raised hand resumes', () => {
     const f = webcamAt('playing');
     f.dispatch({ type: 'gameState', state: 'playing' });
     f.dispatch({ type: 'recalibrate' });
     f.dispatch({ type: 'gameState', state: 'paused' });
     f.dispatch(CALIBRATED);
+    // A recalibration always teaches the moves again, and the gesture is ignored while it is up.
+    expect(f.screen).toBe('moveCheck');
+    expect(f.dispatch({ type: 'startGesture' })).toEqual([]);
+    expect(types(f.dispatch({ type: 'startPressed' }))).toEqual(['endMoveCheck']);
     expect(f.dispatch({ type: 'startGesture' })).toEqual([{ type: 'startGame' }]);
     expect(f.screen).toBe('playing');
   });
@@ -449,6 +456,7 @@ describe('SessionFlow: play again', () => {
     f.dispatch({ type: 'startGesture' });
     f.dispatch({ type: 'recalibrate' });
     f.dispatch(CALIBRATED);
+    f.dispatch({ type: 'startPressed' }); // past the move check the recalibration brings up
     expect(f.model.recheck).toBe(false);
     expect(f.model.message).toMatch(/^Calibrated!/);
   });
@@ -522,5 +530,122 @@ describe('SessionFlow: screen model', () => {
     const f = new SessionFlow({ input: 'webcam', modeChoice: 'small' });
     expect(f.model.input).toBe('webcam');
     expect(f.model.modeChoice).toBe('small');
+  });
+});
+
+describe('SessionFlow: the move check', () => {
+  /** A fresh machine: no saved tuning, so the first calibration teaches the moves. */
+  const firstRun = () => webcamAt('calibrating', { moveCheckSeen: false });
+
+  it('a first-ever calibration goes to the check, a returning player straight to ready', () => {
+    const fresh = firstRun();
+    expect(fresh.dispatch(CALIBRATED)).toEqual([{ type: 'startMoveCheck' }]);
+    expect(fresh.screen).toBe('moveCheck');
+
+    const back = webcamAt('calibrating');
+    expect(back.dispatch(CALIBRATED)).toEqual([]);
+    expect(back.screen).toBe('ready');
+  });
+
+  it('a returning player is offered the check on the ready screen, in one click', () => {
+    const f = webcamAt('ready');
+    expect(f.model.showMoveCheck).toBe(true);
+    expect(f.dispatch({ type: 'checkMoves' })).toEqual([{ type: 'startMoveCheck' }]);
+    expect(f.screen).toBe('moveCheck');
+    // Only from the ready screen: nowhere else has a calibrated player standing still.
+    const g = webcamAt('calibrating');
+    expect(g.dispatch({ type: 'checkMoves' })).toEqual([]);
+    expect(g.screen).toBe('calibrating');
+  });
+
+  it('recalibrating always runs the check, even for a returning player', () => {
+    const f = webcamAt('ready');
+    expect(types(f.dispatch({ type: 'recalibrate' }))).toEqual(['recalibrate']);
+    expect(f.dispatch(CALIBRATED)).toEqual([{ type: 'startMoveCheck' }]);
+    expect(f.screen).toBe('moveCheck');
+  });
+
+  it('?movecheck=skip never runs it and never offers it', () => {
+    const f = webcamAt('ready', { moveCheck: 'skip', moveCheckSeen: false });
+    expect(f.screen).toBe('ready');
+    expect(f.model.showMoveCheck).toBe(false);
+    expect(f.dispatch({ type: 'checkMoves' })).toEqual([]);
+    f.dispatch({ type: 'recalibrate' });
+    expect(f.dispatch(CALIBRATED)).toEqual([]);
+    expect(f.screen).toBe('ready');
+  });
+
+  it('?movecheck=force runs it even for a returning player on a first calibration', () => {
+    const f = webcamAt('calibrating', { moveCheck: 'force', moveCheckSeen: true });
+    expect(f.dispatch(CALIBRATED)).toEqual([{ type: 'startMoveCheck' }]);
+    expect(f.screen).toBe('moveCheck');
+  });
+
+  it('Enter leaves the check for the ready screen; the start gesture is ignored while it is up', () => {
+    const f = webcamAt('calibrating', { moveCheckSeen: false });
+    f.dispatch(CALIBRATED);
+    // The hoverboard step asks for both hands up, one hand away from the start gesture.
+    expect(f.dispatch({ type: 'startGesture' })).toEqual([]);
+    expect(f.screen).toBe('moveCheck');
+    expect(types(f.dispatch({ type: 'startPressed' }))).toEqual(['endMoveCheck']);
+    expect(f.screen).toBe('ready');
+    expect(f.model.message).toMatch(/^Calibrated!/);
+  });
+
+  it('every other way out of the check tears it down too', () => {
+    const back = firstRun();
+    back.dispatch(CALIBRATED);
+    expect(types(back.dispatch({ type: 'back' }))).toEqual(['endMoveCheck']);
+    expect(back.screen).toBe('menu');
+
+    const recal = firstRun();
+    recal.dispatch(CALIBRATED);
+    expect(types(recal.dispatch({ type: 'recalibrate' }))).toEqual(['endMoveCheck', 'recalibrate']);
+    expect(recal.screen).toBe('calibrating');
+
+    const keys = firstRun();
+    keys.dispatch(CALIBRATED);
+    expect(types(keys.dispatch({ type: 'useKeyboard' }))).toEqual(['endMoveCheck', 'stopCamera', 'startGame']);
+    expect(keys.screen).toBe('playing');
+
+    const mode = firstRun();
+    mode.dispatch(CALIBRATED);
+    expect(types(mode.dispatch({ type: 'chooseMode', mode: 'small' }))).toEqual(['endMoveCheck', 'setForcedMode', 'recalibrate']);
+  });
+
+  it('losing the calibration under the check goes back and offers it again', () => {
+    const f = firstRun();
+    f.dispatch(CALIBRATED);
+    expect(types(f.dispatch(STANDING))).toEqual(['endMoveCheck']);
+    expect(f.screen).toBe('calibrating');
+    expect(f.dispatch(CALIBRATED)).toEqual([{ type: 'startMoveCheck' }]);
+  });
+
+  it('runs the check once, then leaves a returning player alone', () => {
+    const f = firstRun();
+    f.dispatch(CALIBRATED);
+    f.dispatch({ type: 'startPressed' });
+    // What main.ts does once a tuning has been saved.
+    f.setMoveCheckSeen(true);
+    f.dispatch(STANDING);
+    expect(f.screen).toBe('calibrating');
+    expect(f.dispatch(CALIBRATED)).toEqual([]);
+    expect(f.screen).toBe('ready');
+  });
+
+  it('after "Reset to defaults" the next new player is taught again', () => {
+    const f = webcamAt('ready');
+    f.setMoveCheckSeen(false);
+    f.dispatch(STANDING);
+    expect(f.dispatch(CALIBRATED)).toEqual([{ type: 'startMoveCheck' }]);
+  });
+
+  it('a run paused by a lost pose is pinned down before the check takes the screen', () => {
+    const f = webcamAt('playing');
+    f.dispatch({ type: 'gameState', state: 'paused', pausedByLoss: true });
+    // Without the pause the run would resume behind the check's scrim the moment tracking returns.
+    expect(types(f.dispatch({ type: 'recalibrate' }))).toEqual(['pauseGame', 'recalibrate']);
+    expect(f.dispatch(CALIBRATED)).toEqual([{ type: 'startMoveCheck' }]);
+    expect(f.screen).toBe('moveCheck');
   });
 });

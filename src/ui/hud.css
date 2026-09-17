@@ -1058,3 +1058,25 @@ body {
   white-space: pre;
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------ pause: the controls cheat sheet */
+
+/*
+ * The very card the move check ends on (renderSummaryCard, styled by moveCheck.css), shown on the
+ * pause screen so the moves can be re-read without recalibrating. Scrolls rather than pushing the
+ * pause title off a short window.
+ */
+.hud-pause-controls {
+  width: min(960px, 94vw);
+  max-height: 56vh;
+  overflow-y: auto;
+  text-align: left;
+  pointer-events: auto;
+}
+.hud-pause-controls:empty {
+  display: none;
+}
+.hud-pause-controls .mc-sheet {
+  width: 100%;
+  animation: none;
+}

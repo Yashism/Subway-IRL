@@ -45,7 +45,7 @@ export interface AppLoopOptions {
 const START: GameCommand = Object.freeze({ type: 'start' });
 const NONE: readonly GameCommand[] = Object.freeze([]);
 /** Esc on these screens goes back to the menu. */
-const BACK_SCREENS: ReadonlySet<FlowScreen> = new Set(['cameraPrompt', 'cameraStarting', 'cameraError', 'calibrating', 'ready']);
+const BACK_SCREENS: ReadonlySet<FlowScreen> = new Set(['cameraPrompt', 'cameraStarting', 'cameraError', 'calibrating', 'moveCheck', 'ready']);
 
 /**
  * The per-frame glue of the game page, kept free of the DOM so it can run headless:

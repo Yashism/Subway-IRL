@@ -297,6 +297,8 @@ export class Hud {
   private readonly pauseTitle: HTMLElement;
   private readonly pauseSub: HTMLElement;
   private readonly pauseIcon: HTMLElement;
+  private readonly pauseControls: HTMLElement;
+  private controlsCard: HTMLElement | null = null;
   private readonly sum: Record<keyof HudSummary, HTMLElement>;
   private readonly best: HTMLElement;
   private readonly menuStats: HTMLElement;
@@ -443,7 +445,19 @@ export class Hud {
     this.pauseIcon = el('div', 'hud-pause-icon', paused);
     this.pauseTitle = el('div', 'hud-pause-title', paused);
     this.pauseSub = el('div', 'hud-pause-sub', paused);
+    this.pauseControls = el('div', 'hud-pause-controls', paused);
     monitorLink(paused);
+  }
+
+  /**
+   * The cheat sheet shown on the pause screen as "Controls" (renderSummaryCard), or null for none.
+   * The same element may be passed every frame: it is only re-attached when it actually changes.
+   */
+  setControls(card: HTMLElement | null): void {
+    if (card === this.controlsCard) return;
+    this.controlsCard = card;
+    if (card) this.pauseControls.replaceChildren(card);
+    else this.pauseControls.replaceChildren();
   }
 
   /** The menu's input line (see menuNotice). */

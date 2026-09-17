@@ -2,12 +2,13 @@ import { TUNING } from '../game/config';
 import type { GameEvent } from '../game/game';
 import type { GameCommand } from '../input/commands';
 import type { Baseline } from '../pose/calibration';
-import type { Pose, PoseEvent, PoseStatus } from '../pose/types';
+import type { PlayMode, Pose, PoseEvent, PoseStatus } from '../pose/types';
 import {
   CONNECTION_TIMEOUT_MS,
   decodePoses,
   readFramePoses,
   type GameMessage,
+  type MoveCheckEvent,
   type GameSample,
   type GameSnapshot,
   type InputSourceName,
@@ -140,10 +141,23 @@ export function describeEntry(d: Describable): { label: string; tone: Tone; type
   }
 }
 
+/** Move-check progress, as one timeline note. Notes are never filtered out. */
+export function describeMoveCheck(mode: PlayMode, e: MoveCheckEvent): { label: string; tone: Tone } {
+  if (e.phase === 'start') return { label: `move check (${mode}): ${e.move} — go`, tone: 'info' };
+  if (e.phase === 'result') {
+    const peak = e.peak === null ? '' : ` peak ${e.peak.toFixed(3)}`;
+    return { label: `move check: ${e.move} ${e.result === 'done' ? '✓' : 'skipped'}${peak}`, tone: e.result === 'done' ? 'good' : 'warn' };
+  }
+  const keys = Object.keys(e.tuned).sort();
+  const tuned = keys.length ? keys.map((k) => `${k}=${e.tuned[k].toFixed(3)}`).join(' ') : 'nothing';
+  return { label: `move check done — tuned ${tuned}${e.note ? ` · ${e.note}` : ''}`, tone: 'info' };
+}
+
 function entriesOf(msg: GameMessage, seq: number): TimelineEntry[] {
   const out: TimelineEntry[] = [];
   const t = msg.t;
-  if (msg.kind === 'poseEvents') for (const event of msg.events) out.push({ seq: ++seq, t, kind: 'pose', ...describeEntry({ kind: 'pose', event }) });
+  if (msg.kind === 'moveCheck') out.push({ seq: ++seq, t, kind: 'note', type: `moveCheck:${msg.event.phase}`, ...describeMoveCheck(msg.mode, msg.event) });
+  else if (msg.kind === 'poseEvents') for (const event of msg.events) out.push({ seq: ++seq, t, kind: 'pose', ...describeEntry({ kind: 'pose', event }) });
   else if (msg.kind === 'gameEvents') for (const event of msg.events) out.push({ seq: ++seq, t, kind: 'game', ...describeEntry({ kind: 'game', event }) });
   else if (msg.kind === 'commands') {
     for (const command of msg.commands) {

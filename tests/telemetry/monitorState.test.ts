@@ -17,6 +17,7 @@ import {
 import { MAX_RECORDING_FRAMES, MAX_RECORDING_MS, SessionRecorder } from '../../src/monitor/recorder';
 import {
   decodeSession,
+  isGameMessage,
   writeFrameData,
   type GameMessage,
   type GameSnapshot,
@@ -332,5 +333,35 @@ describe('offline recording view', () => {
     const v = viewAt(r, recordingTimeline(r), 0);
     expect(v.frame).toBeNull();
     expect(v.frameIndex).toBe(-1);
+  });
+});
+
+describe('monitor: move-check progress', () => {
+  const msgs: GameMessage[] = [
+    { kind: 'moveCheck', t: 100, mode: 'full', event: { phase: 'start', move: 'jump' } },
+    { kind: 'moveCheck', t: 200, mode: 'full', event: { phase: 'result', move: 'jump', result: 'done', peak: 0.321, progress: 1 } },
+    { kind: 'moveCheck', t: 300, mode: 'full', event: { phase: 'result', move: 'roll', result: 'skipped', peak: null, progress: 0.4 } },
+    { kind: 'moveCheck', t: 400, mode: 'full', event: { phase: 'done', tuned: { jumpRise: 0.176 }, note: 'lopsided' } },
+  ];
+
+  it('lands on the timeline as notes, in order, and never as a filtered-out row', () => {
+    const s = run(msgs, 10);
+    expect(s.timeline.map((e) => e.label)).toEqual([
+      'move check (full): jump — go',
+      'move check: jump ✓ peak 0.321',
+      'move check: roll skipped',
+      'move check done — tuned jumpRise=0.176 · lopsided',
+    ]);
+    expect(s.timeline.map((e) => e.tone)).toEqual(['info', 'good', 'warn', 'info']);
+    const hidden = visibleTimeline(s.timeline, { pose: false, command: false, game: false, coins: false });
+    expect(hidden).toHaveLength(4);
+  });
+
+  it('is a game message the strict check accepts, and the recorder ignores without complaint', () => {
+    for (const m of msgs) expect(isGameMessage(m)).toBe(true);
+    const rec = new SessionRecorder();
+    rec.start({ meta: META, backend: 'worker' });
+    expect(() => msgs.forEach((m) => rec.push(m))).not.toThrow();
+    expect(rec.eventCount).toBe(0);
   });
 });
