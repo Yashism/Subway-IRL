@@ -39,7 +39,8 @@ export type FlowInput =
   | { type: 'cameraFailed'; message: string }
   | { type: 'pose'; status: PoseSnapshot }
   | { type: 'startGesture' }
-  | { type: 'gameState'; state: GameState };
+  /** `pausedByLoss` is Game.pausedByLoss at the moment of the change (a paused run that resumes itself). */
+  | { type: 'gameState'; state: GameState; pausedByLoss?: boolean };
 
 export type FlowEffect =
   | { type: 'openCamera'; cameraId: string | null }
@@ -110,6 +111,8 @@ export class SessionFlow {
   private error = '';
   private recheck = false;
   private gameState: GameState = 'menu';
+  /** The game is paused because the pose was lost, so it will resume on its own. */
+  private lossPaused = false;
   /** Owned copy of the last pose snapshot (callers may reuse theirs). */
   private readonly pose: PoseSnapshot = initialPose();
   private cached: ScreenModel | null = null;
@@ -131,6 +134,7 @@ export class SessionFlow {
     this.cached = null;
     if (i.type === 'gameState') {
       this.gameState = i.state;
+      this.lossPaused = i.state === 'paused' && !!i.pausedByLoss;
       return NONE as FlowEffect[];
     }
     return this.input === 'keyboard' ? this.keyboard(i) : this.webcam(i);
@@ -176,6 +180,13 @@ export class SessionFlow {
         }
         return NONE as FlowEffect[];
       case 'cameraError':
+        // A camera start that succeeded after this screen was shown (a late or superseded failure):
+        // move on instead of stranding the player on an error with a working camera.
+        if (i.type === 'cameraOk') {
+          this.cameraReady = true;
+          this.error = '';
+          return this.go(this.pose.calibrated ? 'ready' : 'calibrating');
+        }
         if (i.type === 'retry' || i.type === 'startPressed') return this.openCamera();
         if (i.type === 'chooseCamera') {
           this.cameraId = i.id;
@@ -246,7 +257,7 @@ export class SessionFlow {
     if (id === this.cameraId && this.cameraReady) return NONE as FlowEffect[];
     this.cameraId = id;
     const fx: FlowEffect[] = [];
-    if (this.screen === 'playing' && running(this.gameState)) fx.push({ type: 'pauseGame' });
+    if (this.mustPause()) fx.push({ type: 'pauseGame' });
     fx.push(...this.openCamera(), { type: 'recalibrate' });
     return fx;
   }
@@ -255,7 +266,7 @@ export class SessionFlow {
     this.cameraReady = false;
     this.error = message;
     if (this.screen === 'menu') return NONE as FlowEffect[];
-    const fx: FlowEffect[] = this.screen === 'playing' && running(this.gameState) ? [{ type: 'pauseGame' }] : [];
+    const fx: FlowEffect[] = this.mustPause() ? [{ type: 'pauseGame' }] : [];
     this.screen = 'cameraError';
     return fx;
   }
@@ -274,7 +285,7 @@ export class SessionFlow {
   private recalibrate(before: FlowEffect[]): FlowEffect[] {
     if (!this.canCalibrate()) return NONE as FlowEffect[];
     const fx: FlowEffect[] = [];
-    if (this.screen === 'playing' && running(this.gameState)) fx.push({ type: 'pauseGame' });
+    if (this.mustPause()) fx.push({ type: 'pauseGame' });
     fx.push(...before, { type: 'recalibrate' });
     this.recheck = false;
     this.screen = 'calibrating';
@@ -287,6 +298,15 @@ export class SessionFlow {
     const force: FlowEffect = { type: 'setForcedMode', mode: mode === 'auto' ? null : mode };
     // Without a camera there is nothing to recalibrate yet; the forced mode applies to the next calibration.
     return this.canCalibrate() ? this.recalibrate([force]) : [force];
+  }
+
+  /**
+   * A run is on screen and must be pinned down before an overlay takes over. A run paused by a
+   * lost pose counts: it resumes the moment tracking is back (or the camera stops reporting it),
+   * which would restart it behind the calibration or camera-error card.
+   */
+  private mustPause(): boolean {
+    return this.screen === 'playing' && (running(this.gameState) || this.lossPaused);
   }
 
   /** Calibration needs a running camera and a screen that can show it. */

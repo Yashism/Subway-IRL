@@ -112,10 +112,17 @@ export class AppLoop {
 
   /** Pauses a live run (Esc-style, resumed by Enter or a raised hand) and tells the flow and telemetry. */
   pauseGame(): void {
-    const before = this.game.state;
-    this.game.pause();
+    const game = this.game;
+    const before = game.state;
+    const wasLoss = game.pausedByLoss;
+    // A loss-pause resumes by itself as soon as the pose is back, and Game.pause() early-returns
+    // while already paused: turn it into a real pause here, so the run waits for the player instead
+    // of restarting behind the calibration or camera-error overlay.
+    if (before === 'paused' && wasLoss) game.pausedByLoss = false;
+    game.pause();
     // Game.pause() is a direct call and emits nothing: report the change like a step would.
-    if (this.game.state !== before) this.gameEvents([{ type: 'state', state: this.game.state }], this.lastNow);
+    if (game.state !== before) this.gameEvents([{ type: 'state', state: game.state }], this.lastNow);
+    else if (wasLoss !== game.pausedByLoss) this.dispatch({ type: 'gameState', state: game.state, pausedByLoss: false });
   }
 
   beginFrame(): void {
@@ -143,7 +150,9 @@ export class AppLoop {
     for (let k = 0; k < pc.length; k++) {
       const c = pc[k];
       if (c.type === 'start') {
-        if (usePose && !game.pausedByLoss) this.dispatch({ type: 'startGesture' });
+        // Dropped only while the game is *currently* paused by a lost pose (it resumes by itself).
+        // `pausedByLoss` is not cleared on resume, so the state has to be checked with it.
+        if (usePose && !(game.state === 'paused' && game.pausedByLoss)) this.dispatch({ type: 'startGesture' });
       } else if (usePose) {
         merged.push(c);
       }
@@ -201,7 +210,7 @@ export class AppLoop {
     for (let k = 0; k < events.length; k++) {
       const e = events[k];
       this.frameEvents.push(e);
-      if (e.type === 'state') this.dispatch({ type: 'gameState', state: e.state });
+      if (e.type === 'state') this.dispatch({ type: 'gameState', state: e.state, pausedByLoss: this.game.pausedByLoss });
       this.onGameEvent?.(e);
     }
   }

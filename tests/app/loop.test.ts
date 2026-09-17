@@ -272,6 +272,106 @@ describe('AppLoop: webcam mode', () => {
     expect(r.game.state).toBe('playing');
   });
 
+  it('start gestures work again after a loss-pause has resumed', () => {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.frame();
+    r.key('Enter');
+    r.frame(200);
+    expect(r.game.state).toBe('playing');
+    // Out of frame and back: the game pauses and resumes itself.
+    r.pose.commands.act.lost = true;
+    r.frame();
+    expect(r.game.state).toBe('paused');
+    r.pose.commands.act.lost = false;
+    r.frame(200);
+    expect(r.game.state).toBe('playing');
+    // The run ends (the player stopped jogging) and the raised hand must still start a new one.
+    r.pose.commands.act.msSinceStep = 5000;
+    r.frame(600);
+    expect(r.game.state).toBe('summary');
+    r.pose.commands.act.msSinceStep = 0;
+    r.pose.commands.queue.push({ type: 'start' });
+    r.frame(2);
+    expect(r.game.state).toBe('countdown');
+  });
+
+  it('a start gesture resumes a manual pause taken while the pose was lost', () => {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.frame();
+    r.key('Enter');
+    r.frame(200);
+    r.pose.commands.act.lost = true;
+    r.frame();
+    expect(r.game.pausedByLoss).toBe(true);
+    // Esc while paused-by-loss makes it a real pause: the returning pose must not resume the run.
+    r.loop.pauseGame();
+    expect(r.game.pausedByLoss).toBe(false);
+    r.pose.commands.act.lost = false;
+    r.frame(10);
+    expect(r.game.state).toBe('paused');
+    r.pose.commands.queue.push({ type: 'start' });
+    r.frame();
+    expect(r.game.state).toBe('countdown');
+  });
+
+  it('recalibrating while paused-by-loss keeps the run paused behind the calibration screen', () => {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.frame();
+    r.key('Enter');
+    r.frame(200);
+    r.pose.commands.act.lost = true;
+    r.frame();
+    expect(r.game.state).toBe('paused');
+    expect(r.game.pausedByLoss).toBe(true);
+    r.loop.dispatch({ type: 'recalibrate' });
+    expect(r.flow.screen).toBe('calibrating');
+    expect(r.effects.at(-1)).toEqual({ type: 'recalibrate' });
+    // Tracking comes back during calibration: the run must not restart behind the overlay.
+    r.pose.commands.act.lost = false;
+    r.pose.st.calibrated = false;
+    r.frame(200);
+    expect(r.game.state).toBe('paused');
+    expect(r.game.pausedByLoss).toBe(false);
+  });
+
+  it('a camera failure while paused-by-loss keeps the run paused behind the error screen', () => {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.frame();
+    r.key('Enter');
+    r.frame(200);
+    r.pose.commands.act.lost = true;
+    r.frame();
+    expect(r.game.state).toBe('paused');
+    r.loop.dispatch({ type: 'cameraFailed', message: 'Camera unplugged' });
+    expect(r.flow.screen).toBe('cameraError');
+    // With the camera gone nothing reports a lost pose any more, which used to resume the run.
+    r.pose.commands.act.lost = false;
+    r.frame(200);
+    expect(r.game.state).toBe('paused');
+  });
+
+  it('a camera that starts after the error screen is shown moves the flow on', () => {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.loop.dispatch({ type: 'cameraFailed', message: 'boom' });
+    expect(r.flow.screen).toBe('cameraError');
+    r.loop.dispatch({ type: 'cameraOk' });
+    expect(r.flow.screen).toBe('calibrating');
+    expect(r.flow.cameraReady).toBe(true);
+  });
+
   it('flags a stalled camera and passes darkness to the flow', () => {
     const r = setup({ input: 'webcam' });
     r.openCamera();
