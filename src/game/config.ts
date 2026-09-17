@@ -57,7 +57,7 @@ export const TUNING = {
   idleWarnMs: 1000,
   idleCaughtMs: 2000,
   squatIdleCreditMs: 1000,
-  catchSeconds: 1.5,
+  catchSeconds: 5,
   countdownSeconds: 3,
   // power-ups
   hoverboardsPerRun: 3,
