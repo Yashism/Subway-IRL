@@ -83,7 +83,8 @@ void main() {
   float dz = min( world.z, 0.0 );
   float d2 = dz * dz * uCurveEnabled;
   world.y -= d2 * uCurveVertical;
-  world.x -= sign( world.x ) * d2 * uCurveHorizontal;
+  // Same sideways bend as materials.ts: smooth through x = 0.
+  world.x -= clamp( world.x / 4.0, -1.0, 1.0 ) * d2 * uCurveHorizontal;
   vec4 mv = viewMatrix * world;
   gl_Position = projectionMatrix * mv;
   gl_PointSize = aAlpha <= 0.0 ? 0.0 : aSize * projectionMatrix[1][1] * uViewportH * 0.5 / max( 0.2, -mv.z );
@@ -495,16 +496,20 @@ export class Fx {
       blending: THREE.AdditiveBlending,
       toneMapped: false,
     });
-    this.ringMat = basicMaterial({
-      color: 0x6fd1ff,
-      map: ringTexture(),
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-    });
-    this.ring2Mat = this.ringMat.clone();
+    // Two separate curved materials: clone() would drop the curve patch (onBeforeCompile).
+    const ringMap = ringTexture();
+    const ringMaterial = () =>
+      basicMaterial({
+        color: 0x6fd1ff,
+        map: ringMap,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      });
+    this.ringMat = ringMaterial();
+    this.ring2Mat = ringMaterial();
     const quad = new THREE.PlaneGeometry(1, 1);
     this.bubble = new THREE.Mesh(quad, this.bubbleMat);
     this.bubble.scale.setScalar(3.1);

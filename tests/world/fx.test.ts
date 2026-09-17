@@ -32,6 +32,28 @@ describe('Fx', () => {
     expect(camera.children.some((c) => c.name === 'fx-speedlines')).toBe(true);
   });
 
+  it('curves every fx material like the world (no clone that drops the patch, no sign() kink)', () => {
+    const { scene, fx } = make();
+    const mats: THREE.Material[] = [];
+    scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      if (m) mats.push(...(Array.isArray(m) ? m : [m]));
+    });
+    expect(fx.root.children.length).toBeGreaterThan(0);
+    const rings = mats.filter((m) => (m as THREE.MeshBasicMaterial).isMeshBasicMaterial && m.blending === THREE.AdditiveBlending);
+    expect(rings.length).toBeGreaterThanOrEqual(2);
+    for (const m of rings) {
+      const shader = { uniforms: {} as Record<string, unknown>, vertexShader: '#include <common>\n#include <project_vertex>', fragmentShader: '' };
+      m.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+      expect(shader.uniforms, m.name || m.type).toHaveProperty('uCurveHorizontal');
+    }
+    const points = mats.filter((m) => (m as THREE.ShaderMaterial).isShaderMaterial) as THREE.ShaderMaterial[];
+    expect(points.some((m) => m.vertexShader.includes('uCurveHorizontal'))).toBe(true);
+    for (const m of points) {
+      expect(m.vertexShader).not.toMatch(/sign\(\s*world\.x\s*\)/);
+    }
+  });
+
   it('bursts 8-12 sparks for a coin and lets them die out', () => {
     const { fx } = make();
     const pos = new THREE.Vector3();
