@@ -193,6 +193,30 @@ export function hudModel(g: Game, view?: HudProfileView): HudModel {
   };
 }
 
+export interface InputNoticeState {
+  input: 'webcam' | 'keyboard';
+  /** A camera (or pose replay) is feeding the pose pipeline. */
+  cameraReady: boolean;
+  /** Name of the pose replay, '' for a real camera. */
+  replay: string;
+  autopilot: boolean;
+  /** Why the game fell back to the keyboard, '' if it did not. */
+  fallback: string;
+}
+
+/** The menu's input line: what controls the game right now. */
+export function menuNotice(s: InputNoticeState): string {
+  if (s.autopilot) return 'Autopilot demo';
+  if (s.input === 'keyboard') return s.fallback ? `${s.fallback} · playing with the keyboard` : 'Keyboard play · the webcam is off';
+  if (s.replay) return `Pose replay “${s.replay}” · press Enter`;
+  if (s.cameraReady) return 'Webcam ready · raise your right hand to start';
+  return 'Webcam play · press Enter to set up your camera · keys work too';
+}
+
+/** Where the live monitor lives; the named window is reused by the link and the M key. */
+export const MONITOR_URL = 'monitor.html';
+export const MONITOR_WINDOW = 'subway-irl-monitor';
+
 // ---------------------------------------------------------------- DOM
 
 const el = (tag: string, cls: string, parent: HTMLElement, text?: string): HTMLElement => {
@@ -202,6 +226,16 @@ const el = (tag: string, cls: string, parent: HTMLElement, text?: string): HTMLE
   parent.append(e);
   return e;
 };
+
+/** "Live monitor (M)": opens monitor.html in its own tab or window. */
+function monitorLink(parent: HTMLElement): HTMLAnchorElement {
+  const a = el('a', 'hud-monitor-link', parent, '📈 Live monitor (M)') as HTMLAnchorElement;
+  a.href = MONITOR_URL;
+  a.target = MONITOR_WINDOW;
+  a.rel = 'noopener';
+  a.title = 'Open the live monitor in a separate window to watch what the game sees';
+  return a;
+}
 
 interface TimerRow {
   row: HTMLElement;
@@ -256,6 +290,7 @@ export class Hud {
   private readonly life: HTMLElement;
   private readonly lifeVals: Record<keyof HudProfileModel['lifetime'], HTMLElement>;
   private readonly view: HudProfileView = { profile: null, last: null };
+  private readonly menuFoot: HTMLElement;
 
   private readonly lastText = new Map<HTMLElement, string>();
   private readonly lastStyle = new Map<string, string>();
@@ -319,10 +354,11 @@ export class Hud {
     this.menuCoins = el('span', 'hud-menu-pill-text', coinPill);
     el('span', 'hud-menu-pill-unit', coinPill, 'coins');
     const cta = el('div', 'hud-cta', menu);
-    // Keyboard first until pose control ships.
     el('span', 'hud-cta-text', cta, 'PRESS ENTER');
     const bottom = el('div', 'hud-menu-bottom', menu);
-    el('div', 'hud-menu-foot', bottom, 'Play with the keyboard · Webcam control coming soon');
+    const foot = el('div', 'hud-menu-foot', bottom);
+    this.menuFoot = el('span', 'hud-menu-foot-text', foot, 'Press Enter to start');
+    monitorLink(foot);
     const controls = el('div', 'hud-controls', bottom);
     const control = (keys: string[], label: string) => {
       const c = el('div', 'hud-control', controls);
@@ -390,6 +426,12 @@ export class Hud {
     this.pauseIcon = el('div', 'hud-pause-icon', paused);
     this.pauseTitle = el('div', 'hud-pause-title', paused);
     this.pauseSub = el('div', 'hud-pause-sub', paused);
+    monitorLink(paused);
+  }
+
+  /** The menu's input line (see menuNotice). */
+  setInputNotice(text: string): void {
+    this.text(this.menuFoot, text);
   }
 
   /**

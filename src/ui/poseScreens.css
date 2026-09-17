@@ -40,10 +40,6 @@ html[data-pose-screen='cameraError'] .hud-paused,
 html[data-pose-screen='cameraStarting'] .hud-paused {
   display: none !important;
 }
-/* The HUD menu still says "webcam coming soon"; our mode card replaces that line. */
-html[data-pose-screen] .hud-menu-foot {
-  display: none;
-}
 
 .ps-layer {
   position: absolute;
@@ -819,6 +815,34 @@ html[data-pose-screen] .hud-menu-foot {
 }
 .ps-toast[data-level='stalled'] .ps-toast-icon {
   animation: ps-blink 0.6s steps(2, jump-none) infinite;
+}
+/* Calibration screens own the top centre (banner): the toast moves to the top-left corner. */
+.pose-ui[data-screen='calibrating'] .ps-toast,
+.pose-ui[data-screen='ready'] .ps-toast {
+  left: max(16px, env(safe-area-inset-left));
+  max-width: min(420px, calc(100vw - 32px));
+  transform: translate(0, -160%);
+}
+.pose-ui[data-screen='calibrating'] .ps-toast[data-level='slow'],
+.pose-ui[data-screen='calibrating'] .ps-toast[data-level='stalled'],
+.pose-ui[data-screen='ready'] .ps-toast[data-level='slow'],
+.pose-ui[data-screen='ready'] .ps-toast[data-level='stalled'] {
+  transform: translate(0, 0);
+}
+@media (max-width: 900px) {
+  /* Narrow: centred again, just under the (smaller) banner. */
+  .pose-ui[data-screen='calibrating'] .ps-toast,
+  .pose-ui[data-screen='ready'] .ps-toast {
+    top: 64px;
+    left: 50%;
+    transform: translate(-50%, -160%);
+  }
+  .pose-ui[data-screen='calibrating'] .ps-toast[data-level='slow'],
+  .pose-ui[data-screen='calibrating'] .ps-toast[data-level='stalled'],
+  .pose-ui[data-screen='ready'] .ps-toast[data-level='slow'],
+  .pose-ui[data-screen='ready'] .ps-toast[data-level='stalled'] {
+    transform: translate(-50%, 0);
+  }
 }
 .ps-toast-icon {
   display: grid;
