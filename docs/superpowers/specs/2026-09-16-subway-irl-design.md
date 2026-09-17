@@ -51,7 +51,7 @@ docs/asset-brief.md   Meshy/Tripo prompts + Mixamo checklist
 - **`pose/`** knows nothing about the game. It outputs:
   - Events: `{type:'lane', lane:-1|0|1}` (full-body mode), `{type:'laneShift', dir:-1|1}` (small-room mode), `{type:'jump'}`, `{type:'roll'}`, `{type:'hoverboard'}`, `{type:'start'}`, `{type:'lost'}`, `{type:'found'}`.
   - Status (polled every frame): `{tracking, mode, poseFps, confidence, jog:{active, cadenceSpm, msSinceStep}, landmarks}`.
-- **`input/`** turns pose events and keyboard input into `GameCommand`s: `setLane`, `shiftLane`, `jump`, `roll`, `hoverboard`, `start`, `pause`. Keyboard mapping: ←/→ shift lane, ↑ jump, ↓ roll, Space hoverboard, Enter start, **J held = jogging** (so the jog rule can be tested with the keyboard). In keyboard-only mode the jog rule is disabled unless J-jog is enabled in settings.
+- **`input/`** turns pose events and keyboard input into `GameCommand`s: `setLane`, `shiftLane`, `jump`, `roll`, `hoverboard`, `start`, `pause`. Keyboard mapping: ←/A and →/D shift lane, Space (or ↑/W) jump, S/↓ roll (duck), Ctrl hoverboard, Enter start, Esc/P pause, **J held = jogging** (so the jog rule can be tested with the keyboard). In keyboard-only mode the jog rule is disabled unless J-jog is enabled in settings.
 - **`game/`** knows nothing about the camera or rendering. It is a deterministic simulation with a fixed 60 Hz step and a seeded RNG. It consumes commands and the jog status, and exposes state for `world/` and `ui/` to render.
 - **`world/`** reads the game state and renders it. It never changes the game state.
 
@@ -155,7 +155,7 @@ The TT and dog start right behind the runner, drop out of view after about 4 s, 
 - **Magnet (10 s):** pulls in coins from all lanes.
 - **Diwali Rocket (8 s):** flight above the trains along a coin trail. Lane changes still work, jump and roll are disabled, and the **jog rule still applies**. It ends with a safe landing window of 1 s with no obstacles.
 - **Kolhapuri Chappals (10 s):** higher, longer jumps that can reach train roofs.
-- **Hoverboard:** 3 per run, activated by gesture (or Space). Lasts 30 s or until it absorbs one crash. It can't be activated again while one is active.
+- **Hoverboard:** 3 per run, activated by gesture (or Ctrl). Lasts 30 s or until it absorbs one crash. It can't be activated again while one is active.
 
 ### 5.8 State machine
 `Menu → Calibrate → Countdown → Playing ⇄ Paused → Caught → Summary → (Calibrate | Menu)`. `Paused` is entered on `lost`, a hidden tab, or WebGL context loss.

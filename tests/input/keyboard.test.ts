@@ -4,7 +4,7 @@ import { KeyboardInput } from '../../src/input/keyboard';
 describe('KeyboardInput', () => {
   it('maps keys to commands and ignores auto-repeat', () => {
     const k = new KeyboardInput();
-    for (const code of ['ArrowLeft', 'KeyD', 'ArrowUp', 'KeyS', 'Space', 'Enter', 'Escape']) k.keyDown({ code }, 0);
+    for (const code of ['ArrowLeft', 'KeyD', 'ArrowUp', 'KeyS', 'ControlLeft', 'Enter', 'Escape']) k.keyDown({ code }, 0);
     k.keyDown({ code: 'ArrowUp', repeat: true }, 0);
     expect(k.keyDown({ code: 'KeyZ' }, 0)).toBe(false);
     expect(k.drain()).toEqual([
@@ -16,6 +16,23 @@ describe('KeyboardInput', () => {
       { type: 'start' },
       { type: 'pause' },
     ]);
+    expect(k.drain()).toEqual([]);
+  });
+
+  it('jumps on Space, W and Up; rolls on S and Down', () => {
+    const k = new KeyboardInput();
+    for (const code of ['Space', 'KeyW', 'ArrowUp', 'KeyS', 'ArrowDown']) k.keyDown({ code }, 0);
+    expect(k.drain()).toEqual([{ type: 'jump' }, { type: 'jump' }, { type: 'jump' }, { type: 'roll' }, { type: 'roll' }]);
+  });
+
+  it('uses either Ctrl for the hoverboard and leaves Ctrl combos to the browser', () => {
+    const k = new KeyboardInput();
+    expect(k.keyDown({ code: 'ControlLeft' }, 0)).toBe(true);
+    expect(k.keyDown({ code: 'ControlRight' }, 0)).toBe(true);
+    expect(k.drain()).toEqual([{ type: 'hoverboard' }, { type: 'hoverboard' }]);
+    // Ctrl+R / Ctrl+T: the letter key is not the game's, so its keydown is not blocked.
+    expect(k.keyDown({ code: 'KeyR' }, 0)).toBe(false);
+    expect(k.keyDown({ code: 'KeyT' }, 0)).toBe(false);
     expect(k.drain()).toEqual([]);
   });
 

@@ -15,9 +15,13 @@ const KEYMAP: Record<string, GameCommand> = {
   KeyD: { type: 'shiftLane', dir: 1 },
   ArrowUp: { type: 'jump' },
   KeyW: { type: 'jump' },
+  Space: { type: 'jump' },
   ArrowDown: { type: 'roll' },
   KeyS: { type: 'roll' },
-  Space: { type: 'hoverboard' },
+  // Only Ctrl's own keydown maps; in a combo (Ctrl+R) the other key is not ours, so the
+  // browser shortcut still fires.
+  ControlLeft: { type: 'hoverboard' },
+  ControlRight: { type: 'hoverboard' },
   Enter: { type: 'start' },
   Escape: { type: 'pause' },
   KeyP: { type: 'pause' },

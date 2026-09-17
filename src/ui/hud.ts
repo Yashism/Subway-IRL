@@ -77,7 +77,7 @@ function centerText(g: Game): string {
 function subText(g: Game): string {
   switch (g.state) {
     case 'menu':
-      return 'Press Enter to start · ←/→ lanes · ↑ jump · ↓ roll · Space hoverboard';
+      return 'Press Enter to start · ←/→ lanes · Space jump · S/↓ duck · Ctrl hoverboard';
     case 'paused':
       return g.pausedByLoss ? 'Stand where the camera can see you' : 'Press Enter to resume';
     case 'caught':
@@ -252,9 +252,9 @@ export class Hud {
       el('span', 'hud-control-label', c, label);
     };
     control(['←', '→'], 'Lanes');
-    control(['↑'], 'Jump');
-    control(['↓'], 'Roll');
-    control(['Space'], 'Hoverboard');
+    control(['Space'], 'Jump');
+    control(['S', '↓'], 'Duck');
+    control(['Ctrl'], 'Hoverboard');
     control(['Esc'], 'Pause');
 
     // Countdown: one element per digit, so showing it restarts its CSS animation.

@@ -21,7 +21,7 @@
 - Lanes are `-1 | 0 | 1` (the `Lane` type from `src/pose/types.ts`) and sit 2.5 m apart. Distance along the track is `s`, in metres.
 - Rendering uses a floating origin: world `z = -(itemS - game.s)`, so the runner is at z = 0 and the camera looks toward −z.
 - Render pixel ratio ≤ 1.25. AgX tone mapping. One shadow-casting directional light that follows the runner. Target 60 fps.
-- Keyboard: ←/A and →/D change lane, ↑/W jump, ↓/S roll, Space hoverboard, Enter start, Esc/P pause, **J held = jogging** (only counts when J-jog is enabled with `?jog`).
+- Keyboard: ←/A and →/D change lane, Space (or ↑/W) jump, S/↓ roll (duck), Ctrl (left or right) hoverboard, Enter start, Esc/P pause, **J held = jogging** (only counts when J-jog is enabled with `?jog`).
 - Every game constant lives in `src/game/config.ts` (`TUNING`).
 - Never use Playwright. For visual checks, run `shoot <url> <out.png> [readyExpr] [settleMs]` and open every PNG with the Read tool.
 - Every commit message ends with a blank line followed by exactly: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`
