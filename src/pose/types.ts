@@ -58,7 +58,10 @@ export interface MoveMagnitudes {
   headDrop: number;
   /** The primary jog signal: knee lift (`kneeLift`) or |wrist offset| (`wristPump`). */
   jogPrimary: number;
-  /** Jog bounce amplitude (`bobMinAmp`). */
+  /**
+   * Half the peak-to-trough bounce of the last second (`bobMinAmp`). Ungated, unlike the value the
+   * jump gate uses, so a bounce that is too small to count as a step still reads as a real number.
+   */
   bobAmp: number;
   /** Jog steps counted since calibration. Not a magnitude; the jog step of the check counts these. */
   jogSteps: number;

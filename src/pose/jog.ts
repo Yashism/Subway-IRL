@@ -50,7 +50,8 @@ export class JogDetector {
     const primary = full ? this.kneeStep(body, base, sens) : this.wristStep(body, base, t, sens);
     if (this.mag) {
       this.mag.jogPrimary = this.primaryMag;
-      this.mag.bobAmp = this.bob.amplitudeAt(t);
+      // The raw excursion, not the gated one: a bob under the threshold must still read as a near miss.
+      this.mag.bobAmp = this.bob.rawAmplitude;
     }
     if (primary) {
       this.lastPrimaryT = t;

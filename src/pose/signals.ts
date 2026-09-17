@@ -42,6 +42,7 @@ export class BobTracker {
   private lastPeak = Number.NaN;
   private lastTroughT = -Infinity;
   private swings: number[] = [];
+  private recent = new TimeWindow(1000);
 
   reset(): void {
     this.dir = 'up';
@@ -49,6 +50,7 @@ export class BobTracker {
     this.lastPeak = Number.NaN;
     this.lastTroughT = -Infinity;
     this.swings = [];
+    this.recent.clear();
   }
 
   /** Typical bounce amplitude (half the peak-to-trough swing); 0 once bouncing has stopped. */
@@ -57,7 +59,18 @@ export class BobTracker {
     return this.swings.reduce((a, b) => a + b, 0) / this.swings.length / 2;
   }
 
+  /**
+   * Half the peak-to-trough excursion of the last second, with no minimum-amplitude gate — what the
+   * player is doing right now, whether or not it counts as a bounce. `amplitudeAt` cannot answer
+   * that: a swing is only recorded once it has already cleared `2 × minAmp`, so a player bobbing
+   * just under the threshold reads exactly 0 there. Same units, so it is comparable to `bobMinAmp`.
+   */
+  get rawAmplitude(): number {
+    return this.recent.size ? (this.recent.max() - this.recent.min()) / 2 : 0;
+  }
+
   update(v: number, t: number, minAmp: number, maxGapMs: number, maxSwing: number): boolean {
+    this.recent.push(t, v);
     if (Number.isNaN(this.ext)) {
       this.ext = v;
       this.extT = t;

@@ -34,6 +34,12 @@ export class PoseController {
   forcedMode: PlayMode | null;
   baseline: Baseline | null = null;
   body: Body | null = null;
+  /**
+   * Holds the baseline still. Drift normally follows a player who stands taller or steps nearer,
+   * but it also chases one who holds a slow, sub-threshold lean or knee lift — which would eat the
+   * very excursion the Move Check is trying to measure. The flow sets this while a check runs.
+   */
+  freezeBaseline = false;
 
   private calibrator: Calibrator;
   private jog: JogDetector;
@@ -229,7 +235,7 @@ export class PoseController {
       base.mode === 'full'
         ? Math.abs(body.hip.y - base.hip.y) < this.th.driftSettle * base.torso
         : Math.abs(body.shoulder.y - base.shoulder.y) < this.th.driftSettle * base.shoulderWidth;
-    if (prevT === null) return events;
+    if (prevT === null || this.freezeBaseline) return events;
     const dt = t - prevT;
     // Small-room x follows the player even while jogging, but never during a held lean.
     if (base.mode === 'small' && this.small.leanReady) driftBaselineX(base, body, dt);
