@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { InputHub } from '../../src/input/hub';
 import { PoseCommandSource } from '../../src/input/poseSource';
 import { PoseController } from '../../src/pose/controller';
@@ -24,6 +24,14 @@ class StubController {
     squatting: false,
     slowPose: false,
   };
+
+  statusInto(out: PoseStatus): PoseStatus {
+    const s = this.status;
+    Object.assign(out, { ...s, jog: out.jog, calibration: out.calibration });
+    Object.assign(out.jog, s.jog);
+    Object.assign(out.calibration, s.calibration);
+    return out;
+  }
 
   update(frame: PoseFrame): PoseEvent[] {
     this.status.lastFrameT = frame.t;
@@ -232,5 +240,18 @@ describe('PoseCommandSource with a real controller', () => {
     const at = src.activity(last).msSinceStep;
     expect(src.activity(last + 1400)).toMatchObject({ lost: false, msSinceStep: at + 1400 });
     expect(src.activity(last + 1600).lost).toBe(true);
+  });
+});
+
+describe('PoseCommandSource allocation', () => {
+  it('reads the controller through statusInto, never the allocating status getter', () => {
+    const ctrl = new PoseController();
+    const getter = vi.spyOn(ctrl, 'status', 'get');
+    const src = new PoseCommandSource(ctrl);
+    src.push({ t: 0, aspect: 4 / 3, poses: [] });
+    src.activity(10);
+    src.activity(20);
+    src.recalibrate();
+    expect(getter).not.toHaveBeenCalled();
   });
 });

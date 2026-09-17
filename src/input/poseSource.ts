@@ -1,5 +1,5 @@
 import type { PoseController } from '../pose/controller';
-import type { PoseEvent, PoseFrame } from '../pose/types';
+import type { PoseEvent, PoseFrame, PoseStatus } from '../pose/types';
 import type { ActivityStatus, CommandSource, GameCommand } from './commands';
 
 export interface PoseCommandSourceOptions {
@@ -22,6 +22,23 @@ const JUMP = freeze({ type: 'jump' });
 const ROLL = freeze({ type: 'roll' });
 const HOVERBOARD = freeze({ type: 'hoverboard' });
 const START = freeze({ type: 'start' });
+/** A blank PoseStatus to fill with PoseController.statusInto(). */
+export const emptyPoseStatus = (): PoseStatus => ({
+  tracking: false,
+  calibrated: false,
+  mode: null,
+  lane: 0,
+  poseFps: 0,
+  confidence: 0,
+  jog: { active: false, cadenceSpm: 0, msSinceStep: Infinity, steps: 0 },
+  startProgress: 0,
+  calibration: { progress: 0, bodyVisible: false, distance: 'ok' },
+  pose: null,
+  lastFrameT: null,
+  squatting: false,
+  slowPose: false,
+});
+
 /** Returned by drain() when nothing is queued; frozen so a caller cannot fill it by accident. */
 const NONE = Object.freeze([]) as unknown as GameCommand[];
 
@@ -66,6 +83,8 @@ export class PoseCommandSource implements CommandSource {
   private stepsBefore = 0;
   /** The controller's step count at the last look, to notice a reset done behind our back. */
   private lastRawSteps = 0;
+  /** Scratch status, refilled by statusInto() so the 60 Hz poll does not allocate. */
+  private readonly st = emptyPoseStatus();
   private readonly result: ActivityStatus = {
     tracksJogging: false,
     msSinceStep: Infinity,
@@ -105,7 +124,7 @@ export class PoseCommandSource implements CommandSource {
    * read or copy its fields straight away and never keep a reference (InputHub copies them).
    */
   activity(tMs: number): ActivityStatus {
-    const st = this.controller.status;
+    const st = this.controller.statusInto(this.st);
     const raw = st.jog.steps;
     this.syncSteps(raw);
     const last = st.lastFrameT;
@@ -123,9 +142,9 @@ export class PoseCommandSource implements CommandSource {
 
   /** Recalibrates the controller. Steps stay monotonic; a side-lane player is sent back to lane 0. */
   recalibrate(): void {
-    this.syncSteps(this.controller.status.jog.steps);
+    this.syncSteps(this.controller.statusInto(this.st).jog.steps);
     this.enqueue(this.controller.recalibrate());
-    this.syncSteps(this.controller.status.jog.steps);
+    this.syncSteps(this.controller.statusInto(this.st).jog.steps);
   }
 
   private enqueue(events: readonly PoseEvent[]): void {
