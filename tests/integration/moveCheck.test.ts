@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { SessionFlow, type FlowInput, type FlowOptions } from '../../src/app/flow';
+import { MoveCheckSession } from '../../src/app/moveCheckSession';
 import { TUNING } from '../../src/game/config';
 import { PoseController } from '../../src/pose/controller';
 import { MoveCheck } from '../../src/pose/moveCheck';
@@ -130,6 +132,7 @@ describe('move check → tuning → play', () => {
     expect(Object.keys(summary.tuned).sort()).toEqual([
       'jumpRearm',
       'jumpRise',
+      'jumpVel',
       'kneeLift',
       'kneeRelease',
       'laneEnter',
@@ -164,6 +167,7 @@ describe('move check → tuning → play', () => {
       'noseShift',
       'smallJumpRearm',
       'smallJumpRise',
+      'smallJumpVel',
       'wristPump',
     ]);
     expect(summary.tuned.leanDeg!).toBeLessThan(DEFAULT_THRESHOLDS.leanDeg);
@@ -220,6 +224,25 @@ describe('move check → tuning → play', () => {
     expect(th).toEqual(DEFAULT_THRESHOLDS);
   });
 
+  it('a re-run that skips a step keeps what that step was tuned to last time', () => {
+    const storage = memStore();
+    const store = new MoveTuningStore(storage);
+    store.save(runCheck('full').tuning);
+    const first = store.get('full')!.thresholds;
+    expect(first.jumpRise).toBeDefined();
+
+    // The player recalibrates because their lanes drifted, and skips the jump — a step they
+    // deliberately did not touch must not quietly lose last time's tuning.
+    const redo = new MoveCheck('full');
+    redo.skipAll();
+    new MoveTuningStore(storage).save(redo.tuning(2_000_000_000_000)!);
+
+    const th = { ...DEFAULT_THRESHOLDS };
+    applyTuning(th, new MoveTuningStore(storage).get('full'));
+    expect(th.jumpRise).toBeCloseTo(first.jumpRise!, 10);
+    expect(th.laneEnter).toBeCloseTo(first.laneEnter!, 10);
+  });
+
   it('a skipped check leaves every threshold alone', () => {
     const check = new MoveCheck('full');
     check.skipAll();
@@ -230,3 +253,104 @@ describe('move check → tuning → play', () => {
   });
 });
 
+
+/**
+ * The wiring: real pose frames through a real PoseController, the flow deciding when the check
+ * runs, the session saving what it measured onto the live thresholds, and a reload finding it.
+ */
+describe('move check: wired into the session flow', () => {
+  const CALIBRATED: FlowInput = {
+    type: 'pose',
+    status: {
+      tracking: true,
+      calibrated: true,
+      mode: 'full',
+      startProgress: 0,
+      calibration: { progress: 0, bodyVisible: true, distance: 'ok' },
+      dark: false,
+    },
+  };
+
+  /** A webcam flow on the calibration screen, plus the session its effects drive. */
+  function wired(storage: TuningStorage, opts: Partial<FlowOptions> = {}) {
+    const ctrl = new PoseController({ forcedMode: 'full' });
+    const store = new MoveTuningStore(storage);
+    const session = new MoveCheckSession({ thresholds: ctrl.th, store, now: () => 1_700_000_000_000 });
+    const flow = new SessionFlow({ input: 'webcam', moveCheckSeen: session.seen, ...opts });
+    const run = (i: FlowInput) => {
+      for (const fx of flow.dispatch(i)) {
+        if (fx.type === 'startMoveCheck') session.begin(ctrl.baseline?.mode ?? 'full');
+        if (fx.type === 'endMoveCheck') session.end();
+      }
+    };
+    flow.dispatch({ type: 'startPressed' });
+    flow.dispatch({ type: 'startPressed' });
+    flow.dispatch({ type: 'cameraOk' });
+    return { ctrl, store, session, flow, run };
+  }
+
+  /** Plays the whole full-body timeline into the controller, feeding the check while it is up. */
+  function play(w: ReturnType<typeof wired>): void {
+    for (const f of fullBodyTimeline().frames) {
+      const events = w.ctrl.update(f);
+      if (w.ctrl.baseline) w.run(CALIBRATED);
+      if (w.session.running) w.session.frame(w.ctrl, events, f.t);
+    }
+  }
+
+  it('a first-ever calibration runs the check, and the very next run plays with what it measured', () => {
+    const storage = memStore();
+    const w = wired(storage);
+    expect(w.flow.screen).toBe('calibrating');
+    play(w);
+    expect(w.flow.screen).toBe('moveCheck');
+    expect(w.session.model!.summary, 'the check should have finished').not.toBeNull();
+
+    const tuned = w.store.get('full')!.thresholds;
+    expect(tuned.laneEnter).toBeLessThan(DEFAULT_THRESHOLDS.laneEnter);
+    // Already in force on the live controller, before anyone presses start.
+    expect(w.ctrl.th.laneEnter).toBeCloseTo(tuned.laneEnter!, 10);
+    expect(shallowLaneRun(undefined, false)).not.toContain('setLane:-1');
+    expect(shallowLaneRun({ ...w.ctrl.th }, false)).toContain('setLane:-1');
+
+    w.run({ type: 'startPressed' });
+    expect(w.flow.screen).toBe('ready');
+    expect(w.session.running).toBe(false);
+  });
+
+  it('a returning player goes straight to ready, with the saved tuning already applied', () => {
+    const storage = memStore();
+    play(wired(storage));
+
+    const back = wired(storage);
+    back.session.applyFor('full');
+    expect(back.flow.screen).toBe('calibrating');
+    back.run(CALIBRATED);
+    expect(back.flow.screen).toBe('ready');
+    expect(back.session.running).toBe(false);
+    expect(back.ctrl.th.laneEnter).toBeCloseTo(back.store.get('full')!.thresholds.laneEnter!, 10);
+
+    // ...and the check is still one click away.
+    expect(back.flow.model.showMoveCheck).toBe(true);
+    back.run({ type: 'checkMoves' });
+    expect(back.flow.screen).toBe('moveCheck');
+    expect(back.session.running).toBe(true);
+  });
+
+  it('?movecheck=skip goes straight to ready even on a first run', () => {
+    const w = wired(memStore(), { moveCheck: 'skip' });
+    play(w);
+    expect(w.flow.screen).toBe('ready');
+    expect(w.session.running).toBe(false);
+    expect(w.store.empty).toBe(true);
+    expect(w.ctrl.th.laneEnter).toBe(DEFAULT_THRESHOLDS.laneEnter);
+  });
+
+  it('?movecheck=force runs it for a returning player too', () => {
+    const storage = memStore();
+    play(wired(storage));
+    const forced = wired(storage, { moveCheck: 'force' });
+    forced.run(CALIBRATED);
+    expect(forced.flow.screen).toBe('moveCheck');
+  });
+});

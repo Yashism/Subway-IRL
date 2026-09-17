@@ -62,6 +62,17 @@ class Rig implements MoveCheckSource {
     this.wait(ADVANCE_MS + FRAME_MS, set);
   }
 
+  /** Waits until the step offers a way out, then takes it. Returns what the machine allowed. */
+  skip(): boolean {
+    this.wait(OFFER_SKIP_MS + 100);
+    return this.check.skipStep();
+  }
+
+  accept(): boolean {
+    this.wait(OFFER_SKIP_MS + 100);
+    return this.check.acceptBest();
+  }
+
   /** Four jog steps, with the knees or arms reaching `mag`. */
   passJog(mag: number): void {
     for (let i = 1; i <= JOG_STEPS_NEEDED; i++) {
@@ -183,6 +194,7 @@ describe('MoveCheck — near misses and skipping', () => {
     const r = new Rig('full');
     r.wait(OFFER_SKIP_MS + 100);
     expect(r.step).toMatchObject({ id: 'jog', canSkip: true, canAccept: false });
+    expect(r.check.acceptBest(), 'the jog step has no easier setting to offer').toBe(false);
     r.check.skipStep();
     for (const id of ['left', 'right', 'jump', 'roll'] as const) {
       r.wait(OFFER_SKIP_MS + 100);
@@ -197,7 +209,8 @@ describe('MoveCheck — near misses and skipping', () => {
     const r = new Rig('full');
     r.passJog(0.3);
     r.frame({ lane: -0.9 });
-    r.check.skipStep();
+    expect(r.check.skipStep(), 'a skip before it is offered is refused').toBe(false);
+    expect(r.skip()).toBe(true);
     expect(r.id).toBe('right');
     expect(r.stepFor('left').status).toBe('skipped');
     r.check.skipAll();
@@ -219,9 +232,10 @@ describe('MoveCheck — near misses and skipping', () => {
     const r = new Rig('full');
     r.passJog(0.3);
     r.frame({ lane: -0.4 });
-    r.check.acceptBest();
+    expect(r.check.acceptBest(), 'an easier setting before it is offered is refused').toBe(false);
+    expect(r.accept()).toBe(true);
     r.frame({ lane: 0.4 });
-    r.check.acceptBest();
+    r.accept();
     r.check.skipAll();
     const tuned = r.check.model.summary!.tuned;
     expect(r.stepFor('left').status).toBe('skipped');
@@ -235,8 +249,8 @@ describe('MoveCheck — near misses and skipping', () => {
 
   it('acceptBest with nothing measured lands on the easiest allowed setting', () => {
     const r = new Rig('full');
-    r.check.skipStep();
-    r.check.acceptBest();
+    r.skip();
+    r.accept();
     r.check.skipAll();
     expect(r.check.model.summary!.tuned.laneEnter).toBeCloseTo(TUNE_MIN_FACTOR * DEFAULT_THRESHOLDS.laneEnter, 6);
   });
@@ -271,7 +285,7 @@ describe('MoveCheck — tuning', () => {
     expect(tuned.jumpRise).toBeCloseTo(tunedValue('jumpRise', 0.3), 6);
     expect(tuned.rollDrop).toBeCloseTo(tunedValue('rollDrop', 0.6), 6);
     expect(Object.keys(tuned).sort()).toEqual(
-      ['jumpRearm', 'jumpRise', 'kneeLift', 'kneeRelease', 'laneEnter', 'laneExit', 'rollDrop'].sort(),
+      ['jumpRearm', 'jumpRise', 'jumpVel', 'kneeLift', 'kneeRelease', 'laneEnter', 'laneExit', 'rollDrop'].sort(),
     );
   });
 
@@ -295,14 +309,29 @@ describe('MoveCheck — tuning', () => {
     const summary = r.check.model.summary!;
     expect(summary.asymmetryNote).toMatch(/left/i);
     expect(summary.asymmetryNote).toMatch(/right/i);
-    // Still the mean, not the stronger side.
-    expect(summary.tuned.laneEnter).toBeCloseTo(tunedValue('laneEnter', 0.75), 6);
+    // Tuned to the weaker side, not the mean: the mean (0.75) would put the threshold at 0.41, above
+    // the 0.5 step this player's left side actually managed — a left lane change they could never make.
+    expect(summary.tuned.laneEnter).toBeCloseTo(tunedValue('laneEnter', 0.5), 6);
+    expect(summary.tuned.laneEnter!).toBeLessThan(0.5);
+    expect(summary.tuned.laneEnter!).toBeLessThan(DEFAULT_THRESHOLDS.laneEnter);
+  });
+
+  it('never leaves the weaker side a threshold it cannot reach', () => {
+    for (const [l, r2] of [[0.5, 1.5], [1.5, 0.5], [0.6, 0.7], [0.55, 2.0]] as const) {
+      const r = new Rig('full');
+      r.passJog(0.4);
+      r.succeed({ lane: -l }, [LANE_L]);
+      r.succeed({ lane: r2 }, [LANE_R]);
+      r.check.skipAll();
+      const tuned = r.check.model.summary!.tuned.laneEnter!;
+      expect(tuned, `left ${l} right ${r2}`).toBeLessThan(Math.min(l, r2));
+    }
   });
 
   it('uses the one side it has when the other was skipped', () => {
     const r = new Rig('full');
     r.passJog(0.4);
-    r.check.skipStep();
+    expect(r.skip()).toBe(true);
     r.succeed({ lane: 1.0 }, [LANE_R]);
     r.check.skipAll();
     expect(r.check.model.summary!.tuned.laneEnter).toBeCloseTo(tunedValue('laneEnter', 1.0), 6);
@@ -340,7 +369,7 @@ describe('MoveCheck — tuning', () => {
 
   it('the hoverboard tunes nothing', () => {
     const r = new Rig('full');
-    for (let i = 0; i < 5; i++) r.check.skipStep();
+    for (let i = 0; i < 5; i++) expect(r.skip()).toBe(true);
     expect(r.id).toBe('hover');
     r.succeed({}, [HOVER]);
     expect(r.check.model.summary!.tuned).toEqual({});
@@ -372,7 +401,102 @@ describe('MoveCheck — tuning', () => {
     expect(record.peaks.left).toBeCloseTo(24, 6);
     expect(record.keyPeaks?.bobMinAmp).toBeCloseTo(0.05, 6);
     expect(record.keyPeaks?.noseShift).toBeCloseTo(0.5, 6);
-    expect(record.thresholds).toEqual(r.check.model.summary!.tuned);
+    // The record carries the measured keys only; the summary also shows the companions derived
+    // from them, which a stored record must never be able to contradict.
+    expect(Object.keys(record.thresholds).sort()).toEqual(['bobMinAmp', 'leanDeg', 'noseShift', 'wristPump']);
+    for (const [key, value] of Object.entries(record.thresholds)) {
+      expect(r.check.model.summary!.tuned[key as keyof Thresholds], key).toBeCloseTo(value, 10);
+    }
+  });
+});
+
+describe('MoveCheck — measuring only what the player did', () => {
+  it('leaves the nose-shift threshold alone when the player leaned and their head stayed put', () => {
+    const r = new Rig('small');
+    for (let i = 1; i <= JOG_STEPS_NEEDED; i++) r.frame({ jogPrimary: 0.3, bobAmp: 0.05, jogSteps: i });
+    r.wait(ADVANCE_MS + FRAME_MS);
+    // The instruction says "lean your shoulders LEFT", so that is what they do. The detector fires
+    // on the lean OR the nose, and the nose barely moved — there is no measurement of it to use.
+    r.succeed({ tiltDeg: -24, noseShift: -0.02 }, [SHIFT_L]);
+    r.succeed({ tiltDeg: 24, noseShift: 0.02 }, [SHIFT_R]);
+    r.check.skipAll();
+    const tuned = r.check.model.summary!.tuned;
+    expect(tuned.leanDeg).toBeCloseTo(tunedValue('leanDeg', 24), 6);
+    expect(tuned).not.toHaveProperty('noseShift');
+    expect(tuned).not.toHaveProperty('noseRearm');
+  });
+
+  it('leaves bobMinAmp alone for a player who jogs with their arms and never bounces', () => {
+    const r = new Rig('small');
+    for (let i = 1; i <= JOG_STEPS_NEEDED; i++) r.frame({ jogPrimary: 0.3, bobAmp: 0, jogSteps: i });
+    r.wait(ADVANCE_MS + FRAME_MS);
+    r.check.skipAll();
+    const tuned = r.check.model.summary!.tuned;
+    expect(tuned.wristPump).toBeCloseTo(tunedValue('wristPump', 0.3), 6);
+    expect(tuned).not.toHaveProperty('bobMinAmp');
+  });
+
+  it('leaves the hip drop alone when the roll was performed as a head duck', () => {
+    const r = new Rig('full');
+    r.passJog(0.4);
+    r.skip();
+    r.skip();
+    r.skip();
+    r.succeed({ drop: 0.04, headDrop: 0.6 }, [ROLL]);
+    r.check.skipAll();
+    expect(r.check.model.summary!.tuned).not.toHaveProperty('rollDrop');
+  });
+
+  it('still gives an easier setting when nothing at all cleared the line', () => {
+    const r = new Rig('small');
+    r.skip();
+    r.frame({ tiltDeg: -2, noseShift: -0.01 });
+    r.accept();
+    r.check.skipAll();
+    const tuned = r.check.model.summary!.tuned;
+    // The primary signal — the one the instruction names — is tuned, and only that one.
+    expect(tuned.leanDeg).toBeCloseTo(TUNE_MIN_FACTOR * DEFAULT_THRESHOLDS.leanDeg, 6);
+    expect(tuned).not.toHaveProperty('noseShift');
+  });
+});
+
+describe('MoveCheck — the jump\u2019s second gate', () => {
+  it('counts the jogger\u2019s bounce into what the jump has to clear', () => {
+    const r = new Rig('full');
+    r.passJog(0.3);
+    r.skip();
+    r.skip();
+    expect(r.id).toBe('jump');
+    // Jogging hard: moves.ts makes the jump clear bobJumpFactor x the bounce, or every step is a jump.
+    const bob = 0.1;
+    r.frame({ rise: DEFAULT_THRESHOLDS.jumpRise * 1.1, bobAmp: bob });
+    expect(r.step.progress).toBeLessThan(1);
+    expect(r.step.progress).toBeCloseTo((DEFAULT_THRESHOLDS.jumpRise * 1.1) / (DEFAULT_THRESHOLDS.bobJumpFactor * bob), 6);
+  });
+
+  it('tells a jumper who is high enough but too slow to hop quicker, not further', () => {
+    const r = new Rig('full');
+    r.passJog(0.3);
+    r.skip();
+    r.skip();
+    // Twice the height the threshold asks for, and the detector still has not fired: the only thing
+    // left in the way is speed, and "go a bit further" is advice this player cannot act on.
+    r.frame({ rise: DEFAULT_THRESHOLDS.jumpRise * 2 });
+    expect(r.step.progress).toBe(1);
+    expect(r.step.hint).toBe('Almost — try a quicker hop');
+  });
+
+  it('lowers the speed gate with the height, so an easier setting is actually easier', () => {
+    const r = new Rig('full');
+    r.passJog(0.3);
+    r.skip();
+    r.skip();
+    r.frame({ rise: 0.1 });
+    r.accept();
+    r.check.skipAll();
+    const tuned = r.check.model.summary!.tuned;
+    expect(tuned.jumpRise!).toBeLessThan(DEFAULT_THRESHOLDS.jumpRise);
+    expect(tuned.jumpVel!).toBeLessThan(DEFAULT_THRESHOLDS.jumpVel);
   });
 });
 
@@ -388,6 +512,54 @@ describe('MoveCheck — shape', () => {
     expect(r.check.model.steps).toBe(steps);
     expect(r.check.model.steps[0]).toBe(first);
     expect(r.check.model.steps[0].steps).toBe(counter);
+  });
+
+  it('counts only the jog steps taken since the step began', () => {
+    const r = new Rig('full');
+    // A redo, or ?movecheck=force: the player has already been jogging, so the counter is well past 0.
+    r.magnitudes.jogSteps = 37;
+    r.check.reset();
+    r.frame();
+    expect(r.step.steps).toEqual({ seen: 0, needed: JOG_STEPS_NEEDED });
+    for (let i = 1; i <= JOG_STEPS_NEEDED - 1; i++) {
+      r.frame({ jogPrimary: 0.3, jogSteps: 37 + i });
+      expect(r.step.steps, `after ${i}`).toEqual({ seen: i, needed: JOG_STEPS_NEEDED });
+      expect(r.step.status).toBe('active');
+    }
+    r.frame({ jogSteps: 37 + JOG_STEPS_NEEDED });
+    expect(r.step.status).toBe('done');
+  });
+
+  it('takes the event that lands on the very frame a step becomes active', () => {
+    const r = new Rig('full');
+    for (let i = 1; i <= JOG_STEPS_NEEDED; i++) r.frame({ jogPrimary: 0.3, jogSteps: i });
+    r.wait(ADVANCE_MS - FRAME_MS);
+    expect(r.id).toBe('jog');
+    // The tick runs out on this frame and the left step takes over — with the event already in hand.
+    // The hoverboard fires once per hold, so dropping it would cost a whole raise of both arms.
+    r.frame({ lane: -0.9 }, [LANE_L], FRAME_MS * 2);
+    expect(r.stepFor('left').status).toBe('done');
+  });
+
+  it('builds a hint string only when the hint actually changes', () => {
+    const r = new Rig('full');
+    r.passJog(0.3);
+    r.frame({ lane: -0.4 });
+    const hint = r.step.hint;
+    expect(hint).toBe('Almost — go a bit further');
+    for (let i = 0; i < 20; i++) r.frame({ lane: -0.4 });
+    expect(r.step.hint).toBe(hint);
+  });
+
+  it('does not allocate its way through a long check', () => {
+    const r = new Rig('full');
+    const g = globalThis as { gc?: () => void };
+    g.gc?.();
+    const before = process.memoryUsage().heapUsed;
+    for (let i = 0; i < 4000; i++) r.frame({ lane: -0.2 + 0.4 * Math.sin(i / 7), rise: 0.05, jogPrimary: 0.1 });
+    const grown = process.memoryUsage().heapUsed - before;
+    // Generous bound: 4000 frames must not leave megabytes behind.
+    expect(grown).toBeLessThan(4 * 1024 * 1024);
   });
 
   it('gives every step a label and an instruction, and a step counter only for the jog', () => {

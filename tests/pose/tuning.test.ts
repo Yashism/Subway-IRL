@@ -4,6 +4,7 @@ import { DEFAULT_THRESHOLDS } from '../../src/pose/thresholds';
 import {
   applyTuning,
   cleanTuning,
+  mergeTuning,
   MoveTuningStore,
   REARM_OF,
   TUNABLE_KEYS,
@@ -15,6 +16,7 @@ import {
   type TuningStorage,
 } from '../../src/pose/tuning';
 import type { PlayMode } from '../../src/pose/types';
+import type { Thresholds } from '../../src/pose/thresholds';
 
 /** An in-memory Storage stand-in; `fail` makes every call throw, like a blocked store. */
 function memStore(seed: Record<string, string> = {}, fail = false): TuningStorage & { data: Record<string, string> } {
@@ -120,8 +122,8 @@ describe('cleanTuning', () => {
     });
   });
 
-  it('drops threshold keys the check may not tune', () => {
-    const t = cleanTuning(tuning('full', { thresholds: { lostMs: 5, laneEnter: 0.4 } as never }));
+  it('drops threshold keys the check may not tune, and every derived companion', () => {
+    const t = cleanTuning(tuning('full', { thresholds: { lostMs: 5, laneExit: 0.3, laneEnter: 0.4 } as never }));
     expect(t?.thresholds).toEqual({ laneEnter: 0.4 });
   });
 
@@ -149,12 +151,49 @@ describe('cleanTuning', () => {
 });
 
 describe('applyTuning', () => {
-  it('overwrites only the tuned keys', () => {
+  it('overwrites only the tuned keys, and derives the companions', () => {
     const th = { ...DEFAULT_THRESHOLDS };
-    applyTuning(th, tuning('full', { thresholds: { laneEnter: 0.4, laneExit: 0.28 } }));
+    applyTuning(th, tuning('full', { thresholds: { laneEnter: 0.4 } }));
     expect(th.laneEnter).toBe(0.4);
-    expect(th.laneExit).toBe(0.28);
+    expect(th.laneExit).toBeCloseTo(0.4 * (DEFAULT_THRESHOLDS.laneExit / DEFAULT_THRESHOLDS.laneEnter), 10);
     expect(th.jumpRise).toBe(DEFAULT_THRESHOLDS.jumpRise);
+  });
+
+  it('ignores a stored companion and recomputes it from its own key', () => {
+    const th = { ...DEFAULT_THRESHOLDS };
+    // A hand-edited record that would put the exit above the enter: lane state would then flip on
+    // every frame at a steady offset, strobing the character between lanes until storage is cleared.
+    applyTuning(th, tuning('full', { thresholds: { laneEnter: 0.3, laneExit: 0.56 } as never }));
+    expect(th.laneExit).toBeLessThan(th.laneEnter);
+    expect(th.laneExit).toBeCloseTo(0.3 * (DEFAULT_THRESHOLDS.laneExit / DEFAULT_THRESHOLDS.laneEnter), 10);
+  });
+
+  it('keeps every enter key strictly above its re-arm key, whatever is stored', () => {
+    const hostile: Record<string, number> = {};
+    for (const [enter, rearm] of Object.entries(REARM_OF)) {
+      hostile[enter] = 1e-6;
+      hostile[rearm] = 1e9;
+    }
+    const th = { ...DEFAULT_THRESHOLDS };
+    applyTuning(th, tuning('full', { thresholds: hostile as never }));
+    for (const [enter, rearm] of Object.entries(REARM_OF)) {
+      const e = enter as keyof Thresholds;
+      const r = rearm as keyof Thresholds;
+      expect(th[e], enter).toBeGreaterThan(th[r]);
+      expect(th[r] / th[e], rearm).toBeCloseTo(DEFAULT_THRESHOLDS[r] / DEFAULT_THRESHOLDS[e], 10);
+    }
+  });
+
+  it('scales the jump velocity gate with the jump height', () => {
+    const th = { ...DEFAULT_THRESHOLDS };
+    applyTuning(th, tuning('full', { thresholds: { jumpRise: 0.09, smallJumpRise: 0.072 } }));
+    // Lowering the height a player cannot reach is pointless if the speed gate stays put.
+    expect(th.jumpVel).toBeLessThan(DEFAULT_THRESHOLDS.jumpVel);
+    expect(th.jumpVel / th.jumpRise).toBeCloseTo(DEFAULT_THRESHOLDS.jumpVel / DEFAULT_THRESHOLDS.jumpRise, 10);
+    expect(th.smallJumpVel / th.smallJumpRise).toBeCloseTo(
+      DEFAULT_THRESHOLDS.smallJumpVel / DEFAULT_THRESHOLDS.smallJumpRise,
+      10,
+    );
   });
 
   it('restores the defaults for keys the new tuning does not mention', () => {
@@ -182,7 +221,47 @@ describe('applyTuning', () => {
   });
 });
 
+describe('mergeTuning', () => {
+  it('lays the new measurements over the old ones', () => {
+    const prev = tuning('full', { at: 1, thresholds: { laneEnter: 0.4, jumpRise: 0.1 }, peaks: { jump: 0.2 } });
+    const next = tuning('full', { at: 2, thresholds: { laneEnter: 0.45 }, peaks: { left: 0.9 } });
+    expect(mergeTuning(prev, next)).toEqual({
+      mode: 'full',
+      at: 2,
+      thresholds: { laneEnter: 0.45, jumpRise: 0.1 },
+      peaks: { jump: 0.2, left: 0.9 },
+    });
+  });
+
+  it('ignores a record for the other mode', () => {
+    const next = tuning('small', { thresholds: { leanDeg: 12 } });
+    expect(mergeTuning(tuning('full', { thresholds: { laneEnter: 0.4 } }), next)).toBe(next);
+    expect(mergeTuning(null, next)).toBe(next);
+  });
+});
+
 describe('MoveTuningStore', () => {
+  it('keeps a key the re-run did not measure, instead of reverting it to the default', () => {
+    const storage = memStore();
+    new MoveTuningStore(storage).save(tuning('full', { thresholds: { laneEnter: 0.4, jumpRise: 0.1 } }));
+    // The player redoes the check and skips the jump: that step tunes nothing, and the spec says a
+    // skipped move keeps its *previously saved* threshold, not the shipped default.
+    new MoveTuningStore(storage).save(tuning('full', { thresholds: { laneEnter: 0.45 } }));
+
+    const th = { ...DEFAULT_THRESHOLDS };
+    applyTuning(th, new MoveTuningStore(storage).get('full'));
+    expect(th.laneEnter).toBe(0.45);
+    expect(th.jumpRise).toBe(0.1);
+  });
+
+  it('replaces the record outright when asked', () => {
+    const storage = memStore();
+    const store = new MoveTuningStore(storage);
+    store.save(tuning('full', { thresholds: { laneEnter: 0.4, jumpRise: 0.1 } }));
+    store.save(tuning('full', { thresholds: { laneEnter: 0.45 } }), { replace: true });
+    expect(store.get('full')!.thresholds).toEqual({ laneEnter: 0.45 });
+  });
+
   it('round-trips a record per mode', () => {
     const storage = memStore();
     const store = new MoveTuningStore(storage);
