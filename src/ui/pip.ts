@@ -77,6 +77,7 @@ export class PosePip {
   private video: HTMLVideoElement | null = null;
   private layout: PipLayout = 'corner';
   private shown: boolean;
+  private active = true;
 
   private cw = 0;
   private ch = 0;
@@ -128,10 +129,19 @@ export class PosePip {
     return this.shown;
   }
 
+  /** The player's choice (V key / ?pip=0). Only hides the corner card; the calibration stage always shows. */
   setVisible(v: boolean): void {
     if (v === this.shown) return;
     this.shown = v;
     this.card.classList.toggle('hidden', !v);
+    this.sizeDirty = true;
+  }
+
+  /** App-driven: false while there is nothing to preview (menu, keyboard play, camera screens). */
+  setActive(v: boolean): void {
+    if (v === this.active) return;
+    this.active = v;
+    this.card.classList.toggle('inactive', !v);
     this.sizeDirty = true;
   }
 
@@ -180,7 +190,7 @@ export class PosePip {
    * `aspect` is the camera image width / height (PoseFrame.aspect); defaults to the video's.
    */
   update(st: PoseStatus, stalled: boolean, nowMs: number, aspect?: number): void {
-    if (!this.shown && this.layout === 'corner') return;
+    if (!this.active || (!this.shown && this.layout === 'corner')) return;
     if (this.sizeDirty) this.resize();
 
     const level = trackingLevel(st.tracking, st.slowPose, stalled);

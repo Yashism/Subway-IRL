@@ -89,14 +89,14 @@ export const MSG_STEP_IN = 'Step into view (then raise your RIGHT hand)';
 export const MSG_PLAY_AGAIN = '✋ Raise your right hand to play again';
 
 const NONE: readonly FlowEffect[] = Object.freeze([]);
-const INITIAL_POSE: PoseSnapshot = {
+const initialPose = (): PoseSnapshot => ({
   tracking: false,
   calibrated: false,
   mode: null,
   startProgress: 0,
   calibration: { progress: 0, bodyVisible: false, distance: 'ok' },
   dark: false,
-};
+});
 
 const running = (s: GameState) => s === 'playing' || s === 'countdown';
 
@@ -110,7 +110,8 @@ export class SessionFlow {
   private error = '';
   private recheck = false;
   private gameState: GameState = 'menu';
-  private pose: PoseSnapshot = INITIAL_POSE;
+  /** Owned copy of the last pose snapshot (callers may reuse theirs). */
+  private readonly pose: PoseSnapshot = initialPose();
   private cached: ScreenModel | null = null;
 
   constructor(opts: FlowOptions = {}) {
@@ -196,10 +197,12 @@ export class SessionFlow {
     }
   }
 
+  /** Called every frame: copies into the owned snapshot, allocates nothing. */
   private onPose(p: PoseSnapshot): FlowEffect[] {
-    const prev = this.pose;
-    this.pose = p;
-    if (this.cached && !samePose(prev, p)) this.cached = null;
+    if (!samePose(this.pose, p)) {
+      copyPose(this.pose, p);
+      this.cached = null;
+    }
     if (this.input !== 'webcam') return NONE as FlowEffect[];
     if (this.screen === 'calibrating' && p.calibrated) {
       this.recheck = false;
@@ -342,6 +345,17 @@ function samePose(a: PoseSnapshot, b: PoseSnapshot): boolean {
     a.calibration.bodyVisible === b.calibration.bodyVisible &&
     a.calibration.distance === b.calibration.distance
   );
+}
+
+function copyPose(to: PoseSnapshot, from: PoseSnapshot): void {
+  to.tracking = from.tracking;
+  to.calibrated = from.calibrated;
+  to.mode = from.mode;
+  to.startProgress = from.startProgress;
+  to.dark = !!from.dark;
+  to.calibration.progress = from.calibration.progress;
+  to.calibration.bodyVisible = from.calibration.bodyVisible;
+  to.calibration.distance = from.calibration.distance;
 }
 
 /** Mode chip click order. */

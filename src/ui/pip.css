@@ -35,6 +35,9 @@
     opacity 0.2s,
     transform 0.2s;
 }
+.pip.inactive {
+  display: none;
+}
 .pip.hidden:not(.stage) {
   opacity: 0;
   transform: translateY(20px) scale(0.9);

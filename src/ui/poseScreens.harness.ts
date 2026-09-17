@@ -258,7 +258,7 @@ async function main(): Promise<void> {
     const m = flow.model;
     ui.update(m);
     pip.setLayout(m.screen === 'calibrating' || m.screen === 'ready' ? 'stage' : 'corner');
-    pip.setVisible(m.screen === 'calibrating' || m.screen === 'ready' || m.screen === 'playing' ? pipVisibleFromUrl(location.search) : false);
+    pip.setActive(m.input === 'webcam' && (m.screen === 'calibrating' || m.screen === 'ready' || m.screen === 'playing'));
     ui.setWarnings(status.slowPose, stalled);
   }
   render();

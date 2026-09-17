@@ -487,6 +487,19 @@ describe('SessionFlow: screen model', () => {
     expect(f.model).not.toBe(before);
   });
 
+  it('copies pose snapshots, so a reused (mutated) status object still updates the model', () => {
+    const f = webcamAt('calibrating');
+    const shared: PoseSnapshot = { ...NO_POSE, tracking: true, calibration: { progress: 0.1, bodyVisible: true, distance: 'ok' } };
+    f.dispatch({ type: 'pose', status: shared });
+    expect(f.model.progress).toBeCloseTo(0.1);
+    shared.calibration.progress = 0.7;
+    f.dispatch({ type: 'pose', status: shared });
+    expect(f.model.progress).toBeCloseTo(0.7);
+    shared.calibrated = true;
+    f.dispatch({ type: 'pose', status: shared });
+    expect(f.screen).toBe('ready');
+  });
+
   it('returns the same model object while nothing changes', () => {
     const f = webcamAt('calibrating');
     f.dispatch(STANDING);
