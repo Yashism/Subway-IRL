@@ -143,7 +143,7 @@
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  width: clamp(52px, 6vw, 84px);
+  width: clamp(52px, 6.4vw, 92px);
 }
 .mc-dot-mark {
   display: grid;
@@ -271,16 +271,17 @@
 .mc-strength-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 10px;
   margin-bottom: 5px;
 }
-.mc-strength-title {
+.mc-strength-title,
+.mc-strength-goal {
   font: 800 clamp(11px, 0.9vw, 14px) / 1 var(--font-ui, sans-serif);
   letter-spacing: 0.16em;
   color: var(--mc-brown);
 }
 .mc-strength-value {
+  margin-right: auto;
   font: 400 clamp(18px, 1.7vw, 26px) / 1 var(--font-game, sans-serif);
   color: var(--mc-ink);
 }
@@ -313,14 +314,6 @@
   width: 6px;
   border-radius: 3px;
   background: repeating-linear-gradient(180deg, var(--mc-ink) 0 6px, transparent 6px 11px);
-}
-.mc-bar-goal-label {
-  position: absolute;
-  right: -2px;
-  top: -17px;
-  font: 800 10px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.14em;
-  color: var(--mc-brown);
 }
 .mc-strength-foot {
   display: flex;
@@ -388,16 +381,27 @@
 .mc-head,
 .mc-torso {
   fill: var(--mc-cream);
+  stroke: var(--mc-ink);
+  stroke-width: 10;
+  paint-order: stroke fill;
 }
-.mc-limb {
+.mc-limb,
+.mc-limb-ink {
   fill: none;
   stroke: var(--mc-cream);
   stroke-width: 15;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.mc-limb-ink {
+  stroke: var(--mc-ink);
+  stroke-width: 25;
+}
 .mc-leg .mc-limb {
   stroke-width: 17;
+}
+.mc-leg .mc-limb-ink {
+  stroke-width: 27;
 }
 .mc-fig-body {
   filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35));

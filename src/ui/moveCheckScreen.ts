@@ -92,9 +92,12 @@ function figure(parent: Element): SVGElement {
   svg('ellipse', { class: 'mc-shadow', cx: '110', cy: '326', rx: '54', ry: '9' }, s);
   const body = svg('g', { class: 'mc-fig-body' }, s);
 
+  // Each limb is drawn twice: a fat ink line under a cream one, so an arm crossing the
+  // torso still reads as an arm. Limbs after the torso are in front of it, legs behind.
   const limb = (cls: string, d: string, origin: string): void => {
     const g = svg('g', { class: cls }, body);
     (g as SVGElement).style.transformOrigin = origin;
+    svg('path', { class: 'mc-limb-ink', d }, g);
     svg('path', { class: 'mc-limb', d }, g);
   };
 
@@ -257,13 +260,13 @@ export class MoveCheckScreen {
     const sHead = el('div', 'mc-strength-head', strength);
     el('div', 'mc-strength-title', sHead, 'HOW BIG WAS IT');
     this.barValue = el('div', 'mc-strength-value', sHead);
+    el('div', 'mc-strength-goal', sHead, '100% IS ENOUGH');
     this.bar = el('div', 'mc-bar', strength);
     this.bar.setAttribute('role', 'progressbar');
     this.bar.setAttribute('aria-valuemin', '0');
     this.bar.setAttribute('aria-valuemax', '100');
     this.barFill = el('div', 'mc-bar-fill', this.bar);
-    const goal = el('div', 'mc-bar-goal', this.bar);
-    el('span', 'mc-bar-goal-label', goal, 'ENOUGH');
+    el('div', 'mc-bar-goal', this.bar);
     const foot = el('div', 'mc-strength-foot', strength);
     this.hint = el('div', 'mc-hint', foot);
     this.peak = el('div', 'mc-peak', foot);

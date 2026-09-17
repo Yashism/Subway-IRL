@@ -78,6 +78,13 @@ export interface MoveTuning {
   thresholds: Partial<Thresholds>;
   /** Raw measured peaks, kept so a later change of TUNE_FRACTION can re-derive thresholds. */
   peaks: Partial<Record<MoveId, number>>;
+  /**
+   * The peak behind each tuned key, after left/right averaging. `peaks` holds one number per move,
+   * which cannot describe a step that tunes two signals (small-room jog tunes `wristPump` and
+   * `bobMinAmp`, a small-room lane tunes `leanDeg` and `noseShift`); this makes the re-derivation
+   * exact. Absent in records written before it existed.
+   */
+  keyPeaks?: Partial<Record<keyof Thresholds, number>>;
 }
 
 export const MOVE_TUNING_KEY = 'subway-irl.moveTuning.v1';
