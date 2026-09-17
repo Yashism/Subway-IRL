@@ -92,23 +92,30 @@ function figure(parent: Element): SVGElement {
   svg('ellipse', { class: 'mc-shadow', cx: '110', cy: '326', rx: '54', ry: '9' }, s);
   const body = svg('g', { class: 'mc-fig-body' }, s);
 
-  // Each limb is drawn twice: a fat ink line under a cream one, so an arm crossing the
-  // torso still reads as an arm. Limbs after the torso are in front of it, legs behind.
-  const limb = (cls: string, d: string, origin: string): void => {
+  /**
+   * One hinged limb: an upper segment turning about the shoulder/hip and a lower one about
+   * the elbow/knee, so the figure can really bend rather than swing a stick. Each segment is
+   * drawn twice, a fat ink line under a cream one, so a limb crossing the torso still reads.
+   */
+  const limb = (cls: string, upper: string, lower: string, joint: string, hinge: string): void => {
     const g = svg('g', { class: cls }, body);
-    (g as SVGElement).style.transformOrigin = origin;
-    svg('path', { class: 'mc-limb-ink', d }, g);
-    svg('path', { class: 'mc-limb', d }, g);
+    (g as SVGElement).style.transformOrigin = joint;
+    svg('path', { class: 'mc-limb-ink', d: upper }, g);
+    const low = svg('g', { class: 'mc-lower' }, g);
+    (low as SVGElement).style.transformOrigin = hinge;
+    svg('path', { class: 'mc-limb-ink', d: lower }, low);
+    svg('path', { class: 'mc-limb', d: lower }, low);
+    svg('path', { class: 'mc-limb', d: upper }, g);
   };
 
-  limb('mc-leg mc-leg-l', 'M100 206 L96 262 L98 314', '100px 206px');
-  limb('mc-leg mc-leg-r', 'M120 206 L124 262 L122 314', '120px 206px');
+  limb('mc-leg mc-leg-l', 'M100 206 L96 258', 'M96 258 L98 314', '100px 206px', '96px 258px');
+  limb('mc-leg mc-leg-r', 'M120 206 L124 258', 'M124 258 L122 314', '120px 206px', '124px 258px');
   svg('path', {
     class: 'mc-torso',
     d: 'M93 118 L127 118 Q137 118 137 130 L134 198 Q134 212 121 212 L99 212 Q86 212 86 198 L83 130 Q83 118 93 118 Z',
   }, body);
-  limb('mc-arm mc-arm-l', 'M92 134 L74 168 L79 200', '92px 134px');
-  limb('mc-arm mc-arm-r', 'M128 134 L146 168 L141 200', '128px 134px');
+  limb('mc-arm mc-arm-l', 'M92 134 L76 170', 'M76 170 L80 202', '92px 134px', '76px 170px');
+  limb('mc-arm mc-arm-r', 'M128 134 L144 170', 'M144 170 L140 202', '128px 134px', '144px 170px');
   svg('circle', { class: 'mc-head', cx: '110', cy: '94', r: '25' }, body);
   return s;
 }
@@ -242,21 +249,23 @@ export class MoveCheckScreen {
 
     // ---- the active step
     const card = el('div', 'mc-card', root);
-    const live = el('div', 'mc-live', card);
+    this.stage = el('div', 'mc-stage', card);
+    figure(this.stage);
+    const CUES = { l: '\u2039\u2039', r: '\u203a\u203a', up: '\u25b2', down: '\u25bc', hands: '\u2726' };
+    for (const cue of ['l', 'r', 'up', 'down', 'hands'] as const) el('div', `mc-cue mc-cue-${cue}`, this.stage, CUES[cue]);
+
+    const body = el('div', 'mc-body', card);
+    const live = el('div', 'mc-live', body);
     live.setAttribute('aria-live', 'polite');
     this.moveName = el('div', 'mc-move-name', live);
     this.how = el('div', 'mc-how', live);
 
-    this.stage = el('div', 'mc-stage', card);
-    figure(this.stage);
-    for (const cue of ['l', 'r', 'up', 'down', 'hands'] as const) el('div', `mc-cue mc-cue-${cue}`, this.stage, cue === 'l' ? '‹‹' : cue === 'r' ? '››' : cue === 'up' ? '▲' : cue === 'down' ? '▼' : '✦');
-
-    this.jogBox = el('div', 'mc-jog', card);
+    this.jogBox = el('div', 'mc-jog', body);
     this.jogCount = el('div', 'mc-jog-count', this.jogBox);
     const pips = el('div', 'mc-jog-pips', this.jogBox);
     this.jogPips = Array.from({ length: JOG_PIPS }, () => el('div', 'mc-jog-pip', pips));
 
-    const strength = el('div', 'mc-strength', card);
+    const strength = el('div', 'mc-strength', body);
     const sHead = el('div', 'mc-strength-head', strength);
     el('div', 'mc-strength-title', sHead, 'HOW BIG WAS IT');
     this.barValue = el('div', 'mc-strength-value', sHead);

@@ -187,15 +187,9 @@
 /* ------------------------------------------------------------ the active step card */
 
 .mc-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas:
-    'stage live'
-    'stage jog'
-    'stage strength';
-  align-items: center;
-  column-gap: clamp(16px, 2.4vw, 36px);
-  row-gap: clamp(8px, 1.2vh, 16px);
+  display: flex;
+  align-items: stretch;
+  gap: clamp(16px, 2.4vw, 36px);
   width: min(980px, 96vw);
   box-sizing: border-box;
   padding: clamp(18px, 2.4vh, 30px) clamp(18px, 2.2vw, 34px);
@@ -213,9 +207,15 @@
   display: none;
 }
 
-.mc-live {
-  grid-area: live;
-  align-self: end;
+/* One centred column beside the figure: the step's own rows come and go (the jog counter
+ * only exists on step 1) without the card changing size, because the figure sets its height. */
+.mc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(10px, 1.6vh, 20px);
 }
 .mc-move-name {
   font: 400 clamp(30px, 3.6vw, 56px) / 1.02 var(--font-game, sans-serif);
@@ -231,7 +231,6 @@
 }
 
 .mc-jog {
-  grid-area: jog;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -265,8 +264,7 @@
 /* ------------------------------------------------------------ strength bar */
 
 .mc-strength {
-  grid-area: strength;
-  align-self: start;
+  display: block;
 }
 .mc-strength-head {
   display: flex;
@@ -345,10 +343,10 @@
 /* ------------------------------------------------------------ the mime figure */
 
 .mc-stage {
-  grid-area: stage;
   position: relative;
-  width: clamp(158px, 17vw, 250px);
-  aspect-ratio: 220 / 360;
+  flex: none;
+  width: clamp(150px, 15vw, 215px);
+  aspect-ratio: 220 / 300;
   align-self: center;
   border-radius: 28px;
   box-sizing: border-box;
@@ -374,9 +372,23 @@
   transform-box: view-box;
   transform-origin: 110px 314px;
 }
+/*
+ * --mc-dir is +1 for the limbs on the player's left, -1 on the right, so one keyframe set
+ * poses both sides outwards and nothing ever swings across the body.
+ * A lift turns the upper segment out and foreshortens it (scaleY); the lower segment then
+ * hinges back down — head-on, that is what a raised knee or a pumping elbow looks like.
+ */
 .mc-arm,
-.mc-leg {
+.mc-leg,
+.mc-lower {
   transform-box: view-box;
+  --mc-dir: 1;
+}
+.mc-arm-r,
+.mc-leg-r,
+.mc-arm-r .mc-lower,
+.mc-leg-r .mc-lower {
+  --mc-dir: -1;
 }
 .mc-head,
 .mc-torso {
@@ -417,28 +429,23 @@
 }
 .mc-cue-l {
   left: 5%;
-  top: 44%;
+  bottom: 7%;
 }
 .mc-cue-r {
   right: 5%;
-  top: 44%;
+  bottom: 7%;
 }
 .mc-cue-up {
-  top: 5%;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 7%;
+  left: 5%;
 }
 .mc-cue-down {
-  bottom: 6%;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 7%;
+  left: 5%;
 }
 .mc-cue-hands {
-  top: 5%;
-  left: 50%;
-  transform: translateX(-50%);
-  letter-spacing: 0.7em;
-  padding-left: 0.7em;
+  top: 7%;
+  left: 5%;
 }
 .move-check[data-move='left'] .mc-cue-l,
 .move-check[data-move='right'] .mc-cue-r,
@@ -455,32 +462,47 @@
   animation: mc-cue-right 1.4s ease-in-out infinite;
 }
 
-/* ---- jog: knees up, arms swinging, body bobbing */
+/* ---- jog: knees up, elbows pumping, body bobbing */
 .move-check[data-move='jog'] .mc-fig-body {
   animation: mc-bob 0.46s ease-in-out infinite;
 }
-.move-check[data-move='jog'] .mc-leg-l {
-  animation: mc-knee-a 0.92s ease-in-out infinite;
+.move-check[data-move='jog'] .mc-leg {
+  --mc-lift-rot: 22deg;
+  --mc-lift-scale: 0.66;
+  --mc-hinge-rot: -30deg;
 }
-.move-check[data-move='jog'] .mc-leg-r {
-  animation: mc-knee-b 0.92s ease-in-out infinite;
+.move-check[data-move='jog'] .mc-arm {
+  --mc-lift-rot: 14deg;
+  --mc-hinge-rot: -74deg;
 }
-.move-check[data-move='jog'] .mc-arm-l {
-  animation: mc-swing-b 0.92s ease-in-out infinite;
-}
+.move-check[data-move='jog'] .mc-leg-l,
 .move-check[data-move='jog'] .mc-arm-r {
-  animation: mc-swing-a 0.92s ease-in-out infinite;
+  animation: mc-lift-a 0.92s ease-in-out infinite;
+}
+.move-check[data-move='jog'] .mc-leg-r,
+.move-check[data-move='jog'] .mc-arm-l {
+  animation: mc-lift-b 0.92s ease-in-out infinite;
+}
+.move-check[data-move='jog'] .mc-leg-l .mc-lower,
+.move-check[data-move='jog'] .mc-arm-r .mc-lower {
+  animation: mc-hinge-a 0.92s ease-in-out infinite;
+}
+.move-check[data-move='jog'] .mc-leg-r .mc-lower,
+.move-check[data-move='jog'] .mc-arm-l .mc-lower {
+  animation: mc-hinge-b 0.92s ease-in-out infinite;
 }
 /* Small room: the arms do the work, the feet barely leave the floor. */
-.move-check[data-mode='small'][data-move='jog'] .mc-leg-l,
-.move-check[data-mode='small'][data-move='jog'] .mc-leg-r {
+.move-check[data-mode='small'][data-move='jog'] .mc-leg,
+.move-check[data-mode='small'][data-move='jog'] .mc-leg .mc-lower {
   animation: none;
 }
-.move-check[data-mode='small'][data-move='jog'] .mc-arm-l {
-  animation: mc-pump-b 0.52s ease-in-out infinite;
+.move-check[data-mode='small'][data-move='jog'] .mc-arm {
+  --mc-lift-rot: 20deg;
+  --mc-hinge-rot: -96deg;
+  animation-duration: 0.52s;
 }
-.move-check[data-mode='small'][data-move='jog'] .mc-arm-r {
-  animation: mc-pump-a 0.52s ease-in-out infinite;
+.move-check[data-mode='small'][data-move='jog'] .mc-arm .mc-lower {
+  animation-duration: 0.52s;
 }
 .move-check[data-mode='small'][data-move='jog'] .mc-fig-body {
   animation: mc-bob-small 0.52s ease-in-out infinite;
@@ -507,30 +529,35 @@
 .move-check[data-move='jump'] .mc-shadow {
   animation: mc-jump-shadow 1.4s ease-in-out infinite;
 }
-.move-check[data-move='jump'] .mc-arm-l {
-  animation: mc-jump-arm-l 1.4s ease-in-out infinite;
-}
-.move-check[data-move='jump'] .mc-arm-r {
-  animation: mc-jump-arm-r 1.4s ease-in-out infinite;
+.move-check[data-move='jump'] .mc-arm {
+  animation: mc-jump-arm 1.4s ease-in-out infinite;
 }
 
-/* ---- roll / duck */
+/* ---- roll / duck: the knees fold out and the whole player sinks */
 .move-check[data-move='roll'] .mc-fig-body {
   animation: mc-squat 1.7s ease-in-out infinite;
 }
-.move-check[data-move='roll'] .mc-arm-l {
-  animation: mc-squat-arm-l 1.7s ease-in-out infinite;
+.move-check[data-move='roll'] .mc-arm {
+  animation: mc-squat-arm 1.7s ease-in-out infinite;
 }
-.move-check[data-move='roll'] .mc-arm-r {
-  animation: mc-squat-arm-r 1.7s ease-in-out infinite;
+.move-check[data-move='roll'] .mc-leg {
+  animation: mc-squat-leg 1.7s ease-in-out infinite;
+}
+.move-check[data-move='roll'] .mc-leg .mc-lower {
+  animation: mc-squat-shin 1.7s ease-in-out infinite;
+}
+/* Small room ducks the head rather than folding all the way down. */
+.move-check[data-mode='small'][data-move='roll'] .mc-fig-body {
+  --mc-squat-drop: 20px;
+}
+.move-check[data-mode='small'][data-move='roll'] .mc-leg {
+  --mc-squat-rot: 16deg;
+  --mc-squat-scale: 0.8;
 }
 
 /* ---- hoverboard: both hands up */
-.move-check[data-move='hover'] .mc-arm-l {
-  animation: mc-hands-l 2.2s ease-in-out infinite;
-}
-.move-check[data-move='hover'] .mc-arm-r {
-  animation: mc-hands-r 2.2s ease-in-out infinite;
+.move-check[data-move='hover'] .mc-arm {
+  animation: mc-hands-up 2.2s ease-in-out infinite;
 }
 .move-check[data-move='hover'] .mc-fig-body {
   animation: mc-bob-small 1.1s ease-in-out infinite;
@@ -712,25 +739,31 @@
 
 @media (max-width: 860px) {
   .mc-card {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'live'
-      'stage'
-      'jog'
-      'strength';
-    justify-items: center;
+    flex-direction: column;
+    align-items: center;
+  }
+  .mc-body {
+    width: 100%;
     text-align: center;
   }
-  .mc-live,
-  .mc-strength {
-    width: 100%;
-    align-self: auto;
+  .mc-jog,
+  .mc-strength-head {
+    justify-content: center;
+  }
+  .mc-strength-value {
+    margin-right: 0;
+  }
+  .mc-strength-goal {
+    display: none;
   }
   .mc-strength-foot {
     text-align: left;
   }
   .mc-stage {
-    width: clamp(140px, 34vw, 200px);
+    width: clamp(118px, 25vw, 160px);
+  }
+  .mc-card {
+    padding: clamp(14px, 2vh, 22px) clamp(14px, 2vw, 24px);
   }
   .mc-dot {
     width: clamp(44px, 13vw, 64px);
@@ -758,8 +791,37 @@
   }
 }
 @media (max-height: 600px) {
-  .mc-dots {
+  .mc-dots,
+  .mc-tuned {
     display: none;
+  }
+  .move-check {
+    gap: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  /* On the summary the banner's "All done!" line is the first thing to go. */
+  .move-check[data-phase='summary'] .mc-banner-sub {
+    display: none;
+  }
+  .mc-sheet {
+    gap: 7px;
+    padding: 12px 14px;
+    border-radius: 24px;
+  }
+  .mc-row {
+    padding: 5px 10px 4px 6px;
+  }
+  .mc-row-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 17px;
+  }
+  .mc-note {
+    padding: 7px 12px 6px;
+  }
+  .mc-actions {
+    min-height: 52px;
   }
   .mc-banner-tab {
     font-size: clamp(22px, 3vw, 30px);
@@ -768,6 +830,109 @@
   }
   .mc-keys {
     display: none;
+  }
+}
+
+/* A very wide viewport (a 2880-px laptop panel at 1:1) would otherwise leave the whole
+ * check as a small island in the middle: let every capped size grow once more. */
+@media (min-width: 1900px) {
+  .mc-card {
+    width: min(1240px, 92vw);
+  }
+  .mc-sheet {
+    width: min(1340px, 92vw);
+  }
+  .mc-stage {
+    width: min(300px, 16vw);
+  }
+  .mc-banner-tab {
+    font-size: 62px;
+  }
+  .mc-banner-sub {
+    font-size: 23px;
+  }
+  .mc-dot {
+    width: 112px;
+  }
+  .mc-dot-mark {
+    width: 54px;
+    height: 54px;
+    font-size: 25px;
+  }
+  .mc-dot-label {
+    font-size: 15px;
+  }
+  .mc-move-name {
+    font-size: 66px;
+  }
+  .mc-how {
+    font-size: 28px;
+  }
+  .mc-strength-title,
+  .mc-strength-goal {
+    font-size: 17px;
+  }
+  .mc-strength-value {
+    font-size: 32px;
+  }
+  .mc-bar {
+    height: 42px;
+  }
+  .mc-hint {
+    font-size: 23px;
+  }
+  .mc-peak,
+  .mc-jog-count {
+    font-size: 17px;
+  }
+  .mc-jog-pip {
+    width: 20px;
+    height: 20px;
+  }
+  .mc-btn {
+    font-size: 23px;
+    padding: 17px 36px 13px;
+  }
+  .mc-btn-go {
+    font-size: 42px;
+    padding: 20px 52px 14px;
+  }
+  .mc-actions {
+    min-height: 78px;
+  }
+  .mc-sheet-title {
+    font-size: 50px;
+  }
+  .mc-sheet-mode {
+    font-size: 18px;
+  }
+  .mc-rows {
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  }
+  .mc-row-move {
+    font-size: 23px;
+  }
+  .mc-row-how {
+    font-size: 18px;
+  }
+  .mc-row-peak {
+    font-size: 27px;
+  }
+  .mc-row-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 25px;
+  }
+  .mc-note-text,
+  .mc-tuned {
+    font-size: 20px;
+  }
+  .mc-cap,
+  .mc-key-does {
+    font-size: 17px;
+  }
+  .mc-keys-title {
+    font-size: 14px;
   }
 }
 
@@ -802,38 +967,30 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
 }
-@keyframes mc-knee-a {
-  0%, 100% { transform: rotate(-8deg); }
-  50% { transform: rotate(32deg); }
+@keyframes mc-lift-a {
+  0%, 100% { transform: none; }
+  50% { transform: rotate(calc(var(--mc-dir) * var(--mc-lift-rot, 0deg))) scaleY(var(--mc-lift-scale, 1)); }
 }
-@keyframes mc-knee-b {
-  0%, 100% { transform: rotate(32deg); }
-  50% { transform: rotate(-8deg); }
+@keyframes mc-lift-b {
+  0%, 100% { transform: rotate(calc(var(--mc-dir) * var(--mc-lift-rot, 0deg))) scaleY(var(--mc-lift-scale, 1)); }
+  50% { transform: none; }
 }
-@keyframes mc-swing-a {
-  0%, 100% { transform: rotate(24deg); }
-  50% { transform: rotate(-28deg); }
+@keyframes mc-hinge-a {
+  0%, 100% { transform: none; }
+  50% { transform: rotate(calc(var(--mc-dir) * var(--mc-hinge-rot, 0deg))); }
 }
-@keyframes mc-swing-b {
-  0%, 100% { transform: rotate(-28deg); }
-  50% { transform: rotate(24deg); }
-}
-@keyframes mc-pump-a {
-  0%, 100% { transform: rotate(34deg); }
-  50% { transform: rotate(-62deg); }
-}
-@keyframes mc-pump-b {
-  0%, 100% { transform: rotate(-62deg); }
-  50% { transform: rotate(34deg); }
+@keyframes mc-hinge-b {
+  0%, 100% { transform: rotate(calc(var(--mc-dir) * var(--mc-hinge-rot, 0deg))); }
+  50% { transform: none; }
 }
 @keyframes mc-step-left {
   0%, 8% { transform: none; }
-  30%, 62% { transform: translateX(-38px) rotate(-5deg); }
+  30%, 62% { transform: translateX(-32px) rotate(-5deg); }
   88%, 100% { transform: none; }
 }
 @keyframes mc-step-right {
   0%, 8% { transform: none; }
-  30%, 62% { transform: translateX(38px) rotate(5deg); }
+  30%, 62% { transform: translateX(32px) rotate(5deg); }
   88%, 100% { transform: none; }
 }
 @keyframes mc-lean-left {
@@ -859,41 +1016,35 @@
   40%, 58% { transform: scale(0.58); opacity: 0.45; }
   78%, 100% { transform: scale(1); opacity: 1; }
 }
-@keyframes mc-jump-arm-l {
+@keyframes mc-jump-arm {
   0%, 12% { transform: rotate(0); }
-  20% { transform: rotate(-30deg); }
-  40%, 62% { transform: rotate(142deg); }
-  86%, 100% { transform: rotate(0); }
-}
-@keyframes mc-jump-arm-r {
-  0%, 12% { transform: rotate(0); }
-  20% { transform: rotate(30deg); }
-  40%, 62% { transform: rotate(-142deg); }
+  20% { transform: rotate(calc(var(--mc-dir) * -22deg)); }
+  40%, 62% { transform: rotate(calc(var(--mc-dir) * 142deg)); }
   86%, 100% { transform: rotate(0); }
 }
 @keyframes mc-squat {
   0%, 10% { transform: none; }
-  32%, 70% { transform: translateY(2px) scaleY(0.66); }
+  32%, 70% { transform: translateY(var(--mc-squat-drop, 36px)); }
   92%, 100% { transform: none; }
 }
-@keyframes mc-squat-arm-l {
+@keyframes mc-squat-leg {
+  0%, 10% { transform: none; }
+  32%, 70% { transform: rotate(calc(var(--mc-dir) * var(--mc-squat-rot, 30deg))) scaleY(var(--mc-squat-scale, 0.62)); }
+  92%, 100% { transform: none; }
+}
+@keyframes mc-squat-shin {
+  0%, 10% { transform: none; }
+  32%, 70% { transform: rotate(calc(var(--mc-dir) * calc(-1 * var(--mc-squat-rot, 30deg)))); }
+  92%, 100% { transform: none; }
+}
+@keyframes mc-squat-arm {
   0%, 10% { transform: rotate(0); }
-  32%, 70% { transform: rotate(-26deg); }
+  32%, 70% { transform: rotate(calc(var(--mc-dir) * 34deg)); }
   92%, 100% { transform: rotate(0); }
 }
-@keyframes mc-squat-arm-r {
-  0%, 10% { transform: rotate(0); }
-  32%, 70% { transform: rotate(26deg); }
-  92%, 100% { transform: rotate(0); }
-}
-@keyframes mc-hands-l {
+@keyframes mc-hands-up {
   0%, 8% { transform: rotate(0); }
-  28%, 82% { transform: rotate(163deg); }
-  97%, 100% { transform: rotate(0); }
-}
-@keyframes mc-hands-r {
-  0%, 8% { transform: rotate(0); }
-  28%, 82% { transform: rotate(-163deg); }
+  28%, 82% { transform: rotate(calc(var(--mc-dir) * 140deg)); }
   97%, 100% { transform: rotate(0); }
 }
 @keyframes mc-cue-pulse {
@@ -921,11 +1072,15 @@
   .move-check[data-mode='small'][data-move='left'] .mc-fig-body { transform: rotate(-16deg); }
   .move-check[data-mode='small'][data-move='right'] .mc-fig-body { transform: rotate(16deg); }
   .move-check[data-move='jump'] .mc-fig-body { transform: translateY(-46px); }
-  .move-check[data-move='jump'] .mc-arm-l { transform: rotate(142deg); }
-  .move-check[data-move='jump'] .mc-arm-r { transform: rotate(-142deg); }
-  .move-check[data-move='roll'] .mc-fig-body { transform: scaleY(0.66); }
-  .move-check[data-move='hover'] .mc-arm-l { transform: rotate(163deg); }
-  .move-check[data-move='hover'] .mc-arm-r { transform: rotate(-163deg); }
-  .move-check[data-move='jog'] .mc-leg-l { transform: rotate(28deg); }
+  .move-check[data-move='jump'] .mc-arm { transform: rotate(calc(var(--mc-dir) * 142deg)); }
+  .move-check[data-move='roll'] .mc-fig-body { transform: translateY(var(--mc-squat-drop, 36px)); }
+  .move-check[data-move='roll'] .mc-leg { transform: rotate(calc(var(--mc-dir) * var(--mc-squat-rot, 30deg))) scaleY(var(--mc-squat-scale, 0.62)); }
+  .move-check[data-move='roll'] .mc-leg .mc-lower { transform: rotate(calc(var(--mc-dir) * calc(-1 * var(--mc-squat-rot, 30deg)))); }
+  .move-check[data-move='roll'] .mc-arm { transform: rotate(calc(var(--mc-dir) * 34deg)); }
+  .move-check[data-move='hover'] .mc-arm { transform: rotate(calc(var(--mc-dir) * 140deg)); }
+  .move-check[data-move='jog'] .mc-leg-l { transform: rotate(22deg) scaleY(0.66); }
+  .move-check[data-move='jog'] .mc-leg-l .mc-lower { transform: rotate(-30deg); }
+  .move-check[data-move='jog'] .mc-arm-r { transform: rotate(-14deg); }
+  .move-check[data-move='jog'] .mc-arm-r .mc-lower { transform: rotate(74deg); }
   .move-check .mc-cue { opacity: 1; }
 }
