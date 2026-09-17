@@ -14,7 +14,7 @@ import {
   visibleTimeline,
   type MonitorState,
 } from '../../src/monitor/state';
-import { SessionRecorder } from '../../src/monitor/recorder';
+import { MAX_RECORDING_FRAMES, MAX_RECORDING_MS, SessionRecorder } from '../../src/monitor/recorder';
 import {
   decodeSession,
   writeFrameData,
@@ -238,6 +238,61 @@ describe('session recorder', () => {
     rec.push({ kind: 'game', t: 1, game: g });
     g.lane = -1;
     expect(rec.stop('', 'x').game[0].game.lane).toBe(1);
+  });
+
+  it('reuses landmarks the caller already decoded', () => {
+    const rec = new SessionRecorder();
+    rec.start({ meta: null, backend: null });
+    const poses = [synthPose({ hipX: 0.42 })];
+    rec.push(frameMsg(1000), poses);
+    expect(rec.stop('', 'x').frames[0].poses[0][23][0]).toBeCloseTo(poses[0][23].x, 4);
+  });
+
+  // The monitor tab also runs the game's camera; a session left recording must not grow forever.
+  it('frees its buffers on stop so only the encoded recording stays resident', () => {
+    const rec = new SessionRecorder();
+    rec.start({ meta: META, backend: 'replay' });
+    for (let i = 0; i < 5; i++) rec.push(frameMsg(1000 + i * 33));
+    rec.push({ kind: 'poseEvents', t: 1100, events: [{ type: 'jump' }] });
+    rec.push({ kind: 'status', t: 1100, backend: 'replay', status, base: null });
+    rec.push({ kind: 'game', t: 1100, game: snap() });
+    const out = rec.stop('', 'x');
+    expect(out.frames).toHaveLength(5);
+    expect(out.status).toHaveLength(1);
+    expect(rec.frameCount).toBe(0);
+    expect(rec.eventCount).toBe(0);
+    // The returned recording is independent of the (now empty) recorder.
+    rec.start({ meta: META, backend: 'replay' });
+    rec.push(frameMsg(9000));
+    expect(out.frames).toHaveLength(5);
+  });
+
+  it('stops collecting at the frame cap and says so, and a new start clears the flag', () => {
+    const rec = new SessionRecorder();
+    rec.start({ meta: META, backend: 'replay' });
+    for (let i = 0; i <= MAX_RECORDING_FRAMES + 20; i++) rec.push(frameMsg(1000 + i));
+    expect(rec.full).toBe(true);
+    expect(rec.frameCount).toBe(MAX_RECORDING_FRAMES);
+    // Nothing after the cap lands, including the duration.
+    expect(rec.durationMs).toBe(MAX_RECORDING_FRAMES - 1);
+    rec.push({ kind: 'poseEvents', t: 99_000, events: [{ type: 'jump' }] });
+    expect(rec.eventCount).toBe(0);
+    const out = rec.stop('', 'x');
+    expect(out.frames).toHaveLength(MAX_RECORDING_FRAMES);
+    rec.start({ meta: META, backend: 'replay' });
+    expect(rec.full).toBe(false);
+  });
+
+  it('stops collecting once the recording is longer than the duration cap', () => {
+    const rec = new SessionRecorder();
+    rec.start({ meta: META, backend: 'replay' });
+    rec.push(frameMsg(1000));
+    rec.push(frameMsg(1000 + MAX_RECORDING_MS - 1));
+    expect(rec.full).toBe(false);
+    rec.push(frameMsg(1000 + MAX_RECORDING_MS));
+    expect(rec.full).toBe(true);
+    expect(rec.frameCount).toBe(2);
+    expect(rec.durationMs).toBe(MAX_RECORDING_MS - 1);
   });
 });
 
