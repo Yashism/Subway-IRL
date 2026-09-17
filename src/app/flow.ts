@@ -1,0 +1,348 @@
+import type { GameState } from '../game/game';
+import type { CalibrationState, PlayMode } from '../pose/types';
+
+/**
+ * Session flow (spec "Session flow"): menu → camera setup → calibration → ready → game.
+ * Pure state machine: no DOM, no timers, no camera. Callers feed it inputs and run the effects
+ * it returns, in order and immediately (before the next pose status is dispatched).
+ *
+ * Once the screen is `playing`, the Game owns countdown / playing / paused / caught / summary;
+ * the flow only listens (`gameState`) so it can offer "raise hand to play again" and recalibration.
+ */
+
+export type FlowScreen = 'menu' | 'cameraPrompt' | 'cameraStarting' | 'cameraError' | 'calibrating' | 'ready' | 'playing';
+export type InputMode = 'webcam' | 'keyboard';
+export type ModeChoice = 'auto' | PlayMode;
+export type CheckState = 'ok' | 'bad' | 'pending';
+
+/** The parts of PoseStatus the flow needs, plus the frame-luma verdict. */
+export interface PoseSnapshot {
+  tracking: boolean;
+  calibrated: boolean;
+  mode: PlayMode | null;
+  startProgress: number;
+  calibration: CalibrationState;
+  /** The camera image is too dark to track well (from frame luma). */
+  dark?: boolean;
+}
+
+export type FlowInput =
+  | { type: 'startPressed' }
+  | { type: 'retry' }
+  | { type: 'back' }
+  | { type: 'useKeyboard' }
+  | { type: 'useWebcam' }
+  | { type: 'chooseCamera'; id: string }
+  | { type: 'chooseMode'; mode: ModeChoice }
+  | { type: 'recalibrate' }
+  | { type: 'cameraOk' }
+  | { type: 'cameraFailed'; message: string }
+  | { type: 'pose'; status: PoseSnapshot }
+  | { type: 'startGesture' }
+  | { type: 'gameState'; state: GameState };
+
+export type FlowEffect =
+  | { type: 'openCamera'; cameraId: string | null }
+  | { type: 'stopCamera' }
+  /** Send one `start` command to the game (starts a run, or resumes a paused one). */
+  | { type: 'startGame' }
+  | { type: 'pauseGame' }
+  /** Call PoseController.recalibrate(). */
+  | { type: 'recalibrate' }
+  /** Set PoseController.forcedMode. */
+  | { type: 'setForcedMode'; mode: PlayMode | null };
+
+export interface ScreenModel {
+  screen: FlowScreen;
+  input: InputMode;
+  error: string;
+  cameraId: string | null;
+  modeChoice: ModeChoice;
+  detectedMode: PlayMode | null;
+  tracking: boolean;
+  checks: { body: CheckState; distance: CheckState; light: CheckState };
+  /** Live fix-it hint, '' when every check passes. */
+  hint: string;
+  /** Calibration hold progress 0..1 (1 once calibrated). */
+  progress: number;
+  message: string;
+  /** Right-hand start hold 0..1. */
+  startProgress: number;
+  /** The ready screen was reached by the quick re-check after a run, not a fresh calibration. */
+  recheck: boolean;
+  /** Summary hint in webcam mode, '' otherwise. */
+  playAgain: string;
+  showRecalibrate: boolean;
+  gameState: GameState;
+}
+
+export interface FlowOptions {
+  input?: InputMode;
+  cameraId?: string | null;
+  modeChoice?: ModeChoice;
+}
+
+export const MSG_HOLD = 'Hold still…';
+export const MSG_CALIBRATED = 'Calibrated! Raise your RIGHT hand to start (or press Enter)';
+export const MSG_WELCOME_BACK = 'Looking good! Raise your RIGHT hand to go again (or press Enter)';
+export const MSG_STEP_IN = 'Step into view (then raise your RIGHT hand)';
+export const MSG_PLAY_AGAIN = '✋ Raise your right hand to play again';
+
+const NONE: readonly FlowEffect[] = Object.freeze([]);
+const INITIAL_POSE: PoseSnapshot = {
+  tracking: false,
+  calibrated: false,
+  mode: null,
+  startProgress: 0,
+  calibration: { progress: 0, bodyVisible: false, distance: 'ok' },
+  dark: false,
+};
+
+const running = (s: GameState) => s === 'playing' || s === 'countdown';
+
+export class SessionFlow {
+  screen: FlowScreen = 'menu';
+  input: InputMode;
+  /** A camera stream is open and feeding the pose pipeline. */
+  cameraReady = false;
+  private cameraId: string | null;
+  private modeChoice: ModeChoice;
+  private error = '';
+  private recheck = false;
+  private gameState: GameState = 'menu';
+  private pose: PoseSnapshot = INITIAL_POSE;
+  private cached: ScreenModel | null = null;
+
+  constructor(opts: FlowOptions = {}) {
+    this.input = opts.input ?? 'webcam';
+    this.cameraId = opts.cameraId ?? null;
+    this.modeChoice = opts.modeChoice ?? 'auto';
+  }
+
+  /** The current screen model. The same object is returned until something visible changes. */
+  get model(): ScreenModel {
+    return (this.cached ??= this.build());
+  }
+
+  /** Applies one input; returns the effects to run, in order. The returned array must not be mutated. */
+  dispatch(i: FlowInput): FlowEffect[] {
+    if (i.type === 'pose') return this.onPose(i.status);
+    this.cached = null;
+    if (i.type === 'gameState') {
+      this.gameState = i.state;
+      return NONE as FlowEffect[];
+    }
+    return this.input === 'keyboard' ? this.keyboard(i) : this.webcam(i);
+  }
+
+  private keyboard(i: FlowInput): FlowEffect[] {
+    if (this.screen === 'menu' && i.type === 'startPressed') return this.play();
+    if (this.screen === 'menu' && i.type === 'useWebcam') this.input = 'webcam';
+    return NONE as FlowEffect[];
+  }
+
+  private webcam(i: FlowInput): FlowEffect[] {
+    // Inputs that mean the same on every camera screen.
+    switch (i.type) {
+      case 'useKeyboard':
+        return this.toKeyboard();
+      case 'cameraFailed':
+        return this.cameraFailed(i.message);
+      case 'recalibrate':
+        return this.recalibrate(NONE as FlowEffect[]);
+      case 'chooseMode':
+        return this.chooseMode(i.mode);
+      case 'back':
+        if (this.screen !== 'playing') this.screen = 'menu';
+        return NONE as FlowEffect[];
+      default:
+        break;
+    }
+
+    switch (this.screen) {
+      case 'menu':
+        if (i.type === 'cameraOk') this.cameraReady = true;
+        if (i.type === 'startPressed') return this.cameraReady ? this.quickStart() : this.go('cameraPrompt');
+        if (i.type === 'startGesture' && this.cameraReady) return this.quickStart();
+        return NONE as FlowEffect[];
+      case 'cameraPrompt':
+        if (i.type === 'startPressed') return this.openCamera();
+        return NONE as FlowEffect[];
+      case 'cameraStarting':
+        if (i.type === 'cameraOk') {
+          this.cameraReady = true;
+          return this.go(this.pose.calibrated ? 'ready' : 'calibrating');
+        }
+        return NONE as FlowEffect[];
+      case 'cameraError':
+        if (i.type === 'retry' || i.type === 'startPressed') return this.openCamera();
+        if (i.type === 'chooseCamera') {
+          this.cameraId = i.id;
+          return this.openCamera();
+        }
+        return NONE as FlowEffect[];
+      case 'calibrating':
+      case 'ready':
+        if (i.type === 'chooseCamera') return this.switchCamera(i.id);
+        if (this.screen === 'ready' && (i.type === 'startPressed' || i.type === 'startGesture')) return this.play();
+        return NONE as FlowEffect[];
+      case 'playing':
+        if (i.type === 'chooseCamera') return this.switchCamera(i.id);
+        if (i.type === 'startGesture') {
+          if (this.gameState === 'summary') return this.quickStart();
+          if (this.gameState === 'paused') return [{ type: 'startGame' }];
+        }
+        return NONE as FlowEffect[];
+    }
+  }
+
+  private onPose(p: PoseSnapshot): FlowEffect[] {
+    const prev = this.pose;
+    this.pose = p;
+    if (this.cached && !samePose(prev, p)) this.cached = null;
+    if (this.input !== 'webcam') return NONE as FlowEffect[];
+    if (this.screen === 'calibrating' && p.calibrated) {
+      this.recheck = false;
+      this.screen = 'ready';
+      this.cached = null;
+    } else if (this.screen === 'ready' && !p.calibrated) {
+      this.screen = 'calibrating';
+      this.recheck = false;
+      this.cached = null;
+    }
+    return NONE as FlowEffect[];
+  }
+
+  private go(screen: FlowScreen): FlowEffect[] {
+    this.screen = screen;
+    return NONE as FlowEffect[];
+  }
+
+  private play(): FlowEffect[] {
+    this.screen = 'playing';
+    return [{ type: 'startGame' }];
+  }
+
+  /** Start from the menu or the summary without a full recalibration when the player is ready. */
+  private quickStart(): FlowEffect[] {
+    const p = this.pose;
+    if (!p.calibrated) return this.go('calibrating');
+    if (p.tracking) return this.play();
+    this.recheck = true;
+    return this.go('ready');
+  }
+
+  private openCamera(): FlowEffect[] {
+    this.error = '';
+    this.cameraReady = false;
+    this.screen = 'cameraStarting';
+    return [{ type: 'openCamera', cameraId: this.cameraId }];
+  }
+
+  private switchCamera(id: string): FlowEffect[] {
+    if (id === this.cameraId && this.cameraReady) return NONE as FlowEffect[];
+    this.cameraId = id;
+    const fx: FlowEffect[] = [];
+    if (this.screen === 'playing' && running(this.gameState)) fx.push({ type: 'pauseGame' });
+    fx.push(...this.openCamera(), { type: 'recalibrate' });
+    return fx;
+  }
+
+  private cameraFailed(message: string): FlowEffect[] {
+    this.cameraReady = false;
+    this.error = message;
+    if (this.screen === 'menu') return NONE as FlowEffect[];
+    const fx: FlowEffect[] = this.screen === 'playing' && running(this.gameState) ? [{ type: 'pauseGame' }] : [];
+    this.screen = 'cameraError';
+    return fx;
+  }
+
+  private toKeyboard(): FlowEffect[] {
+    const fx: FlowEffect[] = [];
+    if (this.cameraReady || this.screen === 'cameraStarting') fx.push({ type: 'stopCamera' });
+    this.cameraReady = false;
+    this.input = 'keyboard';
+    this.recheck = false;
+    if (this.screen === 'menu' || this.screen === 'playing') return fx;
+    fx.push(...this.play());
+    return fx;
+  }
+
+  private recalibrate(before: FlowEffect[]): FlowEffect[] {
+    if (!this.canCalibrate()) return NONE as FlowEffect[];
+    const fx: FlowEffect[] = [];
+    if (this.screen === 'playing' && running(this.gameState)) fx.push({ type: 'pauseGame' });
+    fx.push(...before, { type: 'recalibrate' });
+    this.recheck = false;
+    this.screen = 'calibrating';
+    return fx;
+  }
+
+  private chooseMode(mode: ModeChoice): FlowEffect[] {
+    if (mode === this.modeChoice) return NONE as FlowEffect[];
+    this.modeChoice = mode;
+    const force: FlowEffect = { type: 'setForcedMode', mode: mode === 'auto' ? null : mode };
+    // Without a camera there is nothing to recalibrate yet; the forced mode applies to the next calibration.
+    return this.canCalibrate() ? this.recalibrate([force]) : [force];
+  }
+
+  /** Calibration needs a running camera and a screen that can show it. */
+  private canCalibrate(): boolean {
+    return this.cameraReady && (this.screen === 'calibrating' || this.screen === 'ready' || this.screen === 'playing');
+  }
+
+  private build(): ScreenModel {
+    const p = this.pose;
+    const cal = p.calibration;
+    const s = this.screen;
+    const ready = s === 'ready' || (s !== 'calibrating' && p.calibrated);
+    const body: CheckState = ready ? (this.recheck && !p.tracking ? 'bad' : 'ok') : cal.bodyVisible ? 'ok' : 'bad';
+    const distance: CheckState = ready ? 'ok' : !cal.bodyVisible ? 'pending' : cal.distance === 'ok' ? 'ok' : 'bad';
+    const light: CheckState = p.dark ? 'bad' : 'ok';
+
+    let hint = '';
+    if (body === 'bad') hint = 'Step into view';
+    else if (distance === 'bad') hint = cal.distance === 'back' ? 'Step back — show your knees' : 'Come closer';
+    else if (light === 'bad') hint = 'Too dark — turn on a light';
+
+    let message = '';
+    if (s === 'calibrating') message = hint ? '' : MSG_HOLD;
+    else if (s === 'ready') message = !this.recheck ? MSG_CALIBRATED : p.tracking ? MSG_WELCOME_BACK : MSG_STEP_IN;
+
+    const webcam = this.input === 'webcam';
+    return {
+      screen: s,
+      input: this.input,
+      error: this.error,
+      cameraId: this.cameraId,
+      modeChoice: this.modeChoice,
+      detectedMode: p.mode,
+      tracking: p.tracking,
+      checks: { body, distance, light },
+      hint,
+      progress: ready ? 1 : cal.progress,
+      message,
+      startProgress: p.startProgress,
+      recheck: this.recheck,
+      playAgain: webcam && s === 'playing' && this.gameState === 'summary' ? MSG_PLAY_AGAIN : '',
+      showRecalibrate: webcam && s === 'playing' && this.cameraReady,
+      gameState: this.gameState,
+    };
+  }
+}
+
+function samePose(a: PoseSnapshot, b: PoseSnapshot): boolean {
+  return (
+    a.tracking === b.tracking &&
+    a.calibrated === b.calibrated &&
+    a.mode === b.mode &&
+    a.startProgress === b.startProgress &&
+    !!a.dark === !!b.dark &&
+    a.calibration.progress === b.calibration.progress &&
+    a.calibration.bodyVisible === b.calibration.bodyVisible &&
+    a.calibration.distance === b.calibration.distance
+  );
+}
+
+/** Mode chip click order. */
+export const nextMode = (m: ModeChoice): ModeChoice => (m === 'auto' ? 'full' : m === 'full' ? 'small' : 'auto');
