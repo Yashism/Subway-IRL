@@ -90,6 +90,11 @@ export class Game {
     this.track = this.newTrack();
   }
 
+  /** Ms since the player last moved (jog step, jump, roll, lane change); 0 outside play. For telemetry. */
+  get idleMs(): number {
+    return this.state === 'playing' ? Math.max(0, this.idle.idleMs(this.clockMs)) : 0;
+  }
+
   pause(): void {
     if (this.state !== 'playing' && this.state !== 'countdown') return;
     this.pausedByLoss = false;

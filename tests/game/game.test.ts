@@ -145,6 +145,22 @@ describe('Jog rule', () => {
     expect(g.idleLevel).toBe('ok');
   });
 
+  it('exposes idle ms: 0 outside play and for keyboard, growing while still, reset by a jump', () => {
+    const menu = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    steps(menu, 120, [], STILL);
+    expect(menu.idleMs).toBe(0);
+    const kb = playing();
+    steps(kb, 120);
+    expect(kb.idleMs).toBe(0);
+    const g = playing({}, JOGGING);
+    expect(g.idleMs).toBeLessThan(20);
+    steps(g, 30, [], STILL);
+    expect(g.idleMs).toBeGreaterThan(450);
+    expect(g.idleMs).toBeLessThan(550);
+    steps(g, 1, [{ type: 'jump' }], STILL);
+    expect(g.idleMs).toBeLessThan(1);
+  });
+
   it('does not catch while cheating is on (god mode)', () => {
     const g = playing({ god: true }, STILL);
     steps(g, 300, [], STILL);
