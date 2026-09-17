@@ -15,8 +15,8 @@ import {
   type MoveStepModel,
   type MoveTuning,
 } from './moveCheckTypes';
-import type { Thresholds } from './thresholds';
-import { tuneKey, type ThresholdKey } from './tuning';
+import { DEFAULT_THRESHOLDS, type Thresholds } from './thresholds';
+import { tuneKey, tunedValue, type ThresholdKey } from './tuning';
 import type { MoveMagnitudes, PlayMode, PoseEvent } from './types';
 
 /** What the check needs from the pose pipeline each frame. `PoseController` satisfies it. */
@@ -45,9 +45,21 @@ export const ASYMMETRY_FRACTION = 0.4;
 interface Signal {
   key: ThresholdKey;
   read(m: Readonly<MoveMagnitudes>): number;
+  /**
+   * A second floor the detector imposes on top of the threshold, in the same units. Without it the
+   * check would promise a move that the detector still refuses, and the progress bar would lie.
+   */
+  floor?(m: Readonly<MoveMagnitudes>, th: Thresholds): number;
 }
 
-const sig = (key: ThresholdKey, read: (m: Readonly<MoveMagnitudes>) => number): Signal => ({ key, read });
+const sig = (key: ThresholdKey, read: (m: Readonly<MoveMagnitudes>) => number, floor?: Signal['floor']): Signal => ({
+  key,
+  read,
+  floor,
+});
+
+/** The jump also has to clear the jogger's own bounce (`moves.ts`), or every step would be a jump. */
+const bobFloor = (m: Readonly<MoveMagnitudes>, th: Thresholds): number => th.bobJumpFactor * m.bobAmp;
 
 // Read functions are module constants, so a frame allocates nothing.
 const jogPrimary = (m: Readonly<MoveMagnitudes>) => m.jogPrimary;
@@ -96,7 +108,7 @@ const SIGNALS: Record<PlayMode, Record<MoveId, readonly Signal[]>> = {
     jog: [sig('kneeLift', jogPrimary)],
     left: [sig('laneEnter', laneLeft)],
     right: [sig('laneEnter', laneRight)],
-    jump: [sig('jumpRise', rise)],
+    jump: [sig('jumpRise', rise, bobFloor)],
     roll: [sig('rollDrop', hipDrop)],
     hover: [],
   },
@@ -104,10 +116,16 @@ const SIGNALS: Record<PlayMode, Record<MoveId, readonly Signal[]>> = {
     jog: [sig('wristPump', jogPrimary), sig('bobMinAmp', bobAmp)],
     left: [sig('leanDeg', tiltLeft), sig('noseShift', noseLeft)],
     right: [sig('leanDeg', tiltRight), sig('noseShift', noseRight)],
-    jump: [sig('smallJumpRise', rise)],
+    jump: [sig('smallJumpRise', rise, bobFloor)],
     roll: [sig('duckDrop', headDrop)],
     hover: [],
   },
+};
+
+/** Two measurements of the same move far enough apart to be treated as different moves. */
+const lopsided = (a: number, b: number): boolean => {
+  const bigger = Math.max(a, b);
+  return bigger > 0 && Math.abs(a - b) / bigger > ASYMMETRY_FRACTION;
 };
 
 /** Steps whose difficulty is a threshold, so "use an easier setting" means something. */
@@ -134,6 +152,10 @@ function fires(id: MoveId, mode: PlayMode, e: PoseEvent): boolean {
 class Step {
   readonly model: MoveStepModel;
   readonly peaks: number[];
+  /** What each signal had to reach, as of the last frame — the line "was this measured at all?" uses. */
+  readonly needs: number[];
+  /** Packed inputs of the current hint, so an unchanged hint is not rebuilt 30 times a second. */
+  hintSig = -1;
   startT = Number.NaN;
   doneT = Number.NaN;
   attempts = 0;
@@ -146,6 +168,7 @@ class Step {
 
   constructor(readonly id: MoveId, mode: PlayMode, readonly signals: readonly Signal[]) {
     this.peaks = signals.map(() => 0);
+    this.needs = signals.map(() => 0);
     this.model = {
       id,
       status: 'todo',
@@ -162,6 +185,8 @@ class Step {
 
   reset(): void {
     this.peaks.fill(0);
+    this.needs.fill(0);
+    this.hintSig = -1;
     this.startT = Number.NaN;
     this.doneT = Number.NaN;
     this.attempts = 0;
@@ -189,7 +214,6 @@ const snapshot = (m: MoveStepModel): MoveStepModel => ({ ...m, steps: m.steps ? 
 export class MoveCheck {
   private readonly steps: Step[];
   private readonly view: MoveCheckModel;
-  private lastT = 0;
 
   constructor(readonly mode: PlayMode) {
     this.steps = MOVE_ORDER.map((id) => new Step(id, mode, SIGNALS[mode][id]));
@@ -218,57 +242,76 @@ export class MoveCheck {
    * Returns the model, which is the same object every time.
    */
   update(src: MoveCheckSource, events: readonly PoseEvent[], tMs: number): MoveCheckModel {
-    this.lastT = tMs;
     if (this.view.summary) return this.view;
-    const step = this.steps[this.view.index];
-    if (Number.isNaN(step.startT)) {
-      step.startT = tMs;
-      // The jog step counts steps taken from here on, not the ones already on the clock.
-      step.jogFrom = src.magnitudes.jogSteps;
-    }
+    // Two passes at most: the step whose tick has just run out, and the one that becomes active on
+    // the same frame — whose event may already be sitting in this frame's list. The hoverboard fires
+    // once per hold, so dropping that one event would cost the player a whole raise of both arms.
+    for (let pass = 0; pass < 2 && this.view.index < this.steps.length; pass++) {
+      const step = this.steps[this.view.index];
+      if (Number.isNaN(step.startT)) {
+        step.startT = tMs;
+        // The jog step counts steps taken from here on, not the ones already on the clock.
+        step.jogFrom = src.magnitudes.jogSteps;
+      }
 
-    const active = step.model.status === 'active';
-    // A ✓ holds for ADVANCE_MS, and the peak keeps rising through it: a jump's apex comes after the
-    // detector has already fired, and that apex is the number worth tuning from.
-    if (active || step.model.status === 'done') this.measure(step, src);
+      const active = step.model.status === 'active';
+      // A tick holds for ADVANCE_MS, and the peak keeps rising through it: a jump's apex comes after
+      // the detector has already fired, and that apex is the number worth tuning from.
+      if (active || step.model.status === 'done') this.measure(step, src);
 
-    if (active) {
-      if (step.id === 'jog') {
-        const seen = Math.max(0, src.magnitudes.jogSteps - step.jogFrom);
-        step.model.steps!.seen = Math.min(seen, JOG_STEPS_NEEDED);
-        if (seen >= JOG_STEPS_NEEDED) this.succeed(step, tMs);
-      } else {
-        for (const e of events) {
-          if (fires(step.id, this.mode, e)) {
-            this.succeed(step, tMs);
-            break;
+      if (active) {
+        if (step.id === 'jog') {
+          const seen = Math.max(0, src.magnitudes.jogSteps - step.jogFrom);
+          step.model.steps!.seen = Math.min(seen, JOG_STEPS_NEEDED);
+          if (seen >= JOG_STEPS_NEEDED) this.succeed(step, tMs);
+        } else {
+          for (const e of events) {
+            if (fires(step.id, this.mode, e)) {
+              this.succeed(step, tMs);
+              break;
+            }
           }
         }
+        if (step.model.status === 'active') this.describe(step, tMs);
+        break;
       }
-      if (step.model.status === 'active') this.describe(step, tMs);
-    } else if (tMs - step.doneT >= ADVANCE_MS) {
+      if (tMs - step.doneT < ADVANCE_MS) break;
       this.advance();
     }
     return this.view;
   }
 
-  /** Leaves this step untuned and moves on. */
-  skipStep(): void {
-    const step = this.steps[this.view.index];
-    if (!this.view.summary && step.model.status === 'active') {
-      step.model.status = 'skipped';
-      this.advance();
-    }
+  /**
+   * Leaves this step untuned and moves on. Refused, and returns false, until the step actually
+   * offers it (`canSkip`): the rule belongs to the machine, not to whichever button calls it.
+   * `skipAll` is the way out that is always available.
+   */
+  skipStep(): boolean {
+    const step = this.current;
+    if (!step?.model.canSkip) return false;
+    step.model.status = 'skipped';
+    this.advance();
+    return true;
   }
 
-  /** "Use an easier setting": takes the best attempt as the tuning input and moves on. */
-  acceptBest(): void {
+  /**
+   * "Use an easier setting": takes the best attempt as the tuning input and moves on. Only the
+   * steps whose difficulty is a threshold offer it, so this is refused elsewhere.
+   */
+  acceptBest(): boolean {
+    const step = this.current;
+    if (!step?.model.canAccept) return false;
+    step.accepted = true;
+    step.model.status = 'skipped';
+    this.advance();
+    return true;
+  }
+
+  /** The step awaiting the player, or null when none is (finished, or mid-tick). */
+  private get current(): Step | null {
+    if (this.view.summary || this.view.index >= this.steps.length) return null;
     const step = this.steps[this.view.index];
-    if (!this.view.summary && step.model.status === 'active') {
-      step.accepted = true;
-      step.model.status = 'skipped';
-      this.advance();
-    }
+    return step.model.status === 'active' ? step : null;
   }
 
   /** Abandons the rest of the check. What was already measured still counts. */
@@ -285,15 +328,20 @@ export class MoveCheck {
 
   /**
    * The record to persist, once the check has finished; null before that. `at` is epoch ms,
-   * supplied by the caller so this stays deterministic.
+   * supplied by the caller so this stays deterministic. It describes *this* run only: a step the
+   * player skipped is absent rather than reset, which is what lets `MoveTuningStore.save` keep the
+   * threshold they tuned for it last time.
    */
   tuning(at: number): MoveTuning | null {
-    const summary = this.view.summary;
-    if (!summary) return null;
+    if (!this.view.summary) return null;
     const peaks: Partial<Record<MoveId, number>> = {};
     for (const s of this.steps) if (s.tunable && s.signals.length) peaks[s.id] = s.peaks[0];
-    const record: MoveTuning = { mode: this.mode, at, thresholds: { ...summary.tuned }, peaks };
     const keyPeaks = this.keyPeaks();
+    const thresholds: Partial<Thresholds> = {};
+    // Measured keys only. Re-arm and velocity companions are derived from these on apply, so a
+    // record can never carry a companion that disagrees with the key it belongs to.
+    for (const [key, peak] of Object.entries(keyPeaks)) thresholds[key as ThresholdKey] = tunedValue(key as ThresholdKey, peak);
+    const record: MoveTuning = { mode: this.mode, at, thresholds, peaks };
     if (Object.keys(keyPeaks).length) record.keyPeaks = keyPeaks;
     return record;
   }
@@ -304,8 +352,9 @@ export class MoveCheck {
     let now = 0;
     for (let i = 0; i < step.signals.length; i++) {
       const s = step.signals[i];
-      const need = this.need(s.key, src);
+      const need = this.need(s, src);
       const value = s.read(m);
+      step.needs[i] = need;
       if (value > step.peaks[i]) step.peaks[i] = value;
       if (need > 0) {
         best = Math.max(best, step.peaks[i] / need);
@@ -325,26 +374,43 @@ export class MoveCheck {
     }
   }
 
-  /** What this signal has to reach right now: the live threshold, eased by the sensitivity setting. */
-  private need(key: ThresholdKey, src: MoveCheckSource): number {
+  /**
+   * What this signal has to reach right now: the live threshold eased by the sensitivity setting,
+   * and never less than any extra floor the detector imposes. A threshold that is somehow not a
+   * finite number falls back to the shipped default rather than silently killing all feedback.
+   */
+  private need(s: Signal, src: MoveCheckSource): number {
     const sens = Number.isFinite(src.sensitivity) && src.sensitivity > 0 ? src.sensitivity : 1;
-    return src.th[key] / sens;
+    const live = src.th[s.key];
+    const base = (Number.isFinite(live) ? live : DEFAULT_THRESHOLDS[s.key]) / sens;
+    if (!s.floor) return base;
+    const floor = s.floor(src.magnitudes, src.th);
+    return Number.isFinite(floor) && floor > base ? floor : base;
   }
 
   private describe(step: Step, tMs: number): void {
     const m = step.model;
     const near = m.progress >= NEAR_MISS_FRACTION;
+    // A full bar on a move that still has not fired means the other gate is the one in the way: for
+    // the jump that is speed, and telling this player to go further is advice they cannot act on.
+    const tooSlow = step.id === 'jump' && m.progress >= 1;
     m.canSkip = tMs - step.startT >= OFFER_SKIP_MS || step.attempts >= OFFER_SKIP_ATTEMPTS;
     m.canAccept = m.canSkip && CAN_ACCEPT.has(step.id);
+    const sig =
+      (near ? 1 : 0) | (tooSlow ? 2 : 0) | (m.canSkip ? 4 : 0) | (m.canAccept ? 8 : 0) | (step.attempts << 4);
+    if (sig === step.hintSig) return;
+    step.hintSig = sig;
     const out = m.canAccept ? 'use your best attempt' : 'skip this move';
-    if (near && m.canSkip) m.hint = `Almost — go a bit further, or ${out}`;
-    else if (near) m.hint = 'Almost — go a bit further';
+    const almost = tooSlow ? 'Almost — try a quicker hop' : 'Almost — go a bit further';
+    if ((near || tooSlow) && m.canSkip) m.hint = `${almost}, or ${out}`;
+    else if (near || tooSlow) m.hint = almost;
     else if (m.canSkip) m.hint = `No luck yet — ${m.canAccept ? 'skip it, or use your best attempt' : 'you can skip this move'}`;
     else if (step.attempts > 0) m.hint = `${step.attempts} near ${step.attempts === 1 ? 'miss' : 'misses'} so far`;
     else m.hint = null;
   }
 
   private clearHints(step: Step): void {
+    step.hintSig = -1;
     step.model.hint = null;
     step.model.canSkip = false;
     step.model.canAccept = false;
@@ -371,21 +437,53 @@ export class MoveCheck {
     next.startT = Number.NaN;
   }
 
-  /** Peaks per threshold key, left and right averaged into one. */
-  private keyPeaks(): Partial<Record<ThresholdKey, number>> {
-    const sums = new Map<ThresholdKey, { total: number; n: number }>();
+  /**
+   * What each tuned key was measured at, per side.
+   *
+   * A signal the player never used contributes nothing. Several detectors fire on *either* of two
+   * signals — a small-room lane change on a shoulder lean or a nose shift, the jog on an arm pump or
+   * a vertical bob — so a player who follows the instruction exercises one of them and leaves the
+   * other at nearly zero. Tuning that one anyway would read "they can barely manage it" from a
+   * measurement that was never taken, drop it to the bottom of the band, and hand the player a game
+   * where glancing sideways changes lane. Anything below the near-miss line is left alone.
+   */
+  private contributions(): Map<ThresholdKey, { left: number | null; right: number | null; rest: number[] }> {
+    const out = new Map<ThresholdKey, { left: number | null; right: number | null; rest: number[] }>();
     for (const step of this.steps) {
       if (!step.tunable) continue;
+      const used = step.signals.map((_, i) => step.needs[i] > 0 && step.peaks[i] >= NEAR_MISS_FRACTION * step.needs[i]);
+      // "Use an easier setting" has to mean something even when nothing cleared that line, so it
+      // falls back to the primary signal — the one the on-screen instruction actually names.
+      if (step.accepted && step.signals.length && !used.some(Boolean)) used[0] = true;
       for (let i = 0; i < step.signals.length; i++) {
+        if (!used[i]) continue;
         const key = step.signals[i].key;
-        const acc = sums.get(key) ?? { total: 0, n: 0 };
-        acc.total += step.peaks[i];
-        acc.n++;
-        sums.set(key, acc);
+        const c = out.get(key) ?? { left: null, right: null, rest: [] };
+        if (step.id === 'left') c.left = step.peaks[i];
+        else if (step.id === 'right') c.right = step.peaks[i];
+        else c.rest.push(step.peaks[i]);
+        out.set(key, c);
       }
     }
+    return out;
+  }
+
+  /** Peaks per threshold key, the two sides resolved into one number. */
+  private keyPeaks(): Partial<Record<ThresholdKey, number>> {
     const out: Partial<Record<ThresholdKey, number>> = {};
-    for (const [key, { total, n }] of sums) out[key] = total / n;
+    for (const [key, c] of this.contributions()) {
+      const sides = [c.left, c.right].filter((v): v is number => v !== null);
+      // Lopsided sides must not average: the mean always sits above the weaker side's own peak, so
+      // the threshold would be one the player has just shown they cannot reach on that side — and
+      // for a bad enough asymmetry it lands above the shipped default, leaving them worse off than
+      // if they had never run the check. Tune to the side that needs the help.
+      if (sides.length === 2 && lopsided(sides[0], sides[1])) {
+        out[key] = Math.min(sides[0], sides[1]);
+        continue;
+      }
+      const all = [...sides, ...c.rest];
+      if (all.length) out[key] = all.reduce((a, b) => a + b, 0) / all.length;
+    }
     return out;
   }
 
@@ -401,19 +499,20 @@ export class MoveCheck {
   }
 
   /**
-   * Left and right are averaged into one symmetric threshold, so a player whose two sides differ a
-   * lot is told rather than quietly given a threshold their weaker side cannot reach.
+   * A player whose two sides differ a lot is told, rather than quietly given a threshold tuned to
+   * the side they happen to be better on. Every key the lanes tune is checked, not just the first:
+   * a player can lean on one side and shift their head on the other.
    */
   private asymmetryNote(): string | null {
+    const contributions = this.contributions();
     const left = this.steps.find((s) => s.id === 'left')!;
-    const right = this.steps.find((s) => s.id === 'right')!;
-    if (!left.tunable || !right.tunable) return null;
-    const l = left.peaks[0];
-    const r = right.peaks[0];
-    const bigger = Math.max(l, r);
-    if (bigger <= 0 || Math.abs(l - r) / bigger <= ASYMMETRY_FRACTION) return null;
-    const word = this.mode === 'full' ? 'step' : 'lean';
-    const [small, large] = l < r ? ['left', 'right'] : ['right', 'left'];
-    return `Your ${small} ${word} is much smaller than your ${large} — the game uses the average of the two.`;
+    for (const signal of left.signals) {
+      const c = contributions.get(signal.key);
+      if (!c || c.left === null || c.right === null || !lopsided(c.left, c.right)) continue;
+      const word = this.mode === 'full' ? 'step' : 'lean';
+      const [small, large] = c.left < c.right ? ['left', 'right'] : ['right', 'left'];
+      return `Your ${small} ${word} is much smaller than your ${large} — the game is tuned to the smaller one, so both work.`;
+    }
+    return null;
   }
 }
