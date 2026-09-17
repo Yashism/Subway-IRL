@@ -36,7 +36,7 @@ sendMeta();
 pub.onControl((msg) => {
   lastControl = JSON.stringify(msg);
   if (msg.kind === 'setSensitivity') ctrl.sensitivity = msg.value;
-  else if (msg.kind === 'setThreshold' && msg.key in ctrl.th) (ctrl.th as Record<string, number>)[msg.key] = msg.value;
+  else if (msg.kind === 'setThreshold' && Object.hasOwn(ctrl.th, msg.key)) (ctrl.th as Record<string, number>)[msg.key] = msg.value;
   else if (msg.kind === 'recalibrate') pub.poseEvents(ctrl.recalibrate(), performance.now());
   else if (msg.kind === 'forceMode') {
     ctrl.forcedMode = msg.mode;

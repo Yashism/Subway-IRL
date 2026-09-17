@@ -40,6 +40,7 @@ body { margin: 0; background: var(--bg); color: var(--text); display: flex; flex
 .rec { display: flex; align-items: center; gap: 8px; }
 .rec-info { color: var(--muted); font-size: 12px; min-width: 16ch; }
 .rec-info.live { color: var(--bad); }
+.rec-info.full { color: var(--warn); }
 
 /* controls */
 .btn, select, input[type='number'], textarea {

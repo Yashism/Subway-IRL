@@ -16,7 +16,7 @@ import {
   type SessionRecording,
   type WireStatus,
 } from '../telemetry/messages';
-import { SessionRecorder } from './recorder';
+import { MAX_RECORDING_FRAMES, MAX_RECORDING_MS, SessionRecorder } from './recorder';
 import {
   connection,
   formatRel,
@@ -46,23 +46,52 @@ let state: MonitorState = initialState();
 let dirty = true;
 const recorder = new SessionRecorder();
 const monitorId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random()).slice(2);
-const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel(CHANNEL_NAME) : null;
+const channelSupported = typeof BroadcastChannel === 'function';
+let channel: BroadcastChannel | null = null;
+let helloTimer = 0;
 
 function send(msg: HelloMsg | ControlMessage): void {
-  channel?.postMessage(msg);
+  // A closed channel (pagehide with no restore yet) throws InvalidStateError; never let that escape.
+  try {
+    channel?.postMessage(msg);
+  } catch {
+    /* the game tab will hear from us again on the next hello */
+  }
 }
 const hello = () => send({ kind: 'hello', id: monitorId, recording: recorder.active });
 
-channel?.addEventListener('message', (e: MessageEvent) => {
+function onChannelMessage(e: MessageEvent): void {
   const msg: unknown = e.data;
   if (!isGameMessage(msg)) return;
   state = reduce(state, { type: 'message', msg, now: performance.now() });
-  recorder.push(msg);
+  // The reducer already decoded this frame's landmarks; don't decode them a second time.
+  recorder.push(msg, msg.kind === 'frame' ? state.frame?.poses : undefined);
+  dirty = true;
+}
+
+function openChannel(): void {
+  if (!channelSupported || channel) return;
+  channel = new BroadcastChannel(CHANNEL_NAME);
+  channel.addEventListener('message', onChannelMessage);
+  hello();
+  helloTimer = window.setInterval(hello, HELLO_INTERVAL_MS);
+}
+
+function closeChannel(): void {
+  if (helloTimer) clearInterval(helloTimer);
+  helloTimer = 0;
+  channel?.close();
+  channel = null;
+}
+
+openChannel();
+// bfcache: the page keeps running its timers after pagehide, so the channel must be reopened on
+// restore — otherwise every hello and every control click throws on a closed channel forever.
+window.addEventListener('pagehide', closeChannel);
+window.addEventListener('pageshow', () => {
+  openChannel();
   dirty = true;
 });
-hello();
-setInterval(hello, HELLO_INTERVAL_MS);
-window.addEventListener('pagehide', () => channel?.close());
 
 // ---- offline playback -----------------------------------------------------------------------
 
@@ -161,7 +190,9 @@ function renderPose(st: WireStatus | null, backend: string | null, stall: number
   setPose('fps', String(st.poseFps), st.slowPose ? 'bad' : st.poseFps >= 24 ? 'ok' : 'warn');
   setPose('backend', backend ?? '—');
   setPose('jog', st.jog.active ? 'active' : 'idle', st.jog.active ? 'ok' : 'dim');
-  setPose('spm', `${st.jog.cadenceSpm} spm`);
+  // Only show a cadence while the player is actually jogging; the last spm before they stopped is
+  // stale within a step or two and was read as "still jogging".
+  setPose('spm', st.jog.active && st.jog.cadenceSpm > 0 ? `${st.jog.cadenceSpm} spm` : '—', st.jog.active ? '' : 'dim');
   const since = st.jog.msSinceStep;
   setPose('since', ms(since), since === null || !Number.isFinite(since) ? 'dim' : since >= 2000 ? 'bad' : since >= 1000 ? 'warn' : '');
   setPose('steps', String(st.jog.steps));
@@ -440,6 +471,10 @@ const clock = (msv: number) => {
 
 recordBtn.addEventListener('click', () => {
   if (!recorder.active) {
+    // Drop the previous recording first: it is unreachable from the UI once a new one starts, and
+    // a long session is megabytes of landmarks in a tab that is already running MediaPipe.
+    lastSaved = null;
+    fullWarned = false;
     recorder.start({ meta: state.meta, backend: state.backend });
     savedName = '';
     hello();
@@ -451,6 +486,12 @@ recordBtn.addEventListener('click', () => {
     noteDlg.showModal();
   }
   renderRecording();
+});
+
+// Escape used to close the dialog with an empty returnValue, silently throwing the recording away.
+noteDlg.addEventListener('cancel', (e) => {
+  e.preventDefault();
+  showFlash('Choose “Save & download” or “Discard” — Escape will not throw the recording away.');
 });
 
 noteDlg.addEventListener('close', () => {
@@ -474,13 +515,21 @@ noteDlg.addEventListener('close', () => {
   renderRecording();
 });
 
+let fullWarned = false;
 function renderRecording(): void {
   const on = recorder.active;
+  if (on && recorder.full && !fullWarned) {
+    fullWarned = true;
+    showFlash(`Recording limit reached (${MAX_RECORDING_MS / 60_000} min or ${MAX_RECORDING_FRAMES} frames). Stop and save it.`);
+  }
   recordBtn.setAttribute('aria-pressed', String(on));
   recordLabel.textContent = on ? 'Stop' : 'Record session';
-  recInfo.classList.toggle('live', on);
+  recInfo.classList.toggle('live', on && !recorder.full);
+  recInfo.classList.toggle('full', on && recorder.full);
   recInfo.textContent = on
-    ? `${clock(recorder.durationMs)} · ${recorder.frameCount} frames · ${recorder.eventCount} ev${state.fullRate ? '' : ' · waiting for full rate'}`
+    ? recorder.full
+      ? `${clock(recorder.durationMs)} · limit reached — stop and save`
+      : `${clock(recorder.durationMs)} · ${recorder.frameCount} frames · ${recorder.eventCount} ev${state.fullRate ? '' : ' · waiting for full rate'}`
     : savedName;
   viewLast.hidden = on || !lastSaved || savedName === 'discarded';
 }
@@ -498,6 +547,8 @@ const playBtn = $<HTMLButtonElement>('play');
 let flashTimer = 0;
 let lastOfflineKey = '';
 
+const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
 function showFlash(text: string): void {
   flash.textContent = text;
   flash.hidden = false;
@@ -505,16 +556,24 @@ function showFlash(text: string): void {
   flashTimer = window.setTimeout(() => (flash.hidden = true), 8000);
 }
 
+/** Parses + validates a recording and opens it; on bad input it says why and stays where it was. */
+function loadSession(name: string, text: string): boolean {
+  try {
+    openRecording(name, decodeSession(JSON.parse(text)));
+    return true;
+  } catch (err) {
+    const why = err instanceof SyntaxError ? `not valid JSON (${err.message})` : errText(err);
+    showFlash(`Could not load ${name}: ${why}`);
+    return false;
+  }
+}
+
 $<HTMLInputElement>('load').addEventListener('change', async (e) => {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = '';
   if (!file) return;
-  try {
-    openRecording(file.name, decodeSession(JSON.parse(await file.text())));
-  } catch (err) {
-    showFlash(`Could not load ${file.name}: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  loadSession(file.name, await file.text());
 });
 
 function openRecording(name: string, rec: SessionRecording): void {
@@ -569,12 +628,13 @@ function stepFrame(dir: -1 | 1): void {
 }
 $('prevFrame').addEventListener('click', () => stepFrame(-1));
 $('nextFrame').addEventListener('click', () => stepFrame(1));
-$('backLive').addEventListener('click', () => {
+function closeOffline(): void {
   offline = null;
   offlineBar.hidden = true;
   fullLiveRebuild();
   dirty = true;
-});
+}
+$('backLive').addEventListener('click', closeOffline);
 window.addEventListener('keydown', (e) => {
   if (!offline || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
   if (e.key === ' ') {
@@ -616,7 +676,7 @@ function setPill(kind: string, text: string): void {
 }
 
 let lastPillCheck = 0;
-function frame(now: number): void {
+function tick(now: number): void {
   if (offline) {
     if (offline.playing) {
       const dt = now - offline.lastTick;
@@ -626,7 +686,7 @@ function frame(now: number): void {
     }
   } else if (dirty || now - lastPillCheck > 250) {
     lastPillCheck = now;
-    const c = channel ? connection(state, now) : { state: 'waiting' as const, label: 'BroadcastChannel unsupported in this browser' };
+    const c = channelSupported ? connection(state, now) : { state: 'waiting' as const, label: 'BroadcastChannel unsupported in this browser' };
     setPill(c.state, c.label);
     const live = c.state === 'connected';
     syncControls(state.meta, live);
@@ -640,8 +700,46 @@ function frame(now: number): void {
       if (!logPaused) appendLog(state.timeline, state.t0);
     }
   }
-  renderRecording();
+  // Only the recording clock changes every frame; the rest is redrawn by its own handlers.
+  if (recorder.active) renderRecording();
+}
+
+/**
+ * The monitor must survive a bad frame: before, one unexpected value in a mailed-in recording threw
+ * out of the rAF body and the callback was never re-scheduled, so live view, playback and recording
+ * all stopped until reload. Now the error is shown, the recording is dropped and the loop goes on.
+ */
+let frameErrors = 0;
+function frame(now: number): void {
+  try {
+    tick(now);
+    frameErrors = 0;
+  } catch (err) {
+    onFrameError(err);
+  }
   requestAnimationFrame(frame);
+}
+
+function onFrameError(err: unknown): void {
+  frameErrors++;
+  if (frameErrors === 1) console.error('[monitor] render failed', err);
+  try {
+    if (offline) {
+      const name = offline.name;
+      closeOffline();
+      showFlash(`Could not play ${name}: ${errText(err)} — the recording is damaged. Back to live.`);
+    } else if (frameErrors === 1) {
+      showFlash(`Monitor render error: ${errText(err)} — see the console. Live view continues.`);
+    } else if (frameErrors > 300) {
+      // Something in the live state renders badly every frame; drop it rather than spin forever.
+      frameErrors = 0;
+      state = initialState();
+      dirty = true;
+      showFlash('Monitor kept failing to render the live data; cleared it. Reload if this repeats.');
+    }
+  } catch {
+    /* never let the recovery path kill the loop either */
+  }
 }
 
 fullLiveRebuild();
@@ -658,6 +756,7 @@ Object.assign(window as unknown as Record<string, unknown>, {
       return recorder;
     },
     openRecording,
+    loadSession,
     setTime,
   },
 });
