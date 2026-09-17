@@ -357,6 +357,26 @@ describe('monitor: move-check progress', () => {
     expect(hidden).toHaveLength(4);
   });
 
+  it('renders whatever keys the tuning carries, however many', () => {
+    // The tuned set is not fixed: the logic half derives re-arm and velocity companions, and may
+    // add more. Nothing here may hard-code which keys arrive.
+    const many = {
+      kneeLift: 0.22,
+      kneeRelease: 0.11,
+      jumpRise: 0.176,
+      jumpRearm: 0.088,
+      jumpVel: 1.1,
+      laneEnter: 0.3,
+      laneExit: 0.15,
+    };
+    const s = run([{ kind: 'moveCheck', t: 10, mode: 'full', event: { phase: 'done', tuned: many, note: null } }], 1);
+    const label = s.timeline[0].label;
+    for (const key of Object.keys(many)) expect(label).toContain(key);
+    // ...and an empty one says so rather than trailing off.
+    const none = run([{ kind: 'moveCheck', t: 10, mode: 'small', event: { phase: 'done', tuned: {}, note: null } }], 1);
+    expect(none.timeline[0].label).toBe('move check done — tuned nothing');
+  });
+
   it('is a game message the strict check accepts, and the recorder ignores without complaint', () => {
     for (const m of msgs) expect(isGameMessage(m)).toBe(true);
     const rec = new SessionRecorder();

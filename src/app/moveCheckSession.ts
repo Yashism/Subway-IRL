@@ -15,14 +15,21 @@ import {
   type MoveStepModel,
   type MoveTuning,
 } from '../pose/moveCheckTypes';
-import type { Thresholds } from '../pose/thresholds';
-import { applyTuning, MoveTuningStore } from '../pose/tuning';
+import { DEFAULT_THRESHOLDS, type Thresholds } from '../pose/thresholds';
+import { applyTuning, MoveTuningStore, TUNABLE_KEYS } from '../pose/tuning';
 import type { PlayMode, PoseEvent } from '../pose/types';
 import type { MoveCheckEvent } from '../telemetry/messages';
 
 export interface MoveCheckSessionOptions {
   /** The live thresholds object of the PoseController: a tuning is applied into it, in place. */
   thresholds: Thresholds;
+  /**
+   * The PoseController, so its baseline can be pinned while a step is being measured. Drift
+   * chases a player who holds a slow, sub-threshold lean or knee lift — exactly what a cautious
+   * first-timer does when told "lean your shoulders LEFT" — which would eat the very excursion
+   * the check is trying to measure.
+   */
+  controller?: { freezeBaseline: boolean } | null;
   /** Default: the browser's localStorage-backed store. */
   store?: MoveTuningStore;
   /** Epoch ms for a saved record. Default: Date.now. */
@@ -36,6 +43,21 @@ export interface MoveCheckSessionOptions {
 }
 
 /**
+ * The threshold keys a stored record actually puts in force. A record holds only the keys that
+ * were measured; `applyTuning` derives each one's companions (the re-arm keys, and the jump
+ * velocities), so a rebuilt cheat sheet has to ask it rather than count the stored keys — or it
+ * would claim fewer tuned settings than the card the check itself ended on.
+ */
+export function tunedInForce(tuning: MoveTuning | null): Partial<Thresholds> {
+  if (!tuning) return {};
+  const th = { ...DEFAULT_THRESHOLDS };
+  applyTuning(th, tuning);
+  const out: Partial<Thresholds> = {};
+  for (const key of TUNABLE_KEYS) if (th[key] !== DEFAULT_THRESHOLDS[key]) out[key] = th[key];
+  return out;
+}
+
+/**
  * A cheat sheet for a player who has not run a check this session: the moves of `mode` with
  * whatever the saved record measured. The hoverboard tunes nothing, so it has no peak to show and
  * counts as done whenever there is a record at all.
@@ -46,7 +68,7 @@ export function summaryFromTuning(mode: PlayMode, tuning: MoveTuning | null): Mo
     const done = peak !== null || (s.id === 'hover' && tuning !== null);
     return { ...s, status: done ? 'done' : 'skipped', hint: null, canSkip: false, canAccept: false, progress: 0, peak, steps: null };
   });
-  return { mode, steps, tuned: tuning?.thresholds ?? {}, asymmetryNote: null };
+  return { mode, steps, tuned: tunedInForce(tuning), asymmetryNote: null };
 }
 
 export class MoveCheckSession {
@@ -106,11 +128,13 @@ export class MoveCheckSession {
     this.toldIndex = -1;
     this.toldResult.clear();
     this.saved = false;
+    this.freeze(true);
   }
 
   /** The flow's `endMoveCheck` effect. Whatever was measured has already been saved. */
   end(): void {
     this.check = null;
+    this.freeze(false);
   }
 
   /** One pose frame, from the same callback that feeds the controller's events to telemetry. */
@@ -166,6 +190,14 @@ export class MoveCheckSession {
     this.toldIndex = -1;
     this.toldResult.clear();
     this.saved = false;
+    this.freeze(true);
+  }
+
+  /** Pinned exactly while a step is being measured, so the baseline can follow the player again
+   *  the moment the summary is up and they stop posing. */
+  private freeze(on: boolean): void {
+    const c = this.opts.controller;
+    if (c) c.freezeBaseline = on;
   }
 
   /** Reports what changed since the last call, and saves the tuning the moment the check finishes. */
@@ -190,6 +222,7 @@ export class MoveCheckSession {
   private finish(check: MoveCheck, summary: MoveCheckSummary): void {
     this.saved = true;
     this.rev++;
+    this.freeze(false);
     this.lastSummary = summary;
     const record = check.tuning(this.opts.now?.() ?? Date.now());
     if (!record) return;

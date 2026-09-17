@@ -96,6 +96,7 @@ const replayingSession = !!sessionMeta?.thresholds;
 
 const moveCheck = new MoveCheckSession({
   thresholds: runtime.ctrl.th,
+  controller: runtime.ctrl,
   onStart: () => loop.dispatch({ type: 'startPressed' }),
   onTuningChanged: () => {
     flow.setMoveCheckSeen(moveCheck.seen);

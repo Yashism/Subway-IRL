@@ -31,6 +31,8 @@ class Rig implements MoveCheckSource {
   sensitivity = 1;
   readonly magnitudes: MoveMagnitudes = emptyMagnitudes();
   readonly session: MoveCheckSession;
+  /** Stands in for the PoseController's baseline pin. */
+  readonly ctrl = { freezeBaseline: false };
   readonly told: MoveCheckEvent[] = [];
   readonly tuningChanges: (MoveTuning | null)[] = [];
   starts = 0;
@@ -39,6 +41,7 @@ class Rig implements MoveCheckSource {
   constructor(storage: TuningStorage = memStore(), key = MOVE_TUNING_KEY) {
     this.session = new MoveCheckSession({
       thresholds: this.th,
+      controller: this.ctrl,
       store: new MoveTuningStore(storage, key),
       now: () => 1_700_000_000_000,
       onStart: () => this.starts++,
@@ -171,6 +174,33 @@ describe('MoveCheckSession: running a check', () => {
   });
 });
 
+describe('MoveCheckSession: the baseline pin', () => {
+  it('holds the baseline still while a step is being measured, and lets go after', () => {
+    // Drift chases a slow, sub-threshold lean, which is exactly the excursion being measured.
+    const r = new Rig();
+    expect(r.ctrl.freezeBaseline).toBe(false);
+    r.session.begin('full');
+    r.frame();
+    expect(r.ctrl.freezeBaseline).toBe(true);
+    // Nothing is being measured on the summary card: the baseline may follow the player again.
+    r.session.handlers.skipAll();
+    expect(r.ctrl.freezeBaseline).toBe(false);
+    // "Redo the check" measures again, so it pins again.
+    r.session.handlers.redo();
+    expect(r.ctrl.freezeBaseline).toBe(true);
+    r.session.end();
+    expect(r.ctrl.freezeBaseline).toBe(false);
+  });
+
+  it('lets go of the baseline even when the check is abandoned mid-step', () => {
+    const r = new Rig();
+    r.session.begin('full');
+    r.frame();
+    r.session.end();
+    expect(r.ctrl.freezeBaseline).toBe(false);
+  });
+});
+
 describe('MoveCheckSession: telemetry', () => {
   it('reports every step start and result, then the tuned values', () => {
     const r = new Rig();
@@ -206,7 +236,9 @@ describe('the controls cheat sheet', () => {
 
   it('falls back to the saved tuning, and hands back the same object each time', () => {
     const storage = memStore();
-    new Rig(storage).walkThrough('full');
+    const first = new Rig(storage);
+    first.walkThrough('full');
+    const live = first.session.model!.summary!;
     const r = new Rig(storage);
     const card = r.session.controls('full');
     expect(card).toBe(r.session.controls('full'));
@@ -220,6 +252,12 @@ describe('the controls cheat sheet', () => {
       'hover:done',
     ]);
     expect(card.tuned.kneeLift).toBeCloseTo(tunedValue('kneeLift', 0.4), 6);
+    // A record stores only the measured keys; applyTuning derives the companions. The rebuilt
+    // card must still list what the card the check itself ended on listed, or it would quietly
+    // claim fewer tuned settings than the player was just told about.
+    expect(Object.keys(r.session.store.get('full')!.thresholds)).not.toContain('kneeRelease');
+    expect(card.tuned.kneeRelease).toBeDefined();
+    expect(Object.keys(card.tuned).sort()).toEqual(Object.keys(live.tuned).sort());
   });
 
   it('describes the moves of the mode even with nothing saved at all', () => {
