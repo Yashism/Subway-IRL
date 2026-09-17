@@ -75,7 +75,7 @@ Procedural rigs (jointed limbs animated in code) are the guaranteed baseline. A 
   - Crash shake: 0.18 m and ±3°, decaying over 0.35 s.
   - FOV: +5° while on the rocket.
 - **Curve:** vertical 0.0016 and horizontal 0.0004 per m², applied ahead of the runner only.
-- **Light:** sun `#FFF1D6` with soft PCF shadows (a tight frustum around the runner), hemisphere light `#BFE3FF` / `#6B5B4A`, and AgX tone mapping.
+- **Light:** sun `#FFF1D6` with soft PCF shadows (a tight frustum around the runner), hemisphere light `#BFE3FF` / `#6B5B4A`, and Khronos PBR Neutral tone mapping by default. AgX was the first choice, but it dulled the saturated yellows; AgX and ACES stay available through `?tone=agx` and `?tone=aces`.
 - **Sky:** a gradient dome from `#7EC8F2` to `#FFE1A8`, with fog matched to the horizon colour from 60 to 170 m.
 - **Palette:** as in the research notes. Graffiti accents `#E5399B #29C7E0 #FF7A29 #FFD400`; chawl facades `#D9A441 #4C8C7D #8FB8C9 #C1622B #EDE6D6`.
 - **Liveries:**

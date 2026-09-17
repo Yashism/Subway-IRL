@@ -208,7 +208,7 @@ Logical ids (V1):
 
 ### 6.4 Rendering
 - Warm late-afternoon sun (a single shadow-casting directional light whose tight shadow frustum follows the runner), a hemisphere fill light, and a gradient sky dome.
-- AgX tone mapping, with bloom on Medium and High.
+- Khronos PBR Neutral tone mapping by default, with bloom on Medium and High. AgX was the first choice, but it dulled the saturated yellows (the cab, the auto hood, the coins). AgX and ACES stay available through `?tone=agx` and `?tone=aces`.
 - Baked AO in the textures.
 - Object pools for chunks, props and coins. Nothing is allocated per frame during play.
 
