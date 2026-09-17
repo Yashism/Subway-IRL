@@ -239,7 +239,11 @@ export class PoseRuntime {
       return true;
     } catch (err) {
       release();
-      if (!superseded()) video.srcObject = null;
+      // A newer start() (or stop()) tore this one down — `video.play()` rejects with AbortError when
+      // its srcObject is cleared. That is not a camera failure: report it like any other supersede,
+      // or the newer, working camera ends up behind the "Camera trouble" screen.
+      if (superseded()) return false;
+      video.srcObject = null;
       throw err;
     }
   }

@@ -51,6 +51,8 @@ interface Rig {
   sources: FakeSource[];
   store: Map<string, string>;
   video: { srcObject: unknown; played: number };
+  /** Pending video.play() calls, one per start, when the rig defers them. */
+  plays: { resolve: () => void; reject: (e: unknown) => void }[];
 }
 
 function rig(
@@ -61,6 +63,8 @@ function rig(
     failIds?: Record<string, unknown>;
     sourceFail?: unknown;
     saved?: string;
+    /** video.play() stays pending until the test resolves or rejects it (see Rig.plays). */
+    deferPlay?: boolean;
   } = {},
 ): Rig {
   const cams = opts.cams ?? [{ deviceId: 'cam-a', label: 'USB Camera' }];
@@ -69,11 +73,13 @@ function rig(
   const sources: FakeSource[] = [];
   const store = new Map<string, string>();
   if (opts.saved) store.set(CAMERA_KEY, opts.saved);
+  const plays: { resolve: () => void; reject: (e: unknown) => void }[] = [];
   const video = {
     srcObject: null as unknown,
     played: 0,
     play: async () => {
       video.played++;
+      if (opts.deferPlay) await new Promise<void>((resolve, reject) => plays.push({ resolve, reject }));
     },
   };
   const camera: CameraApi = {
@@ -100,10 +106,15 @@ function rig(
       return s;
     },
   });
-  return { rt, opened, tracks, sources, store, video };
+  return { rt, opened, tracks, sources, store, video, plays };
 }
 
 const emptyFrame = (t: number): PoseFrame => ({ t, aspect: 16 / 9, poses: [] });
+
+/** Lets pending promises settle until `fn` is true (or we give up). */
+async function until(fn: () => boolean): Promise<void> {
+  for (let i = 0; i < 200 && !fn(); i++) await Promise.resolve();
+}
 
 describe('PoseRuntime: camera', () => {
   it('opens the saved camera, plays it into the video and remembers the choice', async () => {
@@ -196,6 +207,22 @@ describe('PoseRuntime: camera', () => {
     expect(r.tracks.find((t) => t.deviceId === 'cam-a')?.stopped).toBe(true);
     expect(r.rt.activeCameraId).toBe('cam-b');
     expect(r.sources.length).toBe(1);
+  });
+
+  it('a superseded start whose video.play() rejects resolves false, keeping the new camera', async () => {
+    const r = rig({ cams: [{ deviceId: 'cam-a', label: 'A' }, { deviceId: 'cam-b', label: 'B' }], deferPlay: true });
+    const first = r.rt.start('cam-a');
+    await until(() => r.plays.length === 1);
+    // A second start tears the first one down: clearing srcObject makes its play() reject.
+    const second = r.rt.start('cam-b');
+    r.plays[0].reject(Object.assign(new Error('The play() request was interrupted'), { name: 'AbortError' }));
+    await until(() => r.plays.length === 2);
+    r.plays[1].resolve();
+    expect(await first).toBe(false);
+    expect(await second).toBe(true);
+    expect(r.rt.activeCameraId).toBe('cam-b');
+    expect(r.rt.running).toBe(true);
+    expect(r.video.srcObject).not.toBeNull();
   });
 
   it('describes camera errors and passes model-load errors through', async () => {
