@@ -12,6 +12,8 @@ import {
   isStationAt,
   maxConcurrent,
   planCorridor,
+  platformNumberAt,
+  FOB_STATION,
   type Placement,
 } from '../../src/world/models/scenery';
 import {
@@ -157,6 +159,40 @@ describe('planCorridor', () => {
         if (walls[i].s0 - walls[i - 1].s1 < 1) expect(walls[i].variant).not.toBe(walls[i - 1].variant);
       }
     }
+  });
+});
+
+describe('station numbering', () => {
+  it('tags each platform and station bridge with its station, in running order', () => {
+    const platforms = plan.placements.filter((p) => p.kind === 'platform');
+    for (const p of platforms) expect(plan.stations[p.station][0]).toBe(p.s0);
+    for (const p of plan.placements.filter((q) => q.kind === 'fob')) {
+      if (p.variant === FOB_STATION) {
+        const [a, b] = plan.stations[p.station];
+        expect(p.s0 >= a && p.s0 < b).toBe(true);
+      } else expect(p.station).toBe(-1);
+    }
+    expect(plan.placements.filter((p) => p.kind === 'fob' && p.variant === FOB_STATION)).toHaveLength(plan.stations.length);
+    for (const p of plan.placements) if (p.kind !== 'platform' && p.kind !== 'fob') expect(p.station).toBe(-1);
+  });
+
+  it('numbers the platform at or ahead of the runner, continuing across repeats', () => {
+    const st = plan.stations;
+    const n = st.length;
+    expect(platformNumberAt(plan, 0)).toBe(0);
+    expect(platformNumberAt(plan, st[0][0] + 1)).toBe(0);
+    expect(platformNumberAt(plan, st[0][1] - 0.01)).toBe(0);
+    expect(platformNumberAt(plan, st[0][1] + 0.01)).toBe(1);
+    expect(platformNumberAt(plan, st[n - 1][1] + 1)).toBe(n);
+    expect(platformNumberAt(plan, plan.period + st[1][0])).toBe(n + 1);
+    expect(platformNumberAt(plan, 5 * plan.period + 1)).toBe(5 * n);
+    let prev = -1;
+    for (let s = 0; s < 3 * plan.period; s += 7) {
+      const k = platformNumberAt(plan, s);
+      expect(k === prev || k === prev + 1).toBe(true);
+      prev = k;
+    }
+    expect(prev).toBe(3 * n);
   });
 });
 

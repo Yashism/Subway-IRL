@@ -22,6 +22,7 @@ import { SKY_HORIZON, buildSkyDome, buildSkyline, createSideScenery, type SideSc
 import { createCatenary, createTrackBed, type Catenary, type TrackBed } from './models/trackKit';
 import { buildRamp, buildTrain } from './models/trains';
 import { KeyedPool } from './pools';
+import { LINES, type LineId, type Station } from './stations';
 import { applyAgxLook } from './toneLook';
 import { outlineMaterial } from './render/materials';
 import {
@@ -167,12 +168,12 @@ function setNear(p: Pooled, near: boolean): void {
   for (const o of p.minor) o.visible = near;
 }
 
-function buildObstacle(kind: ObstacleKind, variant: number, length: number): THREE.Object3D {
+function buildObstacle(kind: ObstacleKind, variant: number, length: number, destinations: readonly string[]): THREE.Object3D {
   switch (kind) {
     case 'trainParked':
     case 'trainMoving': {
       const look = trainLook(variant);
-      return buildTrain(length, { livery: look.livery, seed: look.seed, oncoming: kind === 'trainMoving' });
+      return buildTrain(length, { livery: look.livery, seed: look.seed, oncoming: kind === 'trainMoving', destinations });
     }
     case 'ramp':
       return buildRamp(variant);
@@ -226,6 +227,8 @@ export interface WorldViewOptions {
   seed?: number;
   /** Tone mapping (default 'neutral'). */
   tone?: ToneChoice;
+  /** Mumbai suburban line whose real station names the platforms show (default: from the seed). */
+  line?: LineId;
 }
 
 export class WorldView {
@@ -255,6 +258,7 @@ export class WorldView {
   private readonly dog: CharacterRig;
 
   private track: Track | null = null;
+  private trackS = 0;
   private stamp = 0;
   private clock = 0;
   private stumbleLeft = 0;
@@ -309,7 +313,7 @@ export class WorldView {
     scene.add(this.sky, this.skyline);
 
     // Track, overhead wires, side scenery.
-    this.side = createSideScenery(options.seed ?? 1, { behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD, lodFar: LOD_FAR });
+    this.side = createSideScenery(options.seed ?? 1, { behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD, lodFar: LOD_FAR, line: options.line });
     this.bed = createTrackBed(SCENERY_BEHIND, SCENERY_AHEAD);
     this.ohe = createCatenary({ behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD, signalFilter: (s) => !this.side.isStation(s) });
     scene.add(this.bed.root, this.ohe.root, this.side.root);
@@ -358,6 +362,19 @@ export class WorldView {
 
     this.camera.position.set(0, CAMERA.menu.height, CAMERA.menu.back);
     this.compileAll();
+  }
+
+  /** The suburban line this run shows. */
+  get line(): LineId {
+    return this.side.line;
+  }
+
+  /**
+   * The station of the platform the runner is at or approaching (for a "Next station" HUD).
+   * Stable object per station; `en` is the English name, `mr` the Marathi.
+   */
+  get currentStation(): Station {
+    return this.side.stationAt(this.trackS);
   }
 
   get stats(): { calls: number; triangles: number; pixelRatio: number } {
@@ -420,6 +437,7 @@ export class WorldView {
     this.sky.position.copy(cam.position);
     this.skyline.position.copy(cam.position);
 
+    this.trackS = g.s;
     this.bed.update(g.s);
     this.ohe.update(g.s);
     this.side.update(g.s);
@@ -440,6 +458,10 @@ export class WorldView {
 
   // ---------------------------------------------------------------- setup
 
+  private get termini(): readonly string[] {
+    return LINES[this.side.line].termini;
+  }
+
   private prewarm(): void {
     const lengths = trainLengths(CHUNKS);
     for (const kind of Object.keys(OBSTACLES) as ObstacleKind[]) {
@@ -450,7 +472,7 @@ export class WorldView {
         for (let v = 0; v < n; v++) {
           const key = obstacleKey(kind, v, len);
           // Small props can repeat within one chunk (a row of banners), so keep two ready.
-          this.obstaclePool.warm(key, () => pooled(buildObstacle(kind, v, len), isTrain(kind)), isTrain(kind) ? 1 : 2);
+          this.obstaclePool.warm(key, () => pooled(buildObstacle(kind, v, len, this.termini), isTrain(kind)), isTrain(kind) ? 1 : 2);
         }
       }
     }
@@ -468,6 +490,7 @@ export class WorldView {
     }
     this.board.visible = this.rocket.visible = this.tt.root.visible = this.dog.root.visible = true;
     this.coins.count = 1;
+    this.side.update(0); // shows the first station's name boards, so their shader compiles too
     this.renderer.compile(this.scene, this.camera);
     for (let i = 0; i < kids.length; i++) kids[i].visible = false;
     this.board.visible = this.rocket.visible = this.tt.root.visible = this.dog.root.visible = false;
@@ -602,7 +625,7 @@ export class WorldView {
       if (!a) {
         const variant = obstacleVariant(o.kind, o.id);
         const key = obstacleKey(o.kind, variant, o.length);
-        const item = this.obstaclePool.acquire(key, () => pooled(buildObstacle(o.kind, variant, o.length), isTrain(o.kind)));
+        const item = this.obstaclePool.acquire(key, () => pooled(buildObstacle(o.kind, variant, o.length, this.termini), isTrain(o.kind)));
         item.root.visible = true;
         const sz = o.kind === 'ramp' ? o.length / OBSTACLES.ramp.length : 1;
         item.root.scale.set(1, 1, sz);
