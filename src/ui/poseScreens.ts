@@ -41,8 +41,14 @@ export interface Toast {
 
 const TOAST_SLOW: Toast = { level: 'slow', text: 'Camera is slow — tracking may lag' };
 const TOAST_STALLED: Toast = { level: 'stalled', text: 'Camera stalled — pausing' };
+const TOAST_STALLED_IDLE: Toast = { level: 'stalled', text: 'Camera stalled — no frames coming in' };
 
-export const warningToast = (slow: boolean, stalled: boolean): Toast | null => (stalled ? TOAST_STALLED : slow ? TOAST_SLOW : null);
+/**
+ * The stalled toast beats the slow one. `running` says whether there is a live run to pause:
+ * on the calibration or ready screen nothing is paused, so it must not promise it.
+ */
+export const warningToast = (slow: boolean, stalled: boolean, running = true): Toast | null =>
+  stalled ? (running ? TOAST_STALLED : TOAST_STALLED_IDLE) : slow ? TOAST_SLOW : null;
 
 type CopyScreen = Exclude<FlowScreen, 'menu' | 'playing'>;
 const COPY: Record<CopyScreen, { tab: string; title: string; body: string }> = {
@@ -361,7 +367,9 @@ export class PoseScreens {
 
   /** Pose warnings: status.slowPose and a stalled stream (see isStalled in pip.ts). */
   setWarnings(slow: boolean, stalled: boolean): void {
-    const t = warningToast(slow, stalled);
+    const m = this.last;
+    const live = !!m && m.screen === 'playing' && (m.gameState === 'playing' || m.gameState === 'countdown');
+    const t = warningToast(slow, stalled, live);
     this.attr(this.toast, 'data-level', t ? t.level : 'none');
     if (t) this.text(this.toastText, t.text);
   }
@@ -401,8 +409,13 @@ export class PoseScreens {
     const box = el('label', `ps-picker ${cls}`, parent);
     el('span', 'ps-picker-label', box, '📷 Camera');
     const select = el('select', 'ps-select', box);
-    // Keys typed into the dropdown must not reach the game's window key handler.
-    select.addEventListener('keydown', (e) => e.stopPropagation());
+    // Keys typed into the dropdown must not reach the game's window key handler. Enter and Escape
+    // close it, and a select that keeps focus would swallow every later key (Enter, V, M) for the
+    // rest of the session, so let go of it there.
+    select.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Esc') select.blur();
+    });
     select.addEventListener('change', () => {
       const id = select.value;
       select.blur();

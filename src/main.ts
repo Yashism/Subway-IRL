@@ -13,7 +13,7 @@ import type { Thresholds } from './pose/thresholds';
 import type { PlayMode } from './pose/types';
 import type { SessionRecording } from './telemetry/messages';
 import { TelemetryPublisher } from './telemetry/publisher';
-import { Hud, menuNotice, MONITOR_URL, MONITOR_WINDOW } from './ui/hud';
+import { Hud, menuNotice, openMonitorWindow } from './ui/hud';
 import { PosePip, pipVisibleFromUrl } from './ui/pip';
 import { PoseScreens } from './ui/poseScreens';
 import { isLineId } from './world/stations';
@@ -277,21 +277,18 @@ Object.assign(window as unknown as Record<string, unknown>, {
 
 // ---------------------------------------------------------------- live monitor shortcut
 
-function openMonitor(): boolean {
-  return window.open(MONITOR_URL, MONITOR_WINDOW) !== null;
-}
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'KeyM' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target as HTMLElement | null;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
-  openMonitor();
+  openMonitorWindow();
 });
-if (flagOn('monitor') && !openMonitor()) {
+if (flagOn('monitor') && !openMonitorWindow()) {
   // Popup blocked without a user gesture: open on the first key or click instead.
   const once = () => {
     window.removeEventListener('keydown', once, true);
     window.removeEventListener('pointerdown', once, true);
-    openMonitor();
+    openMonitorWindow();
   };
   window.addEventListener('keydown', once, true);
   window.addEventListener('pointerdown', once, true);

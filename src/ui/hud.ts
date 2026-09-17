@@ -216,6 +216,16 @@ export function menuNotice(s: InputNoticeState): string {
 /** Where the live monitor lives; the named window is reused by the link and the M key. */
 export const MONITOR_URL = 'monitor.html';
 export const MONITOR_WINDOW = 'subway-irl-monitor';
+/** A real popup, not a tab: a tab would hide the game and pause the run behind it. */
+export const MONITOR_FEATURES = 'popup=yes,width=1280,height=900';
+
+/**
+ * Opens (or re-focuses) the live monitor in its own window. Returns false when the popup was
+ * blocked. Never opens a tab: `visibilitychange` would pause the very run being watched.
+ */
+export function openMonitorWindow(): boolean {
+  return window.open(MONITOR_URL, MONITOR_WINDOW, MONITOR_FEATURES) !== null;
+}
 
 // ---------------------------------------------------------------- DOM
 
@@ -227,13 +237,20 @@ const el = (tag: string, cls: string, parent: HTMLElement, text?: string): HTMLE
   return e;
 };
 
-/** "Live monitor (M)": opens monitor.html in its own tab or window. */
+/** "Live monitor (M)": opens monitor.html in its own popup window. */
 function monitorLink(parent: HTMLElement): HTMLAnchorElement {
   const a = el('a', 'hud-monitor-link', parent, '📈 Live monitor (M)') as HTMLAnchorElement;
   a.href = MONITOR_URL;
   a.target = MONITOR_WINDOW;
-  a.rel = 'noopener';
   a.title = 'Open the live monitor in a separate window to watch what the game sees';
+  a.addEventListener('click', (e) => {
+    // A plain navigation would open a tab and hide the game; and the focused link would swallow
+    // the next Enter. Open the popup by hand and drop focus, like every PoseScreens button.
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    a.blur();
+    openMonitorWindow();
+  });
   return a;
 }
 

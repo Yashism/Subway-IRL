@@ -14,7 +14,7 @@ import { PoseScreens } from './poseScreens';
 
 const SCREENS = [
   'menu', 'menu-keyboard', 'prompt', 'starting', 'error',
-  'calibrating', 'calib-back', 'calib-closer', 'calib-dark', 'calib-hold', 'calib-small',
+  'calibrating', 'calib-back', 'calib-closer', 'calib-dark', 'calib-hold', 'calib-small', 'calib-stalled',
   'ready', 'ready-hold', 'recheck', 'playing', 'slow', 'stalled', 'summary',
 ] as const;
 type Screen = (typeof SCREENS)[number];
@@ -167,6 +167,7 @@ function buildFlow(s: Screen): SessionFlow {
       f.dispatch(snap({ dark: true, calibration: { progress: 0.2, bodyVisible: true, distance: 'ok' } }));
       return f;
     case 'calib-hold':
+    case 'calib-stalled':
       f.dispatch(snap({ calibration: { progress: 0.62, bodyVisible: true, distance: 'ok' } }));
       return f;
     case 'calib-small':
@@ -248,12 +249,13 @@ async function main(): Promise<void> {
   );
 
   const frames = await loadFrames();
-  const frameIndex = screen === 'playing' || screen === 'slow' || screen === 'stalled' ? 240 : screen === 'calib-hold' ? 30 : 60;
+  const frameIndex =
+    screen === 'playing' || screen === 'slow' || screen === 'stalled' ? 240 : screen === 'calib-hold' || screen === 'calib-stalled' ? 30 : 60;
   let { status } = statusAt(frames, frameIndex);
   if (screen === 'ready' || screen === 'ready-hold') status = raiseRightHand(status);
   if (screen === 'calibrating' || screen === 'recheck') status = { ...status, pose: null, tracking: false };
   if (screen === 'slow') status = { ...status, slowPose: true, poseFps: 11 };
-  const stalled = screen === 'stalled';
+  const stalled = screen === 'stalled' || screen === 'calib-stalled';
   function render(): void {
     const m = flow.model;
     ui.update(m);

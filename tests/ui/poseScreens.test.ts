@@ -65,6 +65,12 @@ describe('small view helpers', () => {
     expect(warningToast(true, true)).toEqual({ level: 'stalled', text: 'Camera stalled — pausing' });
   });
 
+  it('warning toast: only promises to pause when there is a run to pause', () => {
+    expect(warningToast(false, true, true)).toEqual({ level: 'stalled', text: 'Camera stalled — pausing' });
+    expect(warningToast(false, true, false)).toEqual({ level: 'stalled', text: 'Camera stalled — no frames coming in' });
+    expect(warningToast(true, false, false)).toEqual({ level: 'slow', text: 'Camera is slow — tracking may lag' });
+  });
+
   it('splits the ready message into banner, pill and small print', () => {
     expect(messageParts(MSG_CALIBRATED)).toEqual({
       head: 'Calibrated!',
