@@ -107,14 +107,15 @@ export function basicMaterial(o: THREE.MeshBasicMaterialParameters = {}): THREE.
   return applyCurve(new THREE.MeshBasicMaterial(o));
 }
 
-const outlineMaterials = new Map<number, THREE.MeshBasicMaterial>();
+const outlineMaterials = new Map<string, THREE.MeshBasicMaterial>();
 
 /**
  * Inverted-hull outline: adds a slightly larger back-face black copy to every mesh
  * under `root`. Use only on hero objects (runner, trains, obstacles, pickups).
  */
 export function addOutline(root: THREE.Object3D, thickness = 0.03, color = 0x141414): void {
-  let mat = outlineMaterials.get(color);
+  const cacheKey = `${color}|${thickness}`;
+  let mat = outlineMaterials.get(cacheKey);
   if (!mat) {
     mat = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
     mat.onBeforeCompile = (shader) => {
@@ -125,7 +126,7 @@ export function addOutline(root: THREE.Object3D, thickness = 0.03, color = 0x141
     };
     mat.customProgramCacheKey = () => `outline-${thickness}`;
     applyCurve(mat);
-    outlineMaterials.set(color, mat);
+    outlineMaterials.set(cacheKey, mat);
   }
   const meshes: THREE.Mesh[] = [];
   root.traverse((o) => {
