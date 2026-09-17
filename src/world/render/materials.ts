@@ -40,7 +40,7 @@ uniform float uCurveEnabled;`,
   curveWorld = modelMatrix * curveWorld;
   float curveDz = min( curveWorld.z, 0.0 );
   float curveD2 = curveDz * curveDz * uCurveEnabled;
-  vec3 curveOffset = vec3( -sign( curveWorld.x ) * curveD2 * uCurveHorizontal, -curveD2 * uCurveVertical, 0.0 );
+  vec3 curveOffset = vec3( -clamp( curveWorld.x / 4.0, -1.0, 1.0 ) * curveD2 * uCurveHorizontal, -curveD2 * uCurveVertical, 0.0 );
   mat3 curveToLocal = mat3( modelMatrix );
   #ifdef USE_INSTANCING
     curveToLocal = curveToLocal * mat3( instanceMatrix );
