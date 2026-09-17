@@ -147,6 +147,58 @@ describe('SessionRecording', () => {
     expect(() => decodeSession({ ...good, note: 3 })).toThrow(/note/);
   });
 
+  // A recording mailed back by a player is the one input the monitor cannot choose: an older build,
+  // a hand-edited note or a half-downloaded file must fail to load with a reason, never render.
+  it('rejects samples whose status or game snapshot is missing fields the monitor renders', () => {
+    const good = JSON.parse(JSON.stringify(sample())) as Record<string, unknown>;
+    const st = (over: Record<string, unknown>) => [{ t: 0, backend: 'x', status: { ...status, ...over }, base: null }];
+    const gm = (over: Record<string, unknown>) => [{ t: 0, game: { ...snapshot, ...over } }];
+
+    expect(() => decodeSession({ ...good, status: [{ t: 0, backend: 'x', base: null }] })).toThrow(/status\[0\]\.status must be an object/);
+    expect(() => decodeSession({ ...good, status: st({ confidence: undefined }) })).toThrow(/status\[0\]\.status\.confidence/);
+    expect(() => decodeSession({ ...good, status: st({ mode: 'huge' }) })).toThrow(/status\[0\]\.status\.mode/);
+    expect(() => decodeSession({ ...good, status: st({ jog: { active: true } }) })).toThrow(/status\[0\]\.status\.jog\.cadenceSpm/);
+    expect(() => decodeSession({ ...good, status: st({ calibration: undefined }) })).toThrow(/status\[0\]\.status\.calibration must be an object/);
+
+    expect(() => decodeSession({ ...good, game: [{ t: 0 }] })).toThrow(/game\[0\]\.game must be an object/);
+    // The exact freeze from the review: `g.s.toFixed(1)` on a snapshot from an older build.
+    expect(() => decodeSession({ ...good, game: gm({ s: undefined }) })).toThrow(/game\[0\]\.game\.s/);
+    expect(() => decodeSession({ ...good, game: gm({ powerups: { magnet: 0 } }) })).toThrow(/game\[0\]\.game\.powerups\.rocket/);
+    expect(() => decodeSession({ ...good, game: gm({ josh: null }) })).toThrow(/game\[0\]\.game\.josh must be an object/);
+    expect(() => decodeSession({ ...good, game: gm({ caughtReason: 7 }) })).toThrow(/game\[0\]\.game\.caughtReason/);
+  });
+
+  it('rejects a recording whose meta cannot drive the controls', () => {
+    const good = JSON.parse(JSON.stringify(sample())) as Record<string, unknown>;
+    const meta = good.meta as Record<string, unknown>;
+    // syncControls calls meta.sensitivity.toFixed(2) every frame of playback.
+    expect(() => decodeSession({ ...good, meta: { ...meta, sensitivity: undefined } })).toThrow(/meta\.sensitivity/);
+    expect(() => decodeSession({ ...good, meta: 'full' })).toThrow(/meta must be an object/);
+    expect(decodeSession({ ...good, meta: null }).meta).toBe(null);
+    const noTh = decodeSession({ ...good, meta: { ...meta, thresholds: undefined } });
+    expect(noTh.meta!.thresholds).toEqual({});
+  });
+
+  it('rejects a recording from another version, and a truncated download', () => {
+    const text = JSON.stringify(sample());
+    expect(() => decodeSession(JSON.parse(text) as unknown)).not.toThrow();
+    // Half a file: the monitor's loader reports the JSON error rather than dying in the render loop.
+    expect(() => JSON.parse(text.slice(0, Math.floor(text.length / 2)))).toThrow(SyntaxError);
+    const good = JSON.parse(text) as Record<string, unknown>;
+    expect(() => decodeSession({ ...good, version: undefined })).toThrow(/unsupported version undefined/);
+    expect(() => decodeSession({ ...good, version: 2 })).toThrow(/unsupported version 2/);
+    expect(() => decodeSession({ ...good, format: undefined })).toThrow(/unknown format/);
+    expect(() => decodeSession([])).toThrow(/version/);
+  });
+
+  it('accepts the null that JSON writes for an Infinite msSinceStep', () => {
+    const good = JSON.parse(JSON.stringify(sample())) as Record<string, unknown>;
+    const early = { ...status, jog: { ...status.jog, msSinceStep: Infinity }, lastFrameT: null };
+    const back = decodeSession(JSON.parse(JSON.stringify({ ...good, status: [{ t: 0, backend: 'x', status: early, base: null }] })));
+    expect(back.status[0].status.jog.msSinceStep).toBe(null);
+    expect(back.status[0].status.lastFrameT).toBe(null);
+  });
+
   it('fills optional sample arrays when absent', () => {
     const good = JSON.parse(JSON.stringify(sample())) as Record<string, unknown>;
     delete good.status;

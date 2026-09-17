@@ -275,6 +275,93 @@ function fail(msg: string): never {
   throw new Error(`Invalid session recording: ${msg}`);
 }
 
+const isBool = (x: unknown): x is boolean => typeof x === 'boolean';
+const isStr = (x: unknown): x is string => typeof x === 'string';
+/** JSON turns Infinity/NaN into null, so every "ms" field may legitimately arrive as null. */
+const isNumOrNull = (x: unknown): boolean => x === null || isNum(x);
+
+type Check = (v: unknown) => boolean;
+
+function checkShape(x: unknown, where: string, spec: Record<string, Check>): Rec {
+  if (!isObj(x)) fail(`${where} must be an object`);
+  for (const key of Object.keys(spec)) {
+    if (!spec[key](x[key])) fail(`${where}.${key} is missing or invalid`);
+  }
+  return x;
+}
+
+const STATUS_SHAPE: Record<string, Check> = {
+  tracking: isBool,
+  calibrated: isBool,
+  mode: (v) => v === null || v === 'full' || v === 'small',
+  lane: isNum,
+  poseFps: isNum,
+  confidence: isNum,
+  startProgress: isNum,
+  lastFrameT: isNumOrNull,
+  squatting: isBool,
+  slowPose: isBool,
+};
+const JOG_SHAPE: Record<string, Check> = { active: isBool, cadenceSpm: isNum, msSinceStep: isNumOrNull, steps: isNum };
+const CALIBRATION_SHAPE: Record<string, Check> = { progress: isNum, bodyVisible: isBool, distance: isStr };
+
+/** Every field `renderPose` reads, so a stale recording fails to load instead of killing the monitor. */
+function checkStatus(x: unknown, where: string): void {
+  const s = checkShape(x, where, STATUS_SHAPE);
+  checkShape(s.jog, `${where}.jog`, JOG_SHAPE);
+  checkShape(s.calibration, `${where}.calibration`, CALIBRATION_SHAPE);
+}
+
+const GAME_SHAPE: Record<string, Check> = {
+  state: isStr,
+  s: isNum,
+  speed: isNum,
+  lane: isNum,
+  y: isNum,
+  rolling: isBool,
+  airborne: isBool,
+  flying: isBool,
+  idleLevel: isStr,
+  idleMs: isNumOrNull,
+  countdown: isNum,
+  time: isNum,
+  pausedByLoss: isBool,
+  caughtReason: (v) => v === null || isStr(v),
+  coins: isNum,
+  score: isNum,
+};
+const JOSH_SHAPE: Record<string, Check> = { value: isNum, active: isBool };
+const POWERUP_SHAPE: Record<string, Check> = {
+  magnet: isNum,
+  rocket: isNum,
+  chappal: isNum,
+  hoverboard: isNum,
+  grace: isNum,
+  hoverboardsLeft: isNum,
+};
+
+const META_SHAPE: Record<string, Check> = {
+  seed: isNum,
+  difficulty: isStr,
+  input: isStr,
+  mode: (v) => v === null || isStr(v),
+  sensitivity: isNum,
+};
+
+/** `syncControls` calls `meta.sensitivity.toFixed`, so a half-written meta must not load. */
+function checkMeta(x: unknown): void {
+  const m = checkShape(x, 'meta', META_SHAPE);
+  if (m.thresholds === undefined) m.thresholds = {};
+  else if (!isObj(m.thresholds)) fail('meta.thresholds must be an object');
+}
+
+/** Every field `renderGame` reads. */
+function checkSnapshot(x: unknown, where: string): void {
+  const g = checkShape(x, where, GAME_SHAPE);
+  checkShape(g.josh, `${where}.josh`, JOSH_SHAPE);
+  checkShape(g.powerups, `${where}.powerups`, POWERUP_SHAPE);
+}
+
 function checkTimed(list: unknown, name: string, each: (x: Rec, i: number) => void): void {
   if (!Array.isArray(list)) fail(`${name} must be an array`);
   let prev = -Infinity;
@@ -294,7 +381,7 @@ export function decodeSession(json: unknown): SessionRecording {
   if (typeof json.note !== 'string') fail('note must be a string');
   if (!isNum(json.aspect) || json.aspect <= 0) fail('aspect must be a positive number');
   if (!isNum(json.startT) || !isNum(json.durationMs)) fail('startT and durationMs must be numbers');
-  if (json.meta !== null && !isObj(json.meta)) fail('meta must be an object or null');
+  if (json.meta !== null && json.meta !== undefined) checkMeta(json.meta);
   checkTimed(json.frames, 'frames', (f, i) => {
     if (!Array.isArray(f.poses)) fail(`frames[${i}].poses must be an array`);
     for (const p of f.poses as unknown[]) {
@@ -313,11 +400,12 @@ export function decodeSession(json: unknown): SessionRecording {
   const status = json.status ?? [];
   const game = json.game ?? [];
   checkTimed(status, 'status', (x, i) => {
-    if (!isObj(x.status)) fail(`status[${i}] has no status`);
+    checkStatus(x.status, `status[${i}].status`);
+    if (x.base !== null && x.base !== undefined && !isObj(x.base)) fail(`status[${i}].base must be an object or null`);
+    if (x.backend === undefined) x.backend = '';
+    else if (!isStr(x.backend)) fail(`status[${i}].backend must be a string`);
   });
-  checkTimed(game, 'game', (x, i) => {
-    if (!isObj(x.game)) fail(`game[${i}] has no snapshot`);
-  });
+  checkTimed(game, 'game', (x, i) => checkSnapshot(x.game, `game[${i}].game`));
   return {
     version: 1,
     format: 'subway-irl-session',
