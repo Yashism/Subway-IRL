@@ -204,7 +204,7 @@ function renderPose(st: WireStatus | null, backend: string | null, stall: number
   if (!st.tracking) badge(poseBadge, 'not tracking', 'bad');
   else if (!st.calibrated) badge(poseBadge, 'calibrating', 'warn');
   else if (st.slowPose) badge(poseBadge, 'slow', 'bad');
-  else badge(poseBadge, st.jog.active ? `jogging ${st.jog.cadenceSpm}` : 'tracking', 'ok');
+  else badge(poseBadge, st.jog.active ? (st.jog.cadenceSpm > 0 ? `jogging ${st.jog.cadenceSpm}` : 'jogging') : 'tracking', 'ok');
 }
 
 const secs = (v: number) => `${v.toFixed(1)}s`;
@@ -558,10 +558,13 @@ function showFlash(text: string): void {
 
 /** Parses + validates a recording and opens it; on bad input it says why and stays where it was. */
 function loadSession(name: string, text: string): boolean {
+  const before = offline;
   try {
     openRecording(name, decodeSession(JSON.parse(text)));
     return true;
   } catch (err) {
+    // A recording that blew up halfway through its first render must not stay on screen.
+    if (offline !== before) closeOffline();
     const why = err instanceof SyntaxError ? `not valid JSON (${err.message})` : errText(err);
     showFlash(`Could not load ${name}: ${why}`);
     return false;
