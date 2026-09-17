@@ -240,11 +240,10 @@ export class Hud {
     el('div', 'hud-logo-big', logo, 'IRL');
     el('div', 'hud-ribbon', menu, 'Run for real. Bhaago!');
     const cta = el('div', 'hud-cta', menu);
+    // Keyboard first until pose control ships.
     el('span', 'hud-cta-text', cta, 'PRESS ENTER');
-    el('span', 'hud-cta-sep', cta, '/');
-    el('span', 'hud-cta-text', cta, 'RAISE HAND ✋');
     const bottom = el('div', 'hud-menu-bottom', menu);
-    el('div', 'hud-menu-foot', bottom, 'Jog in place to run · jog fast to fill JOSH for ×2 coins');
+    el('div', 'hud-menu-foot', bottom, 'Play with the keyboard · Webcam control coming soon');
     const controls = el('div', 'hud-controls', bottom);
     const control = (keys: string[], label: string) => {
       const c = el('div', 'hud-control', controls);
@@ -261,7 +260,7 @@ export class Hud {
     // Countdown: one element per digit, so showing it restarts its CSS animation.
     const count = el('div', 'hud-screen hud-count', root);
     for (const n of ['3', '2', '1']) this.countNums.set(n, el('div', 'hud-count-num', count, n));
-    el('div', 'hud-count-sub', count, 'Get ready to jog!');
+    el('div', 'hud-count-sub', count, 'Get ready!');
 
     // Caught.
     const caught = el('div', 'hud-screen hud-caught', root);
@@ -292,7 +291,7 @@ export class Hud {
     const sumTime = el('span', 'hud-card-time-val', timeRow);
     const again = el('div', 'hud-again', card);
     el('span', 'hud-again-text', again, 'PLAY AGAIN');
-    el('div', 'hud-again-hint', card, 'Press Enter or raise your hand');
+    el('div', 'hud-again-hint', card, 'Press Enter to run again');
     this.sum = { score: sumScore, coins: sumCoins, distance: sumDist, jumps: sumJumps, rolls: sumRolls, time: sumTime };
 
     // Paused.
