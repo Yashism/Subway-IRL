@@ -51,4 +51,39 @@ describe('hudModel', () => {
     g.step(1 / 60, [], { ...KB, lost: true });
     expect(hudModel(g).center).toBe('Step back into frame');
   });
+
+  it('exposes depleting power-up timers, the josh multiplier and a GO flash', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.step(1 / 60, [{ type: 'start' }], KB);
+    for (let i = 0; i < 181; i++) g.step(1 / 60, [], KB);
+    expect(hudModel(g).go).toBe(true);
+    for (let i = 0; i < 60; i++) g.step(1 / 60, [], KB);
+    expect(hudModel(g).go).toBe(false);
+
+    g.powerups.activate('magnet');
+    g.powerups.activate('rocket');
+    g.powerups.activateHoverboard();
+    g.powerups.magnet = 2.5;
+    const m = hudModel(g);
+    expect(m.timers.map((t) => t.kind)).toEqual(['magnet', 'rocket', 'hoverboard']);
+    expect(m.timers[0].frac).toBeCloseTo(0.25);
+    expect(m.timers[0].seconds).toBe(3);
+    expect(m.timers[1].frac).toBe(1);
+    expect(m.hoverboards).toBe(2);
+    expect(m.multiplier).toBe('');
+
+    g.josh.value = 1;
+    g.josh.active = true;
+    expect(hudModel(g).multiplier).toBe('×2');
+    expect(hudModel(g).joshActive).toBe(true);
+  });
+
+  it('fills the summary card', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.state = 'summary';
+    Object.assign(g.stats, { score: 1234, coins: 56, distance: 789.6, jumps: 7, rolls: 3, timeSec: 75.4 });
+    const m = hudModel(g);
+    expect(m.center).toBe('Score 1234');
+    expect(m.summary).toEqual({ score: '1234', coins: '56', distance: '789 m', jumps: '7', rolls: '3', time: '1:15' });
+  });
 });
