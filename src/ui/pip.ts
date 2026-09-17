@@ -17,6 +17,9 @@ export const isStalled = (lastFrameT: number | null, nowMs: number, ms = STALL_M
 
 /** Mean frame luma (0..255) below this reads as "too dark". */
 export const DARK_LUMA = 45;
+
+/** Shown in the jog pill while there is no cadence to show (dim, like the greyed-out pill). */
+const NO_CADENCE = '—';
 export const isDark = (luma: number | null): boolean => luma !== null && luma < DARK_LUMA;
 
 export const modeBadge = (m: PlayMode | null): string => (m === 'full' ? 'FULL' : m === 'small' ? 'SMALL' : '—');
@@ -218,7 +221,7 @@ export class PosePip {
       this.jog.classList.toggle('on', jog.active);
       if (!jog.active) {
         // The pill greys out; leaving the last spm under it reads as "still jogging at 150".
-        this.cadence.textContent = '';
+        this.cadence.textContent = NO_CADENCE;
         this.lastCadence = -1;
         this.lastCadenceAt = -1e9;
       }
@@ -226,7 +229,7 @@ export class PosePip {
     if (jog.active && jog.cadenceSpm !== this.lastCadence && nowMs - this.lastCadenceAt >= 500) {
       this.lastCadenceAt = nowMs;
       this.lastCadence = jog.cadenceSpm;
-      this.cadence.textContent = jog.cadenceSpm > 0 ? `${jog.cadenceSpm}` : '';
+      this.cadence.textContent = jog.cadenceSpm > 0 ? `${jog.cadenceSpm}` : NO_CADENCE;
     }
     if (jog.steps > this.lastSteps && this.lastSteps >= 0) this.pulse();
     this.lastSteps = jog.steps;

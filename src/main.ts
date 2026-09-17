@@ -158,7 +158,8 @@ telemetry.onControl((msg) => {
       ctrl.sensitivity = msg.value;
       break;
     case 'setThreshold':
-      if (msg.key in ctrl.th) (ctrl.th as unknown as Record<string, number>)[msg.key] = msg.value;
+      // hasOwn, not `in`: `in` walks the prototype, so any same-origin tab could write toString.
+      if (Object.hasOwn(ctrl.th, msg.key)) (ctrl.th as unknown as Record<string, number>)[msg.key] = msg.value;
       break;
     case 'recalibrate':
       loop.dispatch({ type: 'recalibrate' });
