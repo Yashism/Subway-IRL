@@ -7,6 +7,7 @@ import { FixedStepper } from './game/loop';
 import { InputHub } from './input/hub';
 import { KeyboardInput } from './input/keyboard';
 import { Hud } from './ui/hud';
+import { isLineId } from './world/stations';
 import { WorldView, type ToneChoice } from './world/worldView';
 
 const params = new URLSearchParams(location.search);
@@ -26,7 +27,12 @@ const input = new InputHub(autopilot ? [keyboard, autopilot] : [keyboard]);
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const TONES: ToneChoice[] = ['neutral', 'agx', 'aces'];
 const toneParam = params.get('tone') as ToneChoice | null;
-const world = new WorldView(canvas, { seed, tone: toneParam && TONES.includes(toneParam) ? toneParam : undefined });
+const lineParam = params.get('line');
+const world = new WorldView(canvas, {
+  seed,
+  tone: toneParam && TONES.includes(toneParam) ? toneParam : undefined,
+  line: isLineId(lineParam) ? lineParam : undefined,
+});
 const hud = new Hud(document.getElementById('hud')!);
 const stepper = new FixedStepper();
 
