@@ -88,8 +88,8 @@ export const CAMERA = {
   standRate: 3.5,
   /** Menu: a lower, closer showcase of the idle runner, framed right of the logo. */
   menu: { height: 2.0, back: 4.4, lookAhead: 6, lookHeight: 1.15, x: -1.7, lookX: -3.6 },
-  /** Caught: dolly in on the grab. */
-  caught: { height: 2.7, back: 4.9, lookAhead: 6, lookHeight: 1.0, x: 0, lookX: 0 },
+  /** Caught: swing to the side nearer the track centre and dolly in on the grab. */
+  caught: { height: 2.9, back: 4.4, lookAhead: 1.8, lookHeight: 1.15, x: 2.6, lookX: 0 },
 };
 
 const SUN_OFFSET = new THREE.Vector3(-7, 15, 9);
@@ -239,6 +239,8 @@ export class WorldView {
   private chaserX = 0;
   private standY = 0;
   private camReady = false;
+  /** Which side (+1 right, -1 left) the caught camera swings to; the chasers stand opposite. */
+  private caughtSide = 1;
 
   // scratch (render() allocates nothing)
   private readonly tmp = new THREE.Object3D();
@@ -523,10 +525,15 @@ export class WorldView {
     cs.action = caught ? 'caught' : g.state === 'playing' ? 'run' : 'idle';
     cs.speed = g.state === 'playing' ? g.speed : 0;
     cs.lean = 0;
-    const ttSide = caught ? -0.45 : -0.85;
-    this.tt.root.position.set(this.chaserX + ttSide, 0, gap);
+    if (caught) {
+      const away = -this.caughtSide;
+      this.tt.root.position.set(this.chaserX + away * 0.4, 0, gap + 0.1);
+      this.dog.root.position.set(this.chaserX + away * 1.25, 0, gap - 0.9);
+    } else {
+      this.tt.root.position.set(this.chaserX - 0.85, 0, gap);
+      this.dog.root.position.set(this.chaserX + 0.95, 0, gap - 0.7);
+    }
     this.tt.update(dt, cs);
-    this.dog.root.position.set(this.chaserX + 0.95, 0, gap - (caught ? 0.2 : 0.7));
     this.dog.update(dt, cs);
   }
 
@@ -545,11 +552,14 @@ export class WorldView {
     let lookH: number = CAMERA.lookHeight;
     let dx = 0;
     let lookDx = 0;
-    const shot = st === 'menu' ? CAMERA.menu : st === 'caught' || st === 'summary' ? CAMERA.caught : null;
+    const caught = st === 'caught' || st === 'summary';
+    const shot = st === 'menu' ? CAMERA.menu : caught ? CAMERA.caught : null;
     if (shot) ({ height, back, lookAhead: ahead, lookHeight: lookH, x: dx, lookX: lookDx } = shot);
+    if (caught) dx *= this.caughtSide;
+    else this.caughtSide = r.x > 0.1 ? -1 : 1;
 
     const lift = this.standY * CAMERA.standFollow + jump * CAMERA.jumpFollow;
-    const x = r.x * CAMERA.laneFollow;
+    const x = caught ? r.x : r.x * CAMERA.laneFollow;
     this.camPosTarget.set(x + dx, height + lift, back);
     this.camLookTarget.set(x + lookDx, lookH + lift, -ahead);
     const kk = st === 'menu' || st === 'caught' || st === 'summary' ? damp(3, dt) : k;
