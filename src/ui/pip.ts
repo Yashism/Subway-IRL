@@ -216,6 +216,12 @@ export class PosePip {
     if (jog.active !== this.lastJog) {
       this.lastJog = jog.active;
       this.jog.classList.toggle('on', jog.active);
+      if (!jog.active) {
+        // The pill greys out; leaving the last spm under it reads as "still jogging at 150".
+        this.cadence.textContent = '';
+        this.lastCadence = -1;
+        this.lastCadenceAt = -1e9;
+      }
     }
     if (jog.active && jog.cadenceSpm !== this.lastCadence && nowMs - this.lastCadenceAt >= 500) {
       this.lastCadenceAt = nowMs;

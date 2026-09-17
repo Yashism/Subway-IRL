@@ -25,7 +25,9 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?posereplay=<fixture>    pose frames from tests/fixtures/<fixture>.json instead of the camera
 //   ?session=<file>          replay a monitor recording from tests/fixtures/sessions/
 //   ?mode=full|small         force the play mode; ?monitor opens the live monitor
-//   ?difficulty= ?seed= ?god ?jog ?tone= ?line= ?pip=0 ?perf ?saveAutopilot
+//   ?difficulty= ?seed= ?god ?tone= ?line= ?pip=0 ?perf ?saveAutopilot
+//   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
+//                            webcam mode, because the keyboard then claims to track jogging.
 
 const params = new URLSearchParams(location.search);
 const flagOn = (name: string): boolean => {
