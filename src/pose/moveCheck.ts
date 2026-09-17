@@ -339,7 +339,7 @@ export class MoveCheck {
     const out = m.canAccept ? 'use your best attempt' : 'skip this move';
     if (near && m.canSkip) m.hint = `Almost — go a bit further, or ${out}`;
     else if (near) m.hint = 'Almost — go a bit further';
-    else if (m.canSkip) m.hint = m.canAccept ? 'No luck yet — skip it, or use your best attempt' : 'No luck yet — you can skip this move';
+    else if (m.canSkip) m.hint = `No luck yet — ${m.canAccept ? 'skip it, or use your best attempt' : 'you can skip this move'}`;
     else if (step.attempts > 0) m.hint = `${step.attempts} near ${step.attempts === 1 ? 'miss' : 'misses'} so far`;
     else m.hint = null;
   }
