@@ -45,7 +45,7 @@ export interface MoveStepModel {
 export interface MoveCheckSummary {
   mode: PlayMode;
   steps: readonly MoveStepModel[];
-  /** Threshold keys this check changed, with their new values. */
+  /** Threshold keys this check changed, with their new values, including derived companions. */
   tuned: Partial<Thresholds>;
   /** Set when the left and right attempts differed by more than 40 %. */
   asymmetryNote: string | null;
@@ -76,7 +76,11 @@ export interface MoveTuning {
   /** Epoch ms. */
   at: number;
   thresholds: Partial<Thresholds>;
-  /** Raw measured peaks, kept so a later change of TUNE_FRACTION can re-derive thresholds. */
+  /**
+   * The headline peak of each move, for display — "your jump: 0.31". Only the move's first signal,
+   * and in that mode's units (a lane is degrees in small-room mode, torso lengths in full-body), so
+   * it is not safe to feed back into the tuning maths. Use `keyPeaks` for that.
+   */
   peaks: Partial<Record<MoveId, number>>;
   /**
    * The peak behind each tuned key, after left/right averaging. `peaks` holds one number per move,
