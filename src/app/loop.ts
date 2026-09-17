@@ -15,7 +15,8 @@ export interface LoopPose {
   readonly backend: string;
   readonly ctrl: { readonly baseline: Baseline | null };
   status(): RuntimeStatus;
-  dark(nowMs: number): boolean;
+  /** undefined while the frame luma is not known yet. */
+  dark(nowMs: number): boolean | undefined;
 }
 
 /** The parts of TelemetryPublisher the loop uses. */

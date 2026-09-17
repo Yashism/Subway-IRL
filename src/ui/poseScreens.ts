@@ -376,6 +376,11 @@ export class PoseScreens {
 
   destroy(): void {
     this.root.replaceChildren();
+    // The dedupe caches key on the nodes that just went away.
+    this.lastText.clear();
+    this.attrs.clear();
+    this.pickers.length = 0;
+    this.last = null;
     this.root.classList.remove('pose-ui');
     delete document.documentElement.dataset.poseScreen;
     delete document.documentElement.dataset.poseInput;

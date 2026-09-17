@@ -97,6 +97,10 @@ export class PosePip {
   private readonly onResize = () => {
     this.sizeDirty = true;
   };
+  /** Only the card's own size transition matters; the jog pill's opacity bubbles up here too. */
+  private readonly onTransition = (e: TransitionEvent) => {
+    if (e.target === this.card) this.sizeDirty = true;
+  };
 
   constructor(root: HTMLElement, opts: PipOptions = {}) {
     this.root = root;
@@ -122,7 +126,7 @@ export class PosePip {
     this.card.classList.toggle('hidden', !this.shown);
     window.addEventListener('resize', this.onResize);
     // The corner ↔ stage change animates the card size; measure again once it settles.
-    this.card.addEventListener('transitionend', this.onResize);
+    this.card.addEventListener('transitionend', this.onTransition);
   }
 
   get visible(): boolean {
@@ -250,9 +254,14 @@ export class PosePip {
     return this.luma;
   }
 
+  /**
+   * Tears the card down. The <video> belongs to the PoseRuntime and keeps the camera decoding,
+   * so it is only detached from the card: park it afterwards (PoseRuntime.parkVideo).
+   */
   destroy(): void {
     window.removeEventListener('resize', this.onResize);
-    this.video?.remove();
+    this.card.removeEventListener('transitionend', this.onTransition);
+    this.setVideo(null);
     this.card.remove();
     this.root.classList.remove('pip-root');
   }

@@ -148,10 +148,14 @@ export class PoseRuntime {
     return this.ctrl.statusInto(this.st) as RuntimeStatus;
   }
 
-  /** The camera image is too dark to track well. Always false for replays. */
-  dark(nowMs: number): boolean {
+  /**
+   * The camera image is too dark to track well; undefined until the first luma sample lands
+   * (the light check is "pending" then, not "ok"). Always false for replays.
+   */
+  dark(nowMs: number): boolean | undefined {
     if (this.isReplay || !this.sampleLuma) return false;
-    return isDark(this.sampleLuma(nowMs));
+    const luma = this.sampleLuma(nowMs);
+    return luma === null ? undefined : isDark(luma);
   }
 
   savedCameraId(): string | null {

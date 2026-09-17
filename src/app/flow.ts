@@ -22,8 +22,8 @@ export interface PoseSnapshot {
   mode: PlayMode | null;
   startProgress: number;
   calibration: CalibrationState;
-  /** The camera image is too dark to track well (from frame luma). */
-  dark?: boolean;
+  /** The camera image is too dark to track well (from frame luma); undefined until the first sample. */
+  dark?: boolean | undefined;
 }
 
 export type FlowInput =
@@ -96,7 +96,7 @@ const initialPose = (): PoseSnapshot => ({
   mode: null,
   startProgress: 0,
   calibration: { progress: 0, bodyVisible: false, distance: 'ok' },
-  dark: false,
+  dark: undefined,
 });
 
 const running = (s: GameState) => s === 'playing' || s === 'countdown';
@@ -321,7 +321,7 @@ export class SessionFlow {
     const ready = s === 'ready' || (s !== 'calibrating' && p.calibrated);
     const body: CheckState = ready ? (this.recheck && !p.tracking ? 'bad' : 'ok') : cal.bodyVisible ? 'ok' : 'bad';
     const distance: CheckState = ready ? 'ok' : !cal.bodyVisible ? 'pending' : cal.distance === 'ok' ? 'ok' : 'bad';
-    const light: CheckState = p.dark ? 'bad' : 'ok';
+    const light: CheckState = p.dark === undefined ? 'pending' : p.dark ? 'bad' : 'ok';
 
     let hint = '';
     if (body === 'bad') hint = 'Step into view';
@@ -360,7 +360,7 @@ function samePose(a: PoseSnapshot, b: PoseSnapshot): boolean {
     a.calibrated === b.calibrated &&
     a.mode === b.mode &&
     a.startProgress === b.startProgress &&
-    !!a.dark === !!b.dark &&
+    a.dark === b.dark &&
     a.calibration.progress === b.calibration.progress &&
     a.calibration.bodyVisible === b.calibration.bodyVisible &&
     a.calibration.distance === b.calibration.distance
@@ -372,7 +372,7 @@ function copyPose(to: PoseSnapshot, from: PoseSnapshot): void {
   to.calibrated = from.calibrated;
   to.mode = from.mode;
   to.startProgress = from.startProgress;
-  to.dark = !!from.dark;
+  to.dark = from.dark;
   to.calibration.progress = from.calibration.progress;
   to.calibration.bodyVisible = from.calibration.bodyVisible;
   to.calibration.distance = from.calibration.distance;

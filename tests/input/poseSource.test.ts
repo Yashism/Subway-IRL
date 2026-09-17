@@ -192,19 +192,21 @@ describe('PoseCommandSource activity', () => {
     expect(src.activity(0).steps).toBe(14);
   });
 
-  it('reuses one result object, which InputHub copies', () => {
+  it('reuses one result object, and so does the InputHub around it', () => {
     const { stub, src } = stubbed();
     stub.status.jog = { active: true, cadenceSpm: 150, msSinceStep: 50, steps: 7 };
     const a = src.activity(0);
     expect(src.activity(0)).toBe(a);
 
+    // The hub has its own status: never the source's, and refilled in place like this one.
     const hub = new InputHub([src]);
     const merged = hub.activity(0);
     expect(merged).not.toBe(a);
+    expect(merged).toEqual({ tracksJogging: true, msSinceStep: 50, cadenceSpm: 150, steps: 7, squatting: false, lost: false });
     stub.status.jog = { active: false, cadenceSpm: 0, msSinceStep: 900, steps: 9 };
     stub.status.squatting = true;
-    hub.activity(0);
-    expect(merged).toEqual({ tracksJogging: true, msSinceStep: 50, cadenceSpm: 150, steps: 7, squatting: false, lost: false });
+    expect(hub.activity(0)).toBe(merged);
+    expect(merged).toEqual({ tracksJogging: true, msSinceStep: 900, cadenceSpm: 0, steps: 9, squatting: true, lost: false });
   });
 });
 

@@ -458,8 +458,12 @@ describe('SessionFlow: screen model', () => {
   it('checklist and hints follow the calibration state', () => {
     const f = webcamAt('calibrating');
     let m = f.model;
-    expect(m.checks).toEqual({ body: 'bad', distance: 'pending', light: 'ok' });
+    // The light is unknown until the first frame-luma sample lands.
+    expect(m.checks).toEqual({ body: 'bad', distance: 'pending', light: 'pending' });
     expect(m.hint).toBe('Step into view');
+
+    f.dispatch(pose({ dark: false }));
+    expect(f.model.checks.light).toBe('ok');
 
     f.dispatch(pose({ tracking: true, calibration: { progress: 0, bodyVisible: true, distance: 'back' } }));
     m = f.model;

@@ -278,7 +278,7 @@ describe('PoseRuntime: stall and darkness', () => {
     expect(r.rt.commands.activity(1101).lost).toBe(true);
   });
 
-  it('dark() uses the luma sampler and is false without one', async () => {
+  it('dark() uses the luma sampler, is false without one and unknown before the first sample', async () => {
     const r = rig();
     expect(r.rt.dark(0)).toBe(false);
     const luma = vi.fn(() => 20);
@@ -287,8 +287,9 @@ describe('PoseRuntime: stall and darkness', () => {
     expect(luma).toHaveBeenCalledWith(5);
     r.rt.sampleLuma = () => 120;
     expect(r.rt.dark(6)).toBe(false);
+    // No sample yet (the video has no frame): unknown, so the light check stays pending.
     r.rt.sampleLuma = () => null;
-    expect(r.rt.dark(7)).toBe(false);
+    expect(r.rt.dark(7)).toBeUndefined();
   });
 
   it('recalibrate() resets calibration and sends a side-lane player back to the centre', async () => {
