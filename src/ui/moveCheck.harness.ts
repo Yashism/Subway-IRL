@@ -183,6 +183,25 @@ async function main(): Promise<void> {
   });
   ui.update(MODELS[state]);
   await document.fonts.ready;
+  // ?freeze=0..1 holds the mime figure at that point of its loop, so a screenshot can
+  // catch the extreme of the pose instead of whatever frame it happened to land on.
+  const freeze = params.get('freeze');
+  if (freeze !== null) {
+    for (const a of document.getAnimations()) {
+      const target = (a.effect as KeyframeEffect | null)?.target ?? null;
+      const timing = a.effect?.getComputedTiming();
+      const duration = Number(timing?.duration ?? 0);
+      if (target?.closest('.mc-stage')) {
+        a.currentTime = Number(freeze) * duration;
+        a.pause();
+      } else if (timing?.iterations === Infinity) {
+        a.currentTime = 0;
+        a.pause();
+      } else {
+        a.finish();
+      }
+    }
+  }
   (window as unknown as { __ready: boolean }).__ready = true;
 }
 
