@@ -1231,20 +1231,26 @@ function skyTexture(): THREE.CanvasTexture {
         const puffs = 5 + Math.floor(rand() * 4);
         const pts: [number, number, number][] = [];
         for (let k = 0; k < puffs; k++) pts.push([bx + (k - puffs / 2) * 16 * s, cy - Math.sin((k / (puffs - 1)) * Math.PI) * 14 * s, (12 + rand() * 12) * s]);
-        ctx.fillStyle = 'rgba(236,222,214,0.95)';
-        for (const [x, y, r] of pts) {
+        // Flat cloud base: a pill under the puffs. It is part of each silhouette (shadow first,
+        // then white), never painted over the finished cloud, which drew a tan stripe across it.
+        const x0 = pts[0][0];
+        const x1 = pts[pts.length - 1][0];
+        const baseR = Math.min(pts[0][2], pts[pts.length - 1][2]) * 0.8;
+        const silhouette = (dx: number, dy: number) => {
+          for (const [x, y, r] of pts) {
+            ctx.beginPath();
+            ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
           ctx.beginPath();
-          ctx.arc(x + 2, y + 4, r, 0, Math.PI * 2);
+          ctx.roundRect(x0 + dx, cy + dy - baseR, x1 - x0, baseR * 2, baseR);
           ctx.fill();
-        }
-        ctx.fillStyle = 'rgba(255,255,255,0.97)';
-        for (const [x, y, r] of pts) {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.fillStyle = 'rgba(236,222,214,0.95)';
-        ctx.fillRect(pts[0][0], cy, pts[pts.length - 1][0] - pts[0][0], 5 * s);
+        };
+        // Opaque fills, so overlapping puffs never show darker seams.
+        ctx.fillStyle = '#ECDED6';
+        silhouette(2, 4);
+        ctx.fillStyle = '#FFFFFF';
+        silhouette(0, 0);
       }
     }
   });
