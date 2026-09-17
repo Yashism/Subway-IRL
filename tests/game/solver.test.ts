@@ -30,11 +30,25 @@ describe('plan', () => {
     expect(unpassableFrom(specs, 0, 60, 20, 1)).toBe(-1);
   });
 
+  it('never rolls under a banner while riding up a ramp', () => {
+    for (const bannerS of [33, 35, 36.5]) {
+      const specs = [
+        spec('ramp', 0, 30),
+        spec('trainParked', 0, 38, 10),
+        spec('trainParked', -1, 10, 50),
+        spec('trainParked', 1, 10, 50),
+        spec('bannerHigh', 0, bannerS),
+      ];
+      const actions = plan(toBlocks(specs, 20), 0, 60, { speed: 20, minGap: 1, startLane: 0 });
+      if (actions) expect(replayPlan(specs, actions, 0, 20, 60), `banner at ${bannerS}`).toBeNull();
+    }
+  });
+
   it('respects the minimum gap between actions', () => {
     // Two barriers too far apart for one jump; the side lanes are walled, so both must be jumped.
     // At 30 m/s a jump lasts 18 m, so the second barrier must be at least ~33 m in for the first jump to land in time.
     const specs = [spec('barrierLow', 0, 20), spec('barrierLow', 0, 36), spec('trainParked', -1, 10), spec('trainParked', 1, 10)];
-    expect(unpassableFrom(specs, 0, 60, 30, 0.8)).toBe(-1);
+    expect(plan(toBlocks(specs, 30), 0, 60, { speed: 30, minGap: 0.8, startLane: 0 })).toBeNull();
     expect(unpassableFrom(specs, 0, 60, 30, 0.1)).toBeNull();
   });
 

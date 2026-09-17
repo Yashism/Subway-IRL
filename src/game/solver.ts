@@ -132,6 +132,10 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
     return m;
   };
 
+  /** On a roof, or possibly on a ramp (any runner in a ramp's lane past its start). */
+  const raised = (n: Node, s: number): boolean =>
+    n.roof >= 0 || relevant.some((b) => b.rampS !== null && b.lane === n.lane && s >= b.rampS && s <= b.s1);
+
   const valid = (n: Node, i: number, s: number): boolean => {
     for (let bi = 0; bi < relevant.length; bi++) {
       const b = relevant[bi];
@@ -142,6 +146,8 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
         if (n.roof === bi && n.mode !== CHANGE) continue;
         return false;
       }
+      // A runner raised on a ramp or roof is not where a jump or roll is modelled.
+      if (raised(n, s)) return false;
       if (b.need === 'jump') {
         if (n.mode !== AIR) return false;
         if (jumpHeightAt((i - n.start) / hz, NORMAL_JUMP) < b.top + JUMP_CLEARANCE) return false;
@@ -151,10 +157,6 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
     }
     return true;
   };
-
-  /** On a roof, or possibly on a ramp (any runner in a ramp's lane past its start). */
-  const raised = (n: Node, s: number): boolean =>
-    n.roof >= 0 || relevant.some((b) => b.rampS !== null && b.lane === n.lane && s >= b.rampS && s <= b.s1);
 
   let frontier = new Map<string, Node>();
   put(
