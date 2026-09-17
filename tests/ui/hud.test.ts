@@ -5,6 +5,7 @@ import { Game } from '../../src/game/game';
 import type { ActivityStatus } from '../../src/input/commands';
 import { emptyProfile, type Profile } from '../../src/app/profile';
 import { hudModel } from '../../src/ui/hud';
+import { menuNotice } from '../../src/ui/hud';
 
 const EMPTY: ChunkDef[] = [{ id: 'empty', tier: 0, obstacles: [], coins: [] }];
 const KB: ActivityStatus = { tracksJogging: false, msSinceStep: Infinity, cadenceSpm: 0, steps: 0, squatting: false, lost: false };
@@ -160,5 +161,18 @@ describe('hudModel with a profile', () => {
     const m = hudModel(g, { profile: profile(), last: { newBest: false, previousBest: 1500 } });
     expect(m.profile.newBest).toBe(false);
     expect(m.profile.summaryBest).toBe('Best: 1,500');
+  });
+});
+
+describe('menuNotice', () => {
+  const base = { input: 'webcam' as const, cameraReady: false, replay: '', autopilot: false, fallback: '' };
+  it('describes the real input state, never "coming soon"', () => {
+    expect(menuNotice(base)).toBe('Webcam play · press Enter to set up your camera · keys work too');
+    expect(menuNotice({ ...base, cameraReady: true })).toBe('Webcam ready · raise your right hand to start');
+    expect(menuNotice({ ...base, input: 'keyboard' })).toBe('Keyboard play · the webcam is off');
+    expect(menuNotice({ ...base, input: 'keyboard', fallback: 'No camera found' })).toBe('No camera found · playing with the keyboard');
+    expect(menuNotice({ ...base, replay: 'synth-full' })).toBe('Pose replay “synth-full” · press Enter');
+    expect(menuNotice({ ...base, input: 'keyboard', autopilot: true })).toBe('Autopilot demo');
+    for (const s of [base, { ...base, input: 'keyboard' as const }]) expect(menuNotice(s)).not.toMatch(/coming soon/i);
   });
 });

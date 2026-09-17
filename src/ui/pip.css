@@ -1,0 +1,229 @@
+/* Camera preview card (PosePip). Uses the HUD tokens from hud.css. */
+
+.pip-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.pip {
+  --pip-ink: var(--ink, #1b1035);
+  position: absolute;
+  left: 18px;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  width: 220px;
+  height: 165px;
+  border-radius: 22px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(88, 64, 160, 0.55), rgba(20, 12, 45, 0) 70%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 22px),
+    #1b1035;
+  border: 4px solid #fff;
+  box-shadow:
+    0 0 0 3px var(--pip-ink),
+    0 7px 0 3px rgba(20, 12, 45, 0.6),
+    0 16px 30px rgba(0, 0, 0, 0.35);
+  transition:
+    left 0.45s cubic-bezier(0.2, 1.1, 0.3, 1),
+    bottom 0.45s cubic-bezier(0.2, 1.1, 0.3, 1),
+    width 0.45s cubic-bezier(0.2, 1.1, 0.3, 1),
+    height 0.45s cubic-bezier(0.2, 1.1, 0.3, 1),
+    border-radius 0.45s,
+    opacity 0.2s,
+    transform 0.2s;
+}
+.pip.inactive {
+  display: none;
+}
+.pip.hidden:not(.stage) {
+  opacity: 0;
+  transform: translateY(20px) scale(0.9);
+}
+
+/* Big centred view behind the calibration outline; keep the size formula in sync with .ps-figure. */
+.pip.stage {
+  --stage-h: min(58vh, 56vw);
+  left: calc(50% - var(--stage-h) * 2 / 3);
+  bottom: calc(49% - var(--stage-h) / 2);
+  width: calc(var(--stage-h) * 4 / 3);
+  height: var(--stage-h);
+  border-radius: 34px;
+  border-width: 5px;
+}
+
+.pip-video,
+.pip-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pip-video {
+  object-fit: contain;
+  /* Landmarks are already mirrored; mirror the picture to match (selfie view). */
+  transform: scaleX(-1);
+  background: #000;
+}
+.pip.stage .pip-video {
+  filter: saturate(0.85) brightness(0.8);
+}
+
+.pip-bar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.pip-live,
+.pip-mode {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(20, 12, 45, 0.78);
+  font: 800 11px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.08em;
+  color: #fff;
+}
+.pip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff4d3a;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+.pip[data-level='ok'] .pip-dot {
+  background: #3ee07a;
+  animation: pip-live 1.6s ease-in-out infinite;
+}
+.pip[data-level='slow'] .pip-dot {
+  background: #ffb020;
+}
+.pip[data-level='lost'] .pip-dot {
+  animation: pip-blink 0.7s steps(2, jump-none) infinite;
+}
+.pip[data-level='lost'] .pip-state {
+  color: #ff9b8f;
+}
+.pip[data-level='slow'] .pip-state {
+  color: #ffd27a;
+}
+.pip-fps {
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+.pip-fps:empty {
+  display: none;
+}
+.pip-mode {
+  background: var(--gold, #ffd400);
+  color: var(--pip-ink);
+  box-shadow: inset 0 0 0 2px var(--pip-ink);
+}
+
+.pip-jog {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 9px 0 4px;
+  border-radius: 999px;
+  background: rgba(20, 12, 45, 0.78);
+  opacity: 0.55;
+  filter: grayscale(1);
+  transition: opacity 0.2s, filter 0.2s;
+}
+.pip-jog.on {
+  opacity: 1;
+  filter: none;
+  background: linear-gradient(180deg, #4fd08a, #2a8c60);
+  box-shadow: inset 0 0 0 2px var(--pip-ink);
+}
+.pip-jog-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 17px;
+}
+.pip-cadence {
+  font: 400 15px/1 var(--font-game, sans-serif);
+  padding-top: 3px;
+  color: #fff;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 3px var(--pip-ink);
+}
+.pip-cadence:empty {
+  display: none;
+}
+.pip-key {
+  position: absolute;
+  left: 8px;
+  bottom: 10px;
+  font: 800 10px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+}
+.pip.stage .pip-key,
+.pip.stage .pip-jog {
+  display: none;
+}
+.pip.stage .pip-bar {
+  top: 14px;
+  left: 14px;
+  right: auto;
+}
+.pip.stage .pip-mode {
+  display: none;
+}
+
+@keyframes pip-live {
+  50% { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 0 6px rgba(62, 224, 122, 0.35); }
+}
+@keyframes pip-blink {
+  50% { opacity: 0.3; }
+}
+
+@media (max-width: 900px) {
+  .pip.stage {
+    bottom: calc(58% - var(--stage-h) / 2);
+  }
+}
+@media (max-height: 620px) {
+  .pip.stage {
+    --stage-h: min(54vh, 50vw);
+    bottom: calc(52% - var(--stage-h) / 2);
+  }
+}
+@media (max-width: 560px) {
+  .pip:not(.stage) {
+    width: 148px;
+    height: 111px;
+    left: 10px;
+    bottom: 10px;
+  }
+  .pip-key {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pip,
+  .pip * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

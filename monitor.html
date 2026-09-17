@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Subway IRL — Live Monitor</title>
+    <link rel="stylesheet" href="/src/monitor/monitor.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>Subway IRL <span>monitor</span></h1>
+      <span id="pill" class="pill waiting" role="status" aria-live="polite">waiting for game tab</span>
+      <span id="flash" class="flash" role="alert" hidden></span>
+      <span class="spacer"></span>
+      <div class="rec">
+        <button id="record" type="button" class="btn rec-btn" aria-pressed="false"><span class="dot"></span><span id="recordLabel">Record session</span></button>
+        <span id="recInfo" class="rec-info mono"></span>
+        <button id="viewLast" type="button" class="btn small" hidden>View</button>
+      </div>
+      <label class="btn" for="load">Load recording…</label>
+      <input id="load" type="file" accept=".json,application/json" class="visually-hidden" />
+    </header>
+
+    <section id="offline" class="offline" hidden aria-label="Recording playback">
+      <span class="tag">Playback</span>
+      <span id="offName" class="off-name"></span>
+      <button id="prevFrame" type="button" class="btn icon" aria-label="Previous frame">−1f</button>
+      <button id="play" type="button" class="btn icon" aria-label="Play">▶</button>
+      <button id="nextFrame" type="button" class="btn icon" aria-label="Next frame">+1f</button>
+      <input id="scrub" type="range" min="0" max="0" step="1" value="0" aria-label="Recording time" />
+      <output id="scrubOut" class="mono"></output>
+      <button id="backLive" type="button" class="btn">Back to live</button>
+      <p id="offNote" class="off-note"></p>
+    </section>
+
+    <main class="grid">
+      <div class="col">
+      <section class="card stage-card" aria-label="Skeleton">
+        <div class="card-h">
+          <h2>Skeleton</h2>
+          <span id="frameInfo" class="muted mono"></span>
+        </div>
+        <div class="stage" id="stage">
+          <canvas id="skeleton"></canvas>
+          <div id="stageEmpty" class="empty">No pose frames yet</div>
+        </div>
+        <ul class="legend">
+          <li><i class="sw lane"></i>lane / lean</li>
+          <li><i class="sw jump"></i>jump rise</li>
+          <li><i class="sw roll"></i>roll / duck</li>
+        </ul>
+      </section>
+
+      <section class="card controls" aria-label="Live controls">
+        <div class="card-h"><h2>Controls</h2><span id="controlsNote" class="muted">act on the game tab</span></div>
+        <div class="row">
+          <label class="field grow">Sensitivity <output id="sensOut" class="mono">1.00</output>
+            <input id="sens" type="range" min="0.75" max="1.25" step="0.05" value="1" />
+          </label>
+          <label class="field">Mode
+            <select id="mode">
+              <option value="">Auto</option>
+              <option value="full">Full body</option>
+              <option value="small">Small room</option>
+            </select>
+          </label>
+          <button id="recalibrate" type="button" class="btn">Recalibrate</button>
+        </div>
+        <details>
+          <summary>Thresholds <span id="thChanged" class="muted"></span></summary>
+          <div id="thresholds" class="thresholds"></div>
+        </details>
+      </section>
+      </div>
+
+      <div class="col">
+      <section class="card" aria-label="Pose status">
+        <div class="card-h"><h2>Pose</h2><span id="poseBadge" class="chip">—</span></div>
+        <dl id="pose" class="kv"></dl>
+      </section>
+
+      <section class="card" aria-label="Game state">
+        <div class="card-h"><h2>Game</h2><span id="gameBadge" class="chip">—</span></div>
+        <div class="idle">
+          <div class="idle-h"><span>Idle clock</span><span id="idleText" class="mono">—</span></div>
+          <div class="meter" id="idleMeter"><div id="idleFill" class="fill"></div><i style="left: 33.333%"></i><i style="left: 66.667%"></i></div>
+        </div>
+        <dl id="game" class="kv"></dl>
+      </section>
+
+      </div>
+
+      <section class="card timeline" aria-label="Timeline">
+        <div class="card-h">
+          <h2>Timeline</h2>
+          <div class="filters" role="group" aria-label="Show">
+            <label class="chip k-pose"><input type="checkbox" data-filter="pose" checked />pose</label>
+            <label class="chip k-command"><input type="checkbox" data-filter="command" checked />cmd</label>
+            <label class="chip k-game"><input type="checkbox" data-filter="game" checked />game</label>
+            <label class="chip"><input type="checkbox" data-filter="coins" />coins</label>
+          </div>
+          <span class="spacer"></span>
+          <button id="pauseLog" type="button" class="btn small" aria-pressed="false">Pause</button>
+          <button id="clearLog" type="button" class="btn small">Clear</button>
+        </div>
+        <div class="log-head mono"><span>time s</span><span>Δms</span><span>type</span><span>event</span></div>
+        <ol id="log" class="log mono"></ol>
+      </section>
+    </main>
+
+    <dialog id="noteDlg" class="dlg">
+      <form method="dialog">
+        <h2>Save session</h2>
+        <p id="noteSummary" class="muted"></p>
+        <label class="field">What happened? (what you did, what went wrong)
+          <textarea id="noteText" rows="4"></textarea>
+        </label>
+        <div class="row end">
+          <button value="discard" class="btn">Discard</button>
+          <button value="save" class="btn primary">Save &amp; download</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/monitor/main.ts"></script>
+  </body>
+</html>

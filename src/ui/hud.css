@@ -597,9 +597,35 @@ body {
   box-shadow: 0 3px 0 #8f88b5;
 }
 .hud-menu-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 14px;
+  text-align: center;
   font: 700 15px/1.2 var(--font-ui);
   color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 1px 0 var(--ink), 0 0 8px rgba(20, 12, 45, 0.9);
+}
+.hud-monitor-link {
+  pointer-events: auto;
+  padding: 5px 12px 4px;
+  border-radius: 999px;
+  font: 700 13px/1.2 var(--font-ui);
+  color: #fff;
+  text-decoration: none;
+  text-shadow: none;
+  background: rgba(20, 12, 45, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.hud-monitor-link:hover,
+.hud-monitor-link:focus-visible {
+  background: rgba(60, 40, 120, 0.9);
+  border-color: var(--gold);
+}
+.hud-paused .hud-monitor-link {
+  margin-top: 6px;
 }
 @media (max-width: 560px) {
   .hud-controls { gap: 8px 12px; padding: 10px 12px; }

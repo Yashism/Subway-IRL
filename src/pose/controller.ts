@@ -106,9 +106,54 @@ export class PoseController {
     };
   }
 
+  /**
+   * Non-allocating `status`: fills `out` (and its nested `jog`/`calibration` objects) in place and
+   * returns the same reference. For a 60 Hz poller (`PoseCommandSource.activity()`); read or copy
+   * the result at once, never hold onto `out.jog`/`out.calibration` across calls expecting them to
+   * be snapshots.
+   */
+  statusInto(out: PoseStatus): PoseStatus {
+    const poseFps = Math.round(this.fps);
+    const base = this.baseline;
+    out.tracking = this.body !== null;
+    out.calibrated = this.baseline !== null;
+    out.mode = this.baseline?.mode ?? null;
+    out.lane = this.full.lane;
+    out.poseFps = poseFps;
+    out.confidence = this.body?.confidence ?? 0;
+    const jog = this.jog.status(this.now);
+    out.jog.active = jog.active;
+    out.jog.cadenceSpm = jog.cadenceSpm;
+    out.jog.msSinceStep = jog.msSinceStep;
+    out.jog.steps = jog.steps;
+    out.startProgress = this.gestures.startProgress;
+    const cal = this.calibrator.state;
+    out.calibration.progress = cal.progress;
+    out.calibration.bodyVisible = cal.bodyVisible;
+    out.calibration.distance = cal.distance;
+    out.pose = this.pose;
+    out.lastFrameT = this.lastT;
+    out.squatting = base ? (base.mode === 'full' ? this.full : this.small).isDown : false;
+    out.slowPose =
+      this.firstT !== null &&
+      this.lastT !== null &&
+      this.lastT - this.firstT >= SLOW_POSE_AFTER_MS &&
+      poseFps > 0 &&
+      poseFps < SLOW_POSE_FPS;
+    return out;
+  }
+
   update(frame: PoseFrame): PoseEvent[] {
     const { t } = frame;
     const prevT = this.lastT;
+    const events: PoseEvent[] = [];
+    // A gap since the previous update() call — of any kind, not just empty frames — longer than
+    // lostMs: treat it like lost-then-found even though no empty frames arrived to flag it. Without
+    // this, a pose that resumes directly (no empty frames in between) skips the found-reset below.
+    if (prevT !== null && !this.lost && t - prevT >= this.th.lostMs) {
+      this.lost = true;
+      events.push({ type: 'lost' });
+    }
     if (prevT !== null && t > prevT) {
       const inst = 1000 / (t - prevT);
       this.fps = this.fps ? this.fps * 0.9 + inst * 0.1 : inst;
@@ -128,12 +173,11 @@ export class PoseController {
       if (!this.baseline && t - this.lastSeenT > CALIB_GAP_MS) this.calibrator.update(null, t, this.forcedMode);
       if (!this.lost && t - this.lastSeenT >= this.th.lostMs) {
         this.lost = true;
-        return [{ type: 'lost' }];
+        events.push({ type: 'lost' });
       }
-      return [];
+      return events;
     }
 
-    const events: PoseEvent[] = [];
     const found = this.lost;
     if (found) {
       this.lost = false;

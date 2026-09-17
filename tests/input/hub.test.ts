@@ -18,6 +18,13 @@ it('merges commands and activity', () => {
   expect(hub.activity(0)).toEqual({ tracksJogging: true, msSinceStep: 300, cadenceSpm: 170, steps: 7, squatting: true, lost: true });
 });
 
+it('refills one status object instead of allocating per step', () => {
+  const hub = new InputHub([source([], { tracksJogging: true, msSinceStep: 100, cadenceSpm: 150, steps: 3 })]);
+  const first = hub.activity(0);
+  expect(hub.activity(10)).toBe(first);
+  expect(first).toEqual({ tracksJogging: true, msSinceStep: 100, cadenceSpm: 150, steps: 3, squatting: false, lost: false });
+});
+
 it('reports no jogging when no source tracks it', () => {
   const hub = new InputHub([source([], { cadenceSpm: 200 })]);
   expect(hub.activity(0)).toMatchObject({ tracksJogging: false, msSinceStep: Infinity, cadenceSpm: 0 });
