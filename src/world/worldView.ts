@@ -1,196 +1,350 @@
 import * as THREE from 'three';
-import { LANE_WIDTH, laneX, TUNING } from '../game/config';
-import type { Game } from '../game/game';
+import { CHUNKS } from '../game/chunks';
+import { laneX } from '../game/config';
+import type { Game, GameEvent, GameState } from '../game/game';
 import { OBSTACLES, type ObstacleKind } from '../game/obstacles';
-import type { PowerupKind } from '../game/track';
-import { BUILDING_SLOT, buildingAt, repeatingOffsets, type BuildingLook } from './worldMath';
+import type { Track, PowerupKind } from '../game/track';
+import { CHAPPAL_JUMP, NORMAL_JUMP } from '../game/runner';
+import { Fx } from './fx';
+import { createDog, createInspector, createRunner, type CharacterRig } from './models/characters';
+import {
+  buildAuto,
+  buildBanner,
+  buildCow,
+  buildHandcart,
+  buildHoverboard,
+  buildLowBarrier,
+  buildPickup,
+  coinGeometry,
+  coinMaterial,
+} from './models/props';
+import { SKY_HORIZON, buildSkyDome, buildSkyline, createSideScenery, type SideScenery } from './models/scenery';
+import { createCatenary, createTrackBed, type Catenary, type TrackBed } from './models/trackKit';
+import { buildRamp, buildTrain } from './models/trains';
+import { KeyedPool } from './pools';
+import { applyAgxLook } from './toneLook';
+import { outlineMaterial } from './render/materials';
+import {
+  OBSTACLE_VARIANTS,
+  airborneProgress,
+  damp,
+  isTrain,
+  laneLean,
+  obstacleKey,
+  obstacleVariant,
+  runnerAction,
+  trainLengths,
+  trainLook,
+} from './viewState';
 
-const VIEW_AHEAD = 220;
-const VIEW_BEHIND = 12;
+// ------------------------------------------------------------------ tuning
+
 const MAX_PIXEL_RATIO = 1.25;
-const SLEEPER_SPACING = 1.5;
-const MAX_COINS = 400;
-const MAX_SLEEPERS = 3 * (Math.ceil((VIEW_AHEAD + VIEW_BEHIND) / SLEEPER_SPACING) + 2);
-const MAX_BUILDINGS = 2 * (Math.ceil((VIEW_AHEAD + VIEW_BEHIND) / BUILDING_SLOT) + 2);
-const OBSTACLE_WIDTH = 2;
-const SKY = 0xf7c59f;
-const TRACK_LENGTH = VIEW_AHEAD + VIEW_BEHIND + 40;
+/** Obstacles, coins and pickups are drawn this far ahead (the fog is opaque from 170 m). */
+const VIEW_AHEAD = 172;
+const VIEW_BEHIND = 8;
+/**
+ * Level of detail: beyond this the inverted-hull outlines and small parts (lamps, plates,
+ * decals, un-outlined detail meshes) are a few pixels and fogged, so skip their draw calls.
+ */
+const LOD_FAR = 55;
+/** Parts whose bounding sphere is smaller than this (m) count as small. */
+const SMALL_PART = 0.35;
+const FOG_NEAR = 60;
+const FOG_FAR = 170;
+const SCENERY_AHEAD = 175;
+const SCENERY_BEHIND = 12;
+const MAX_COINS = 320;
+/**
+ * Tone mapping. AgX (the spec's first choice) turns the #FFD400 cab yellow, the auto hood and
+ * the coins khaki at any exposure; Khronos PBR Neutral keeps hue and saturation, which is what
+ * a toon runner needs. AgX (with a punchy look) and ACES stay selectable for comparison.
+ */
+export type ToneChoice = 'neutral' | 'agx' | 'aces';
+const TONE: Record<ToneChoice, { mapping: THREE.ToneMapping; exposure: number }> = {
+  neutral: { mapping: THREE.NeutralToneMapping, exposure: 0.9 },
+  agx: { mapping: THREE.AgXToneMapping, exposure: 1.5 },
+  aces: { mapping: THREE.ACESFilmicToneMapping, exposure: 1.0 },
+};
+const STUMBLE_SECONDS = 0.36;
+const COIN_TINT = 0xffffff;
+const COIN_GLOW = 0xffd000;
+const COIN_GLOW_INTENSITY = 0.42;
+/** Magnet: coins this close fly visibly toward the runner. */
+const MAGNET_PULL_RANGE = 14;
 
-const OBSTACLE_COLORS: Record<ObstacleKind, number> = {
-  trainParked: 0x9b2d30,
-  trainMoving: 0x1f5aa6,
-  barrierLow: 0xc8a165,
-  handcart: 0x8b5a2b,
-  bannerHigh: 0xff6f3c,
-  auto: 0xf4c430,
-  cow: 0xf1ede4,
-  ramp: 0x8a8f96,
+export const CAMERA = {
+  fov: 62,
+  height: 3.4,
+  back: 6.2,
+  lookAhead: 10,
+  lookHeight: 1.2,
+  laneFollow: 0.6,
+  /** Share of a jump's height the camera follows. */
+  jumpFollow: 0.45,
+  /** Share of a standing height (train roof, rocket) the camera follows. */
+  standFollow: 0.8,
+  rate: 8,
+  standRate: 3.5,
+  /** Menu: a lower, closer showcase of the idle runner, framed right of the logo. */
+  menu: { height: 2.0, back: 4.4, lookAhead: 6, lookHeight: 1.15, x: -1.7, lookX: -3.6 },
+  /** Caught: dolly in on the grab. */
+  caught: { height: 2.7, back: 4.9, lookAhead: 6, lookHeight: 1.0, x: 0, lookX: 0 },
 };
 
-const PICKUP_COLORS: Record<PowerupKind, number> = {
-  magnet: 0xe53935,
-  rocket: 0xff9800,
-  chappal: 0x8d6e63,
-};
+const SUN_OFFSET = new THREE.Vector3(-7, 15, 9);
 
-/** Floating origin: the runner is always at z = 0 and the track runs toward -z. */
-const toZ = (itemS: number, runnerS: number) => -(itemS - runnerS);
+const NO_EVENTS: readonly GameEvent[] = [];
 
-function obstacleGeometry(kind: ObstacleKind): THREE.BufferGeometry {
-  const info = OBSTACLES[kind];
-  if (kind === 'ramp') {
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0);
-    shape.lineTo(info.length, 0);
-    shape.lineTo(info.length, TUNING.trainHeight);
-    shape.closePath();
-    const g = new THREE.ExtrudeGeometry(shape, { depth: OBSTACLE_WIDTH, bevelEnabled: false });
-    g.rotateY(Math.PI / 2); // profile x (along the track) -> -z, extrusion -> +x
-    g.translate(-OBSTACLE_WIDTH / 2, 0, 0);
-    return g;
-  }
-  const g = new THREE.BoxGeometry(OBSTACLE_WIDTH, info.yMax - info.yMin, 1);
-  // Origin at the near end; scaling z by the length stretches it away from the runner.
-  g.translate(0, (info.yMax + info.yMin) / 2, -0.5);
-  return g;
+// ------------------------------------------------------------------ pooled objects
+
+interface Pooled {
+  root: THREE.Group;
+  /** Hidden when far away: outline hulls and small or detail-only parts. */
+  minor: THREE.Object3D[];
+  near: boolean;
 }
 
-const standard = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra });
+interface Active {
+  id: number;
+  key: string;
+  item: Pooled;
+  stamp: number;
+}
+
+function isMinorPart(o: THREE.Object3D): boolean {
+  const mesh = o as THREE.Mesh;
+  if (!mesh.isMesh) return false;
+  if (o.userData.isOutline) return true;
+  const g = mesh.geometry;
+  if (!g.boundingSphere) g.computeBoundingSphere();
+  const scale = o.getWorldScale(new THREE.Vector3());
+  if (g.boundingSphere!.radius * Math.max(scale.x, scale.y, scale.z) < SMALL_PART) return true;
+  // Un-outlined, plain vertex-coloured detail (train fittings, fruit, spokes).
+  const mat = mesh.material as THREE.MeshToonMaterial;
+  return !!o.userData.noOutline && mat.vertexColors === true && !mat.map && mat.emissive?.getHex() === 0;
+}
+
+function pooled(object: THREE.Object3D): Pooled {
+  const root = new THREE.Group();
+  root.add(object);
+  root.updateMatrixWorld(true);
+  const minor: THREE.Object3D[] = [];
+  root.traverse((o) => {
+    if (isMinorPart(o)) minor.push(o);
+  });
+  root.visible = false;
+  return { root, minor, near: true };
+}
+
+function setNear(p: Pooled, near: boolean): void {
+  if (p.near === near) return;
+  p.near = near;
+  for (const o of p.minor) o.visible = near;
+}
+
+function buildObstacle(kind: ObstacleKind, variant: number, length: number): THREE.Object3D {
+  switch (kind) {
+    case 'trainParked':
+    case 'trainMoving': {
+      const look = trainLook(variant);
+      return buildTrain(length, { livery: look.livery, seed: look.seed, oncoming: kind === 'trainMoving' });
+    }
+    case 'ramp':
+      return buildRamp(variant);
+    case 'barrierLow':
+      return buildLowBarrier(variant);
+    case 'handcart':
+      return buildHandcart(variant);
+    case 'bannerHigh':
+      return buildBanner(variant);
+    case 'auto':
+      return buildAuto(variant);
+    case 'cow':
+      return buildCow(variant);
+  }
+}
+
+/** A list of live pooled objects keyed by game id, allocation-free per frame. */
+class ActiveSet {
+  readonly list: Active[] = [];
+  private readonly byId = new Map<number, Active>();
+
+  get(id: number): Active | undefined {
+    return this.byId.get(id);
+  }
+
+  add(a: Active): void {
+    this.list.push(a);
+    this.byId.set(a.id, a);
+  }
+
+  /** Removes entries not stamped this frame; calls release for each. */
+  sweep(stamp: number, release: (a: Active) => void): void {
+    const list = this.list;
+    let w = 0;
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (a.stamp === stamp) list[w++] = a;
+      else {
+        this.byId.delete(a.id);
+        release(a);
+      }
+    }
+    list.length = w;
+  }
+}
+
+// ------------------------------------------------------------------ view
+
+export interface WorldViewOptions {
+  /** Seeds the side-scenery layout. */
+  seed?: number;
+  /** Tone mapping (default 'neutral'). */
+  tone?: ToneChoice;
+}
 
 export class WorldView {
   readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(62, 16 / 9, 0.1, 400);
-  private readonly lookAt = new THREE.Vector3(0, 1.2, -14);
+  private readonly camera = new THREE.PerspectiveCamera(CAMERA.fov, 16 / 9, 0.1, 900);
   private readonly sun: THREE.DirectionalLight;
-  private readonly tmp = new THREE.Object3D();
-  private readonly color = new THREE.Color();
+  private readonly sky: THREE.Mesh;
+  private readonly skyline: THREE.Mesh;
+  private readonly bed: TrackBed;
+  private readonly ohe: Catenary;
+  private readonly side: SideScenery;
+  private readonly fx: Fx;
 
-  private readonly obstacleGeo = {} as Record<ObstacleKind, THREE.BufferGeometry>;
-  private readonly obstacleMat = {} as Record<ObstacleKind, THREE.Material>;
-  private readonly obstacleMeshes = new Map<number, THREE.Mesh>();
-  private readonly obstaclePool = new Map<ObstacleKind, THREE.Mesh[]>();
-
-  private readonly pickupGeo = new THREE.IcosahedronGeometry(0.45, 1);
-  private readonly pickupMeshes = new Map<number, THREE.Mesh>();
-
-  private readonly sleepers: THREE.InstancedMesh;
-  private readonly buildings: THREE.InstancedMesh;
+  private readonly obstacleRoot = new THREE.Group();
+  private readonly obstaclePool: KeyedPool<Pooled>;
+  private readonly obstacles = new ActiveSet();
+  private readonly pickupPool: KeyedPool<Pooled>;
+  private readonly pickups = new ActiveSet();
   private readonly coins: THREE.InstancedMesh;
+  private readonly coinOutlines: THREE.InstancedMesh;
 
-  private readonly runner = new THREE.Group();
-  private readonly board: THREE.Mesh;
-  private readonly flame: THREE.Mesh;
-  private readonly chaser = new THREE.Group();
+  private readonly runner: CharacterRig;
+  private readonly board: THREE.Group;
+  private readonly rocket: THREE.Group;
+  private readonly tt: CharacterRig;
+  private readonly dog: CharacterRig;
+
+  private track: Track | null = null;
+  private stamp = 0;
   private clock = 0;
+  private stumbleLeft = 0;
+  private jumpLaunch = 0;
+  private prevState: GameState | null = null;
+  private chaserX = 0;
+  private standY = 0;
+  private camReady = false;
 
-  /** Scratch fields reused per frame so render() allocates nothing (spec §6.4). */
-  private readonly camTargetPos = new THREE.Vector3();
-  private readonly camTargetLookAt = new THREE.Vector3();
-  private readonly seenObstacles = new Set<number>();
-  private readonly seenPickups = new Set<number>();
-  private readonly sleeperOffsets: number[] = [];
-  private readonly buildingScratch: BuildingLook = { height: 0, width: 0, depth: 0, color: 0 };
+  // scratch (render() allocates nothing)
+  private readonly tmp = new THREE.Object3D();
+  private readonly camPos = new THREE.Vector3();
+  private readonly camLook = new THREE.Vector3();
+  private readonly camPosTarget = new THREE.Vector3();
+  private readonly camLookTarget = new THREE.Vector3();
+  private readonly runnerPos = new THREE.Vector3();
+  private readonly fxFrame = { speed: 0, flying: false, magnet: false, josh: false, runnerPos: this.runnerPos };
+  private readonly runnerState = { action: 'idle' as ReturnType<typeof runnerAction>, speed: 0, lean: 0, airborneT: 0 };
+  private readonly chaserState = { action: 'idle' as ReturnType<typeof runnerAction>, speed: 0, lean: 0 };
+  private readonly look = { state: 'menu' as GameState, flying: false, airborne: false, rolling: false, hoverboard: false, stumbling: false };
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.toneMapping = THREE.AgXToneMapping;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  constructor(canvas: HTMLCanvasElement, options: WorldViewOptions = {}) {
+    applyAgxLook();
+    const r = (this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }));
+    const tone = TONE[options.tone ?? 'neutral'] ?? TONE.neutral;
+    r.toneMapping = tone.mapping;
+    r.toneMappingExposure = tone.exposure;
+    r.shadowMap.enabled = true;
+    r.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const scene = this.scene;
-    scene.background = new THREE.Color(SKY);
-    scene.fog = new THREE.Fog(SKY, 70, VIEW_AHEAD);
+    const horizon = new THREE.Color(SKY_HORIZON);
+    scene.background = horizon;
+    scene.fog = new THREE.Fog(horizon, FOG_NEAR, FOG_FAR);
 
-    scene.add(new THREE.HemisphereLight(0xfff3e0, 0x7a5c3e, 1.1));
-    this.sun = new THREE.DirectionalLight(0xffd7a8, 2.4);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1024, 1024);
-    Object.assign(this.sun.shadow.camera, { left: -14, right: 14, top: 20, bottom: -20, near: 1, far: 70 });
-    this.sun.shadow.camera.updateProjectionMatrix();
-    this.sun.shadow.bias = -0.0005;
-    scene.add(this.sun, this.sun.target);
+    // Light: warm sun from behind-left, cool sky fill so shadow sides never go black.
+    scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x6b5b4a, 1.15));
+    const sun = (this.sun = new THREE.DirectionalLight(0xfff1d6, 2.7));
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 15, bottom: -15, near: 8, far: 60 });
+    sun.shadow.camera.updateProjectionMatrix();
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.03;
+    scene.add(sun, sun.target);
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, TRACK_LENGTH), standard(0xb08a63));
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.z = -(TRACK_LENGTH / 2 - VIEW_BEHIND - 20);
-    ground.receiveShadow = true;
-    scene.add(ground);
+    // Sky and far skyline follow the camera (unlit, uncurved).
+    this.sky = buildSkyDome();
+    this.skyline = buildSkyline();
+    scene.add(this.sky, this.skyline);
 
-    const ballastGeo = new THREE.BoxGeometry(LANE_WIDTH * 0.85, 0.12, TRACK_LENGTH);
-    const railGeo = new THREE.BoxGeometry(0.08, 0.1, TRACK_LENGTH);
-    const ballastMat = standard(0x7a6f66);
-    const railMat = standard(0xaab0b6, { metalness: 0.6, roughness: 0.4 });
-    for (const lane of [-1, 0, 1]) {
-      const ballast = new THREE.Mesh(ballastGeo, ballastMat);
-      ballast.position.set(laneX(lane), 0, ground.position.z);
-      ballast.receiveShadow = true;
-      scene.add(ballast);
-      for (const side of [-0.7, 0.7]) {
-        const rail = new THREE.Mesh(railGeo, railMat);
-        rail.position.set(laneX(lane) + side, 0.16, ground.position.z);
-        scene.add(rail);
-      }
+    // Track, overhead wires, side scenery.
+    this.side = createSideScenery(options.seed ?? 1, { behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD });
+    this.bed = createTrackBed(SCENERY_BEHIND, SCENERY_AHEAD);
+    this.ohe = createCatenary({ behind: SCENERY_BEHIND, ahead: SCENERY_AHEAD, signalFilter: (s) => !this.side.isStation(s) });
+    scene.add(this.bed.root, this.ohe.root, this.side.root);
+
+    // Obstacles and pickups (pooled, pre-warmed).
+    this.obstacleRoot.name = 'obstacles';
+    scene.add(this.obstacleRoot);
+    this.obstaclePool = new KeyedPool<Pooled>((p) => this.obstacleRoot.add(p.root));
+    this.pickupPool = new KeyedPool<Pooled>((p) => this.obstacleRoot.add(p.root));
+    this.prewarm();
+
+    // Coins: one instanced mesh plus its own instanced outline hull.
+    const coinGeo = coinGeometry();
+    const coinMat = coinMaterial() as THREE.MeshToonMaterial;
+    // Warmer, brighter gold so coins pop against the toon-lit track.
+    coinMat.color.set(COIN_TINT);
+    coinMat.emissive.set(COIN_GLOW);
+    coinMat.emissiveIntensity = COIN_GLOW_INTENSITY;
+    this.coins = new THREE.InstancedMesh(coinGeo, coinMat, MAX_COINS);
+    this.coinOutlines = new THREE.InstancedMesh(coinGeo, outlineMaterial(0.03), MAX_COINS);
+    this.coinOutlines.instanceMatrix = this.coins.instanceMatrix;
+    for (const m of [this.coins, this.coinOutlines]) {
+      m.frustumCulled = false;
+      m.count = 0;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     }
+    this.coins.name = 'coins';
+    scene.add(this.coins, this.coinOutlines);
 
-    this.sleepers = new THREE.InstancedMesh(new THREE.BoxGeometry(1.9, 0.08, 0.25), standard(0x5a4632), MAX_SLEEPERS);
-    this.sleepers.frustumCulled = false;
-    this.sleepers.receiveShadow = true;
-    scene.add(this.sleepers);
+    // Characters.
+    this.runner = createRunner();
+    this.board = buildHoverboard();
+    this.board.visible = false;
+    this.rocket = new THREE.Group();
+    const rocketModel = buildPickup('rocket');
+    rocketModel.rotation.z = 0.55; // undo the pickup's display tilt: nose up
+    rocketModel.scale.setScalar(1.25);
+    this.rocket.add(rocketModel);
+    this.rocket.visible = false;
+    this.tt = createInspector();
+    this.dog = createDog();
+    this.tt.root.visible = this.dog.root.visible = false;
+    scene.add(this.runner.root, this.board, this.rocket, this.tt.root, this.dog.root);
 
-    this.buildings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), standard(0xffffff, { roughness: 0.9 }), MAX_BUILDINGS);
-    this.buildings.frustumCulled = false;
-    this.buildings.castShadow = true;
-    this.buildings.receiveShadow = true;
-    scene.add(this.buildings);
+    this.fx = new Fx(scene, this.camera);
 
-    const coinGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 20);
-    coinGeo.rotateX(Math.PI / 2);
-    this.coins = new THREE.InstancedMesh(
-      coinGeo,
-      standard(0xffc83d, { metalness: 0.7, roughness: 0.3, emissive: 0x6b4a00 }),
-      MAX_COINS,
-    );
-    this.coins.frustumCulled = false;
-    scene.add(this.coins);
-
-    for (const kind of Object.keys(OBSTACLES) as ObstacleKind[]) {
-      this.obstacleGeo[kind] = obstacleGeometry(kind);
-      this.obstacleMat[kind] = standard(OBSTACLE_COLORS[kind], { roughness: 0.6 });
-    }
-
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 0.8, 4, 12), standard(0xff7a1a, { roughness: 0.5 }));
-    body.position.y = 0.78;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), standard(0xc68642));
-    head.position.y = 1.62;
-    this.board = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 1.8), standard(0x00c2d1, { emissive: 0x004a52 }));
-    this.board.position.y = 0.04;
-    this.flame = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.9, 12), standard(0xff9800, { emissive: 0xff5a00 }));
-    this.flame.rotation.x = Math.PI;
-    this.flame.position.set(0, -0.2, 0.3);
-    for (const m of [body, head, this.board]) m.castShadow = true;
-    this.runner.add(body, head, this.board, this.flame);
-    scene.add(this.runner);
-
-    const coat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.1, 0.5), standard(0x2b2b2b));
-    coat.position.y = 0.55;
-    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.5), standard(0xf5f5f5));
-    shirt.position.y = 1.4;
-    const ttHead = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), standard(0x8d5524));
-    ttHead.position.y = 1.9;
-    const dog = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.45, 0.9), standard(0xc49a6c));
-    dog.position.set(0.9, 0.35, 0.4);
-    for (const m of [coat, shirt, ttHead, dog]) m.castShadow = true;
-    this.chaser.add(coat, shirt, ttHead, dog);
-    scene.add(this.chaser);
-
-    this.camera.position.set(0, 4.2, 7.5);
+    this.camera.position.set(0, CAMERA.menu.height, CAMERA.menu.back);
+    this.compileAll();
   }
 
   get stats(): { calls: number; triangles: number; pixelRatio: number } {
-    const r = this.renderer.info.render;
-    return { calls: r.calls, triangles: r.triangles, pixelRatio: this.renderer.getPixelRatio() };
+    const i = this.renderer.info.render;
+    return { calls: i.calls, triangles: i.triangles, pixelRatio: this.renderer.getPixelRatio() };
+  }
+
+  /** Pool diagnostics (objects built; built on demand during play). */
+  get poolStats(): { built: number; misses: number } {
+    return {
+      built: this.obstaclePool.built + this.pickupPool.built,
+      misses: this.obstaclePool.misses + this.pickupPool.misses,
+    };
   }
 
   resize(width: number, height: number, dpr: number): void {
@@ -200,173 +354,297 @@ export class WorldView {
     this.camera.updateProjectionMatrix();
   }
 
-  render(g: Game, dtSec: number): void {
-    this.clock += dtSec;
-    this.updateRunner(g);
-    this.updateCamera(g, dtSec);
-    this.updateTrack(g.s);
+  render(g: Game, dtSec: number, events: readonly GameEvent[] = NO_EVENTS): void {
+    const dt = Number.isFinite(dtSec) ? Math.min(Math.max(dtSec, 0), 0.1) : 0;
+    const animDt = g.state === 'paused' ? 0 : dt;
+    this.clock += animDt;
+    this.stamp++;
+
+    if (g.track !== this.track) {
+      this.track = g.track;
+      this.obstacles.sweep(-1, (a) => this.releaseObstacle(a));
+      this.pickups.sweep(-1, (a) => this.releasePickup(a));
+    }
+    this.handleEvents(g, events);
+    this.prevState = g.state;
+
+    const r = g.runner;
+    this.runnerPos.set(r.x, r.y, 0);
+
+    this.updateCharacters(g, animDt);
+    this.updateCamera(g, dt);
+
+    const f = this.fxFrame;
+    f.speed = g.state === 'playing' ? g.speed : 0;
+    f.flying = r.flying;
+    f.magnet = g.powerups.magnet > 0;
+    f.josh = g.josh.active;
+    this.fx.onEvents(events, this.runnerPos);
+    const out = this.fx.update(animDt, f);
+    const cam = this.camera;
+    cam.position.copy(this.camPos).add(out.shake);
+    cam.lookAt(this.camLook);
+    cam.rotateZ(out.roll);
+    const fov = CAMERA.fov + out.fovDelta;
+    if (cam.fov !== fov) {
+      cam.fov = fov;
+      cam.updateProjectionMatrix();
+    }
+
+    this.sky.position.copy(cam.position);
+    this.skyline.position.copy(cam.position);
+
+    this.bed.update(g.s);
+    this.ohe.update(g.s);
+    this.side.update(g.s);
     this.updateObstacles(g);
     this.updateCoins(g);
     this.updatePickups(g);
-    this.renderer.render(this.scene, this.camera);
+
+    // Tight shadow frustum around the runner.
+    this.sun.target.position.set(this.camPos.x, this.standY, -7);
+    this.sun.position.copy(this.sun.target.position).add(SUN_OFFSET);
+
+    this.renderer.render(this.scene, cam);
   }
 
   dispose(): void {
     this.renderer.dispose();
   }
 
-  private updateRunner(g: Game): void {
-    const r = g.runner;
-    this.runner.position.set(r.x, r.y, 0);
-    this.runner.scale.y = r.rolling ? TUNING.rollHeight / TUNING.runnerHeight : 1;
-    this.board.visible = g.powerups.hoverboard > 0;
-    this.flame.visible = r.flying;
-    this.runner.visible = g.powerups.grace <= 0 || Math.floor(this.clock * 12) % 2 === 0;
+  // ---------------------------------------------------------------- setup
 
-    const showChaser = g.chaser.visible || g.state === 'caught' || g.state === 'summary';
-    this.chaser.visible = showChaser;
-    this.chaser.position.set(r.x * 0.8, 0, g.chaser.gap + 0.8);
-
-    this.sun.position.set(r.x - 12, 25, 10);
-    this.sun.target.position.set(r.x, 0, -8);
-  }
-
-  private updateCamera(g: Game, dtSec: number): void {
-    const r = g.runner;
-    const k = dtSec > 0 ? 1 - Math.exp(-8 * dtSec) : 1;
-    this.camTargetPos.set(r.x * 0.55, 4.2 + r.y * 0.7, 7.5);
-    this.camera.position.lerp(this.camTargetPos, k);
-    this.camTargetLookAt.set(r.x * 0.55, 1.2 + r.y * 0.7, -14);
-    this.lookAt.lerp(this.camTargetLookAt, k);
-    this.camera.lookAt(this.lookAt);
-  }
-
-  private updateTrack(s: number): void {
-    const t = this.tmp;
-    t.rotation.set(0, 0, 0);
-    t.scale.set(1, 1, 1);
-    let n = 0;
-    const offsets = repeatingOffsets(s, SLEEPER_SPACING, VIEW_BEHIND, VIEW_AHEAD, this.sleeperOffsets);
-    sleeperLoop: for (const ahead of offsets) {
-      for (const lane of [-1, 0, 1]) {
-        if (n >= MAX_SLEEPERS) break sleeperLoop;
-        t.position.set(laneX(lane), 0.06, -ahead);
-        t.updateMatrix();
-        this.sleepers.setMatrixAt(n++, t.matrix);
+  private prewarm(): void {
+    const lengths = trainLengths(CHUNKS);
+    for (const kind of Object.keys(OBSTACLES) as ObstacleKind[]) {
+      const n = OBSTACLE_VARIANTS[kind];
+      const lens = isTrain(kind) ? lengths[kind as 'trainParked' | 'trainMoving'] : [OBSTACLES[kind].length];
+      if (lens.length === 0) lens.push(OBSTACLES[kind].length);
+      for (const len of lens) {
+        for (let v = 0; v < n; v++) {
+          const key = obstacleKey(kind, v, len);
+          // Small props can repeat within one chunk (a row of banners), so keep two ready.
+          this.obstaclePool.warm(key, () => pooled(buildObstacle(kind, v, len)), isTrain(kind) ? 1 : 2);
+        }
       }
     }
-    this.sleepers.count = n;
-    this.sleepers.instanceMatrix.needsUpdate = true;
+    for (const kind of ['magnet', 'rocket', 'chappal'] as PowerupKind[]) {
+      this.pickupPool.warm(kind, () => pooled(buildPickup(kind)), 1);
+    }
+  }
 
-    n = 0;
-    const first = Math.floor((s - VIEW_BEHIND) / BUILDING_SLOT);
-    const last = Math.ceil((s + VIEW_AHEAD) / BUILDING_SLOT);
-    for (const side of [-1, 1] as const) {
-      for (let k = first; k <= last && n < MAX_BUILDINGS; k++) {
-        const b = buildingAt(k, side, this.buildingScratch);
-        t.position.set(side * (1.5 * LANE_WIDTH + 3 + b.width / 2), b.height / 2, toZ(k * BUILDING_SLOT + BUILDING_SLOT / 2, s));
-        t.scale.set(b.width, b.height, b.depth);
-        t.updateMatrix();
-        this.buildings.setMatrixAt(n, t.matrix);
-        this.buildings.setColorAt(n, this.color.setHex(b.color));
-        n++;
+  /** Compile every shader up front (pooled objects shown once, far away) so play never hitches. */
+  private compileAll(): void {
+    const kids = this.obstacleRoot.children;
+    for (let i = 0; i < kids.length; i++) {
+      kids[i].visible = true;
+      kids[i].position.set(0, 0, -30);
+    }
+    this.board.visible = this.rocket.visible = this.tt.root.visible = this.dog.root.visible = true;
+    this.coins.count = 1;
+    this.renderer.compile(this.scene, this.camera);
+    for (let i = 0; i < kids.length; i++) kids[i].visible = false;
+    this.board.visible = this.rocket.visible = this.tt.root.visible = this.dog.root.visible = false;
+    this.coins.count = 0;
+  }
+
+  // ---------------------------------------------------------------- per frame
+
+  private handleEvents(g: Game, events: readonly GameEvent[]): void {
+    for (let i = 0; i < events.length; i++) {
+      const e = events[i];
+      if (e.type === 'stumble') this.stumbleLeft = STUMBLE_SECONDS;
+      else if (e.type === 'jump') {
+        const p = g.powerups.chappal > 0 ? CHAPPAL_JUMP : NORMAL_JUMP;
+        this.jumpLaunch = (4 * p.height) / p.seconds;
+      } else if (e.type === 'state' && e.state === 'countdown' && (this.prevState === 'menu' || this.prevState === 'summary')) {
+        this.fx.reset();
+        this.stumbleLeft = 0;
       }
     }
-    this.buildings.count = n;
-    this.buildings.instanceMatrix.needsUpdate = true;
-    if (this.buildings.instanceColor) this.buildings.instanceColor.needsUpdate = true;
+  }
+
+  private updateCharacters(g: Game, dt: number): void {
+    const r = g.runner;
+    const p = g.powerups;
+    const playing = g.state === 'playing' || g.state === 'paused';
+    this.stumbleLeft = Math.max(0, this.stumbleLeft - dt);
+
+    const look = this.look;
+    look.state = g.state;
+    look.flying = r.flying;
+    look.airborne = r.airborne && !r.flying;
+    look.rolling = r.rolling;
+    look.hoverboard = playing && p.hoverboard > 0;
+    look.stumbling = this.stumbleLeft > 0;
+    const action = runnerAction(look);
+
+    if (!r.airborne) this.jumpLaunch = 0;
+    const launch = this.jumpLaunch > 0 ? this.jumpLaunch : (4 * NORMAL_JUMP.height) / NORMAL_JUMP.seconds;
+    const st = this.runnerState;
+    st.action = action;
+    st.speed = playing ? g.speed : 0;
+    st.lean = playing ? laneLean(r.x, r.lane) : 0;
+    st.airborneT = look.airborne ? (this.jumpLaunch > 0 ? airborneProgress(r.vy, launch) : Math.max(0.5, airborneProgress(r.vy, launch))) : 0;
+
+    const root = this.runner.root;
+    root.position.set(r.x, r.y, 0);
+    this.runner.update(dt, st);
+    // Blink while invulnerable after a hoverboard save.
+    root.visible = p.grace <= 0 || r.flying || Math.floor(this.clock * 14) % 2 === 0;
+
+    // Hoverboard under the feet (the rig lifts itself in hover).
+    const board = this.board;
+    board.visible = look.hoverboard && root.visible;
+    if (board.visible) {
+      const hover = action === 'hover';
+      board.position.set(r.x, r.y + (hover ? 0.2 + 0.03 * Math.sin(this.clock * Math.PI * 2) : 0.06), 0.05);
+      board.rotation.set(0, 0, -st.lean * 0.3);
+    }
+
+    // Diwali rocket ridden like a jetpack.
+    this.rocket.visible = r.flying;
+    if (r.flying) {
+      this.rocket.position.set(r.x, r.y + 0.75, 0.32);
+      this.rocket.rotation.set(0.35 + 0.05 * Math.sin(this.clock * 30), 0, 0.04 * Math.sin(this.clock * 23));
+    }
+
+    // TT and dog.
+    const caught = g.state === 'caught' || g.state === 'summary';
+    const show = caught || (g.chaser.visible && g.state !== 'menu');
+    this.tt.root.visible = this.dog.root.visible = show;
+    if (!show) {
+      this.chaserX = r.x;
+      return;
+    }
+    this.chaserX += (r.x - this.chaserX) * damp(caught ? 12 : 4, dt);
+    const gap = g.chaser.gap;
+    const cs = this.chaserState;
+    cs.action = caught ? 'caught' : g.state === 'playing' ? 'run' : 'idle';
+    cs.speed = g.state === 'playing' ? g.speed : 0;
+    cs.lean = 0;
+    const ttSide = caught ? -0.45 : -0.85;
+    this.tt.root.position.set(this.chaserX + ttSide, 0, gap);
+    this.tt.update(dt, cs);
+    this.dog.root.position.set(this.chaserX + 0.95, 0, gap - (caught ? 0.2 : 0.7));
+    this.dog.update(dt, cs);
+  }
+
+  private updateCamera(g: Game, dt: number): void {
+    const r = g.runner;
+    const st = g.state;
+    const k = this.camReady ? damp(CAMERA.rate, dt) : 1;
+    // Height the runner stands on (train roof, rocket altitude), followed more than a jump arc.
+    if (!r.airborne || r.flying) this.standY += (r.y - this.standY) * (this.camReady ? damp(CAMERA.standRate, dt) : 1);
+    if (r.y < this.standY) this.standY = Math.max(r.y, this.standY - 12 * dt);
+    const jump = Math.max(0, r.y - this.standY);
+
+    let height: number = CAMERA.height;
+    let back: number = CAMERA.back;
+    let ahead: number = CAMERA.lookAhead;
+    let lookH: number = CAMERA.lookHeight;
+    let dx = 0;
+    let lookDx = 0;
+    const shot = st === 'menu' ? CAMERA.menu : st === 'caught' || st === 'summary' ? CAMERA.caught : null;
+    if (shot) ({ height, back, lookAhead: ahead, lookHeight: lookH, x: dx, lookX: lookDx } = shot);
+
+    const lift = this.standY * CAMERA.standFollow + jump * CAMERA.jumpFollow;
+    const x = r.x * CAMERA.laneFollow;
+    this.camPosTarget.set(x + dx, height + lift, back);
+    this.camLookTarget.set(x + lookDx, lookH + lift, -ahead);
+    const kk = st === 'menu' || st === 'caught' || st === 'summary' ? damp(3, dt) : k;
+    this.camPos.lerp(this.camPosTarget, this.camReady ? kk : 1);
+    this.camLook.lerp(this.camLookTarget, this.camReady ? kk : 1);
+    this.camReady = true;
   }
 
   private updateObstacles(g: Game): void {
-    const seen = this.seenObstacles;
-    seen.clear();
+    const s = g.s;
+    const stamp = this.stamp;
     for (const o of g.track.obstacles) {
-      const z = toZ(o.front, g.s);
+      const z = -(o.front - s);
       if (z < -VIEW_AHEAD || z - o.length > VIEW_BEHIND) continue;
-      seen.add(o.id);
-      let mesh = this.obstacleMeshes.get(o.id);
-      if (!mesh) {
-        mesh = this.takeObstacleMesh(o.kind);
-        this.obstacleMeshes.set(o.id, mesh);
+      let a = this.obstacles.get(o.id);
+      if (!a) {
+        const variant = obstacleVariant(o.kind, o.id);
+        const key = obstacleKey(o.kind, variant, o.length);
+        const item = this.obstaclePool.acquire(key, () => pooled(buildObstacle(o.kind, variant, o.length)));
+        item.root.visible = true;
+        const sz = o.kind === 'ramp' ? o.length / OBSTACLES.ramp.length : 1;
+        item.root.scale.set(1, 1, sz);
+        a = { id: o.id, key, item, stamp };
+        this.obstacles.add(a);
       }
-      mesh.position.set(laneX(o.lane), 0, z);
-      mesh.scale.z = o.kind === 'ramp' ? o.length / OBSTACLES.ramp.length : o.length;
+      a.stamp = stamp;
+      a.item.root.position.set(laneX(o.lane), 0, z);
+      setNear(a.item, z > -LOD_FAR);
     }
-    for (const [id, mesh] of this.obstacleMeshes) {
-      if (seen.has(id)) continue;
-      this.obstacleMeshes.delete(id);
-      mesh.visible = false;
-      this.obstaclePool.get(mesh.userData.kind as ObstacleKind)!.push(mesh);
-    }
+    this.obstacles.sweep(stamp, (a) => this.releaseObstacle(a));
   }
 
-  private takeObstacleMesh(kind: ObstacleKind): THREE.Mesh {
-    let pool = this.obstaclePool.get(kind);
-    if (!pool) {
-      pool = [];
-      this.obstaclePool.set(kind, pool);
-    }
-    let mesh = pool.pop();
-    if (!mesh) {
-      mesh = new THREE.Mesh(this.obstacleGeo[kind], this.obstacleMat[kind]);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.userData.kind = kind;
-      this.scene.add(mesh);
-    }
-    mesh.visible = true;
-    return mesh;
+  private releaseObstacle(a: Active): void {
+    a.item.root.visible = false;
+    this.obstaclePool.release(a.key, a.item);
+  }
+
+  private releasePickup(a: Active): void {
+    a.item.root.visible = false;
+    this.pickupPool.release(a.key, a.item);
   }
 
   private updateCoins(g: Game): void {
     const t = this.tmp;
     const r = g.runner;
     const magnet = g.powerups.magnet > 0;
-    t.scale.set(1, 1, 1);
+    const spin = this.clock * Math.PI;
+    const bob = Math.sin(this.clock * Math.PI * 2);
     let n = 0;
     for (const c of g.track.coins) {
-      if (c.taken || n >= MAX_COINS) continue;
+      if (c.taken) continue;
       const ahead = c.s - g.s;
       if (ahead > VIEW_AHEAD || ahead < -VIEW_BEHIND) continue;
+      if (n >= MAX_COINS) break;
       let x = laneX(c.lane);
-      let y = c.y;
-      if (magnet && ahead > 0 && ahead < TUNING.magnetRange) {
-        const pull = 1 - ahead / TUNING.magnetRange;
+      let y = c.y + 0.12 + 0.05 * bob;
+      let z = -ahead;
+      if (magnet && ahead > 0 && ahead < MAGNET_PULL_RANGE) {
+        const u = 1 - ahead / MAGNET_PULL_RANGE;
+        const pull = u * u * (3 - 2 * u);
         x += (r.x - x) * pull;
         y += (r.y + 1 - y) * pull;
+        z *= 1 - 0.6 * pull;
       }
-      t.position.set(x, y, -ahead);
-      t.rotation.set(0, this.clock * 4 + c.id, 0);
+      t.position.set(x, y, z);
+      t.rotation.set(0, spin + c.s * 0.05, 0);
       t.updateMatrix();
       this.coins.setMatrixAt(n++, t.matrix);
     }
     this.coins.count = n;
+    this.coinOutlines.count = n;
     this.coins.instanceMatrix.needsUpdate = true;
   }
 
   private updatePickups(g: Game): void {
-    const seen = this.seenPickups;
-    seen.clear();
+    const stamp = this.stamp;
     for (const p of g.track.pickups) {
       if (p.taken) continue;
       const ahead = p.s - g.s;
       if (ahead > VIEW_AHEAD || ahead < -VIEW_BEHIND) continue;
-      seen.add(p.id);
-      let mesh = this.pickupMeshes.get(p.id);
-      if (!mesh) {
-        mesh = new THREE.Mesh(this.pickupGeo, standard(PICKUP_COLORS[p.kind], { emissive: PICKUP_COLORS[p.kind], emissiveIntensity: 0.4 }));
-        mesh.castShadow = true;
-        this.scene.add(mesh);
-        this.pickupMeshes.set(p.id, mesh);
+      let a = this.pickups.get(p.id);
+      if (!a) {
+        const kind = p.kind;
+        const item = this.pickupPool.acquire(kind, () => pooled(buildPickup(kind)));
+        item.root.visible = true;
+        a = { id: p.id, key: kind, item, stamp };
+        this.pickups.add(a);
       }
-      mesh.position.set(laneX(p.lane), 1 + Math.sin(this.clock * 3 + p.id) * 0.2, -ahead);
-      mesh.rotation.y = this.clock * 2;
+      a.stamp = stamp;
+      const root = a.item.root;
+      root.position.set(laneX(p.lane), 1 + 0.12 * Math.sin(this.clock * 3 + p.id), -ahead);
+      root.rotation.y = this.clock * 2.2;
+      setNear(a.item, ahead < LOD_FAR);
     }
-    for (const [id, mesh] of this.pickupMeshes) {
-      if (seen.has(id)) continue;
-      this.scene.remove(mesh);
-      (mesh.material as THREE.Material).dispose();
-      this.pickupMeshes.delete(id);
-    }
+    this.pickups.sweep(stamp, (a) => this.releasePickup(a));
   }
 }
+

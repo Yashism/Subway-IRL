@@ -1,12 +1,12 @@
 import './ui/hud.css';
 import { Autopilot } from './game/autopilot';
 import type { Difficulty } from './game/config';
-import { Game } from './game/game';
+import { Game, type GameEvent } from './game/game';
 import { FixedStepper } from './game/loop';
 import { InputHub } from './input/hub';
 import { KeyboardInput } from './input/keyboard';
 import { Hud } from './ui/hud';
-import { WorldView } from './world/worldView';
+import { WorldView, type ToneChoice } from './world/worldView';
 
 const params = new URLSearchParams(location.search);
 const DIFFICULTIES: Difficulty[] = ['chill', 'cardio', 'beast'];
@@ -23,10 +23,12 @@ const autopilot = params.has('autopilot') ? new Autopilot(game) : null;
 const input = new InputHub(autopilot ? [keyboard, autopilot] : [keyboard]);
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
-const world = new WorldView(canvas);
+const TONES: ToneChoice[] = ['neutral', 'agx', 'aces'];
+const toneParam = params.get('tone') as ToneChoice | null;
+const world = new WorldView(canvas, { seed, tone: toneParam && TONES.includes(toneParam) ? toneParam : undefined });
 const hud = new Hud(document.getElementById('hud')!);
 const stepper = new FixedStepper();
-(window as unknown as { __game: Game }).__game = game;
+Object.assign(window as unknown as { __game: Game; __world: WorldView }, { __game: game, __world: world });
 
 const perf = params.has('perf') ? document.body.appendChild(document.createElement('div')) : null;
 if (perf) perf.className = 'hud-perf';
@@ -42,15 +44,18 @@ document.addEventListener('visibilitychange', () => {
 });
 
 let last = performance.now();
+const frameEvents: GameEvent[] = [];
 function frame(now: number): void {
   const dt = Math.max(0, (now - last) / 1000);
   last = now;
   const steps = stepper.advance(dt);
+  frameEvents.length = 0;
   for (let i = 0; i < steps; i++) {
     autopilot?.tick();
-    game.step(stepper.stepSec, input.drain(), input.activity(now));
+    const events = game.step(stepper.stepSec, input.drain(), input.activity(now));
+    for (const e of events) frameEvents.push(e);
   }
-  world.render(game, dt);
+  world.render(game, dt, frameEvents);
   hud.update(game);
   if (perf && dt > 0) {
     fps += (1 / dt - fps) * 0.05;
