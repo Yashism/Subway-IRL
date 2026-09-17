@@ -42,7 +42,7 @@ The `ActivityStatus` it reports is built from these rules:
 - **`cadenceSpm`** comes straight from the jog status.
 - **`steps`** must never decrease: add the previous run's total when the controller recalibrates or resets.
 - **`squatting`** comes from `status.squatting`.
-- **`lost`** is true when a `lost` event is pending, or when no frame has arrived for 1.5 s, which is a stalled stream.
+- **`lost`** is true when a `lost` event is pending, or when no frame has arrived for `staleMs`, which is a stalled stream. The class default is 1.5 s; the game page passes the controller's `lostMs` (1.0 s) instead, so a full stall pauses at the same moment the controller would call the pose lost (P3 ruling).
 
 Pose events keep the pose clock. The source converts them into commands when the game drains it. The game's own idle clock already restarts on resume.
 
