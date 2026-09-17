@@ -61,6 +61,8 @@ export const TUNING = {
   hoverboardsPerRun: 3,
   hoverboardSeconds: 30,
   crashGraceSeconds: 1,
+  /** Extra metres cleared around the grace stretch after a hoverboard save. */
+  crashClearMargin: 1,
   magnetSeconds: 10,
   magnetRange: 30,
   rocketSeconds: 8,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChunkDef } from '../../src/game/chunks';
 import { TUNING } from '../../src/game/config';
+import { movingFrontAt } from '../../src/game/obstacles';
 import { Rng } from '../../src/game/rng';
 import { POWERUP_KINDS, Track, TRACK_AHEAD } from '../../src/game/track';
 
@@ -113,10 +114,35 @@ describe('Track', () => {
     const t = new Track(new Rng(1), 'cardio', chunks);
     t.update(0, 12, 0, DT);
     const before = t.obstacles.length;
-    t.clearObstacles(45, 65);
+    t.clearObstacles(45, 65, 0, 12);
     expect(t.obstacles.length).toBe(before - 1);
     expect(t.obstacles.some((o) => o.front === 70)).toBe(true);
     t.addCoinTrail(100, 109, 0, TUNING.rocketHeight);
     expect(t.coins.filter((c) => c.y === TUNING.rocketHeight).map((c) => c.s)).toEqual([100, 103, 106, 109]);
+  });
+
+  it('clears oncoming trains by where they will meet the runner', () => {
+    const t = new Track(new Rng(1), 'cardio', []);
+    const speed = 20;
+    // Meets the runner inside the window although its front is still far ahead.
+    t.obstacles.push({ id: 1, kind: 'trainMoving', lane: 0, length: 30, front: movingFrontAt(60, 0, speed) });
+    // Parked beyond the window: stays.
+    t.obstacles.push({ id: 2, kind: 'trainParked', lane: 1, length: 30, front: 80 });
+    expect(t.obstacles[0].front).toBeGreaterThan(70);
+    t.obstacles.push({ id: 3, kind: 'trainMoving', lane: -1, length: 30, front: movingFrontAt(200, 0, speed) });
+    t.clearObstacles(0, 70, 0, speed);
+    expect(t.obstacles.map((o) => o.id)).toEqual([2, 3]);
+  });
+
+  it('clears one lane around the runner', () => {
+    const t = new Track(new Rng(1), 'cardio', []);
+    const speed = 20;
+    t.obstacles.push({ id: 1, kind: 'auto', lane: 0, length: 3, front: 9 });
+    t.obstacles.push({ id: 2, kind: 'trainParked', lane: 0, length: 30, front: 16 });
+    t.obstacles.push({ id: 3, kind: 'auto', lane: 1, length: 3, front: 12 });
+    t.obstacles.push({ id: 4, kind: 'trainMoving', lane: 0, length: 30, front: movingFrontAt(25, 10, speed) });
+    t.obstacles.push({ id: 5, kind: 'barrierLow', lane: 0, length: 0.5, front: 40 });
+    t.clearLane(0, 9, 31, 10, speed);
+    expect(t.obstacles.map((o) => o.id)).toEqual([3, 5]);
   });
 });

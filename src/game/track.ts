@@ -1,7 +1,7 @@
 import type { Lane } from '../pose/types';
 import { CHUNK_LENGTH, CHUNKS, type ChunkDef, type CoinRun } from './chunks';
 import { TUNING, type Difficulty } from './config';
-import { lengthOf, movingFrontAt, OBSTACLES, type Obstacle } from './obstacles';
+import { lengthOf, meetPointOf, movingFrontAt, OBSTACLES, type Obstacle } from './obstacles';
 import type { Rng } from './rng';
 import { NORMAL_JUMP } from './runner';
 import { POWERUP_KINDS, type PowerupKind } from './powerups';
@@ -37,6 +37,21 @@ function removeWhere<T>(items: T[], drop: (item: T) => boolean): void {
   items.length = w;
 }
 
+/**
+ * Stretch of track on which the obstacle can touch a runner at runnerS moving at speed.
+ * An oncoming train is taken where it will meet the runner, not where its front is now.
+ */
+function reachOf(o: Obstacle, runnerS: number, speed: number): [number, number] {
+  if (!OBSTACLES[o.kind].moving) return [o.front, o.front + o.length];
+  const meet = meetPointOf(o.front, runnerS, speed);
+  return [meet, meet + o.length / (1 + TUNING.oncomingTrainSpeed / speed)];
+}
+
+function meetsWithin(o: Obstacle, fromS: number, toS: number, runnerS: number, speed: number): boolean {
+  const [s0, s1] = reachOf(o, runnerS, speed);
+  return s0 < toS && s1 > fromS;
+}
+
 export class Track {
   readonly obstacles: Obstacle[] = [];
   readonly coins: Coin[] = [];
@@ -63,9 +78,17 @@ export class Track {
     removeWhere(this.pickups, (p) => p.taken || p.s < cutoff);
   }
 
-  /** Removes every obstacle that overlaps [fromS, toS] (used for a safe rocket landing). */
-  clearObstacles(fromS: number, toS: number): void {
-    removeWhere(this.obstacles, (o) => o.front < toS && o.front + o.length > fromS);
+  /**
+   * Removes every obstacle the runner (at runnerS, moving at speed) would meet in [fromS, toS].
+   * Used for a safe rocket landing.
+   */
+  clearObstacles(fromS: number, toS: number, runnerS: number, speed: number): void {
+    removeWhere(this.obstacles, (o) => meetsWithin(o, fromS, toS, runnerS, speed));
+  }
+
+  /** Like clearObstacles, for one lane only (used after a hoverboard absorbs a crash). */
+  clearLane(lane: Lane, fromS: number, toS: number, runnerS: number, speed: number): void {
+    removeWhere(this.obstacles, (o) => o.lane === lane && meetsWithin(o, fromS, toS, runnerS, speed));
   }
 
   removeObstacle(id: number): void {

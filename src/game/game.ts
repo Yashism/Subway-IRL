@@ -104,8 +104,8 @@ export class Game {
         if (wants('start')) this.startRun(activity, events);
         break;
       case 'countdown':
-        if (activity.lost) {
-          this.pausedByLoss = true;
+        if (activity.lost || wants('pause')) {
+          this.pausedByLoss = activity.lost;
           this.setState('paused', events);
           break;
         }
@@ -177,8 +177,9 @@ export class Game {
 
     const p = this.powerups;
     if (p.update(dt).rocketEnded) {
-      this.track.clearObstacles(this.s, this.s + this.speed * (TUNING.rocketLandingClearSeconds + TUNING.rocketFallSeconds));
-      p.grace = Math.max(p.grace, TUNING.rocketLandingClearSeconds + TUNING.rocketFallSeconds);
+      const clear = TUNING.rocketLandingClearSeconds + TUNING.rocketFallSeconds;
+      this.track.clearObstacles(this.s, this.s + this.speed * clear, this.s, this.speed);
+      p.grace = Math.max(p.grace, clear);
       events.push({ type: 'rocketLanding' });
     }
     const r = this.runner;
@@ -289,6 +290,9 @@ export class Game {
     }
     if (this.powerups.absorbCrash()) {
       this.track.removeObstacle(hit.obstacle.id);
+      // Whatever follows in this lane would be hit the moment the grace runs out.
+      const reach = TUNING.crashClearMargin;
+      this.track.clearLane(r.lane, this.s - reach, this.s + this.speed * TUNING.crashGraceSeconds + reach, this.s, this.speed);
       events.push({ type: 'hoverboardSaved' });
       return;
     }

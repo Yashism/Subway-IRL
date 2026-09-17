@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChunkDef } from '../../src/game/chunks';
 import { TUNING } from '../../src/game/config';
 import { Game, type GameEvent, type GameOptions } from '../../src/game/game';
-import { lengthOf, type ObstacleSpec } from '../../src/game/obstacles';
+import { lengthOf, movingFrontAt, type ObstacleSpec } from '../../src/game/obstacles';
 import type { ActivityStatus, GameCommand } from '../../src/input/commands';
 
 const EMPTY: ChunkDef[] = [{ id: 'empty', tier: 0, obstacles: [], coins: [] }];
@@ -77,6 +77,15 @@ describe('Game states', () => {
     expect(g.state).toBe('paused');
   });
 
+  it('pauses on command during the countdown', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    steps(g, 1, [{ type: 'start' }]);
+    steps(g, 30);
+    steps(g, 1, [{ type: 'pause' }]);
+    expect(g.state).toBe('paused');
+    expect(g.pausedByLoss).toBe(false);
+  });
+
   it('is deterministic for a seed', () => {
     const run = () => {
       const g = new Game({ seed: 9, difficulty: 'cardio' });
@@ -149,6 +158,17 @@ describe('Collisions', () => {
     expect(g.track.obstacles.some((o) => o.id === id)).toBe(false);
     expect(g.powerups.hoverboardsLeft).toBe(TUNING.hoverboardsPerRun - 1);
     expect(g.stats.hoverboardsUsed).toBe(1);
+  });
+
+  it('clears the lane behind a crash the hoverboard absorbed', () => {
+    const g = playing();
+    const front = g.s + 10;
+    place(g, { kind: 'auto', lane: 0, s: front });
+    place(g, { kind: 'trainParked', lane: 0, s: front + lengthOf({ kind: 'auto', lane: 0, s: 0 }) + 4 });
+    const ev = steps(g, 60, [{ type: 'hoverboard' }]);
+    expect(ev).toContainEqual({ type: 'hoverboardSaved' });
+    steps(g, 180);
+    expect(g.state).toBe('playing');
   });
 
   it('clears a barrier with a well-timed jump', () => {
@@ -239,6 +259,21 @@ describe('Coins and power-ups', () => {
     steps(g, 180);
     expect(g.state).toBe('playing');
     expect(g.runner.y).toBe(0);
+  });
+
+  it('clears oncoming trains that would meet the runner just after a rocket landing', () => {
+    for (const after of [1.8, 2.1, 2.4]) {
+      const g = playing();
+      g.powerups.activate('rocket');
+      steps(g, 60 * (TUNING.rocketSeconds - 1));
+      expect(g.runner.flying).toBe(true);
+      const left = g.powerups.rocket;
+      const meet = g.s + g.speed * (left + after);
+      place(g, { kind: 'trainMoving', lane: g.runner.lane, s: movingFrontAt(meet, g.s, g.speed) });
+      const ev = steps(g, Math.round(60 * (left + 4)));
+      expect(ev).toContainEqual({ type: 'rocketLanding' });
+      expect(g.state, `meeting ${after} s after landing`).toBe('playing');
+    }
   });
 
   it('jumps higher with chappals', () => {
