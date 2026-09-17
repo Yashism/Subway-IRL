@@ -1,7 +1,7 @@
 import type { Lane } from '../pose/types';
 import { TUNING } from './config';
 import { lengthOf, OBSTACLES, type ObstacleSpec } from './obstacles';
-import { jumpHeightAt, NORMAL_JUMP } from './runner';
+import { jumpHeightAt, NORMAL_JUMP, type JumpProfile } from './runner';
 
 export interface Block {
   lane: Lane;
@@ -26,6 +26,13 @@ export interface PlanOptions {
   startLane: Lane;
   /** The runner starts on the roof of a ramp-served train in its lane. */
   onRoof?: boolean;
+  /** How jumps go (chappals make them higher and longer). Default NORMAL_JUMP. */
+  jump?: JumpProfile;
+  /**
+   * Where `jump` runs out: jumps that start before `from` use it, jumps from `to` on use
+   * NORMAL_JUMP, and none start in between (it is uncertain which profile applies there).
+   */
+  jumpExpiry?: { from: number; to: number };
 }
 
 /** Extra room around an oncoming train's danger zone (runner speed drifts while it approaches). */
@@ -55,6 +62,8 @@ interface Node {
   roof: number;
   /** This lane change leaves a raised surface, so the runner falls once it ends. */
   drop: boolean;
+  /** The current jump uses `PlanOptions.jump` rather than NORMAL_JUMP. */
+  boosted: boolean;
   parent: Node | null;
   action: PlanAction | null;
 }
@@ -86,7 +95,10 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
   const ds = o.speed / hz;
   const steps = Math.ceil((toS - fromS) / ds);
   const gap = Math.ceil(o.minGap * hz);
-  const airFrames = Math.round(NORMAL_JUMP.seconds * hz);
+  const boost = o.jump ?? NORMAL_JUMP;
+  const expiry = o.jumpExpiry ?? { from: Infinity, to: Infinity };
+  const profileOf = (n: Node) => (n.boosted ? boost : NORMAL_JUMP);
+  const airFramesOf = (n: Node) => Math.round(profileOf(n).seconds * hz);
   const rollFrames = Math.round(TUNING.rollSeconds * hz);
   const changeFrames = Math.ceil(TUNING.laneChangeSeconds * hz);
   const relevant = blocks.filter((b) => b.s1 >= fromS && b.s0 <= toS);
@@ -100,7 +112,7 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
 
   const put = (map: Map<string, Node>, n: Node, at: number) => {
     const age = n.mode === RUN ? 0 : at - n.start;
-    const key = `${n.lane}|${n.from}|${n.mode}|${age}|${n.roof}|${n.drop}`;
+    const key = `${n.lane}|${n.from}|${n.mode}|${age}|${n.roof}|${n.drop}|${n.mode === AIR && n.boosted}`;
     const old = map.get(key);
     if (!old || n.free < old.free) map.set(key, n);
   };
@@ -111,7 +123,7 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
     if (n.mode === CHANGE && n.drop && age >= changeFrames) {
       m = { ...m, mode: FALL, from: m.lane, start: i, drop: false };
     } else if (
-      (n.mode === AIR && age >= airFrames) ||
+      (n.mode === AIR && age >= airFramesOf(n)) ||
       (n.mode === ROLL && age >= rollFrames) ||
       (n.mode === CHANGE && age >= changeFrames) ||
       (n.mode === FALL && age >= fallFrames)
@@ -150,7 +162,7 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
       if (raised(n, s)) return false;
       if (b.need === 'jump') {
         if (n.mode !== AIR) return false;
-        if (jumpHeightAt((i - n.start) / hz, NORMAL_JUMP) < b.top + JUMP_CLEARANCE) return false;
+        if (jumpHeightAt((i - n.start) / hz, profileOf(n)) < b.top + JUMP_CLEARANCE) return false;
         continue;
       }
       if (n.mode !== ROLL) return false;
@@ -161,7 +173,7 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
   let frontier = new Map<string, Node>();
   put(
     frontier,
-    { lane: o.startLane, from: o.startLane, mode: RUN, start: 0, free: 0, roof: startRoof, drop: false, parent: null, action: null },
+    { lane: o.startLane, from: o.startLane, mode: RUN, start: 0, free: 0, roof: startRoof, drop: false, boosted: false, parent: null, action: null },
     0,
   );
 
@@ -176,7 +188,10 @@ export function plan(blocks: readonly Block[], fromS: number, toS: number, o: Pl
       if (n.mode !== RUN || i < n.free) continue;
       // Jumps start only from the ground (a jump off a roof or ramp is not modelled).
       const up = raised(n, s);
-      if (!up) put(next, { ...n, mode: AIR, start: i, free: i + gap, parent: n, action: { s, type: 'jump' } }, i + 1);
+      if (!up && (s < expiry.from || s >= expiry.to)) {
+        const boosted = s < expiry.from;
+        put(next, { ...n, mode: AIR, start: i, free: i + gap, boosted, parent: n, action: { s, type: 'jump' } }, i + 1);
+      }
       put(next, { ...n, mode: ROLL, start: i, free: i + gap, parent: n, action: { s, type: 'roll' } }, i + 1);
       for (const d of [-1, 1] as const) {
         const lane = n.lane + d;

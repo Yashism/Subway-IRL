@@ -2,7 +2,8 @@ import type { ActivityStatus, CommandSource, GameCommand } from '../input/comman
 import { TUNING } from './config';
 import type { Game } from './game';
 import { meetPointOf, OBSTACLES, type Obstacle, type ObstacleSpec } from './obstacles';
-import { plan, toBlocks, type PlanAction } from './solver';
+import { CHAPPAL_JUMP } from './runner';
+import { plan, toBlocks, type PlanAction, type PlanOptions } from './solver';
 
 /** Metres between replans while the runner is settled. */
 const REPLAN_EVERY = 4;
@@ -12,6 +13,13 @@ const HORIZON_SECONDS = 3;
 const MIN_HORIZON = 60;
 const BOT_CADENCE = 165;
 const ROOF_TOLERANCE = 0.1;
+/**
+ * Plans assume the current speed, but the runner keeps speeding up, so an action fires up to
+ * this many seconds before its planned time (max acceleration 0.24 m/s² × horizon² / 2 / speed).
+ */
+const SPEEDUP_DRIFT = 0.3;
+/** Frames of slack for float rounding in power-up timers. */
+const TIMER_SLACK_FRAMES = 2;
 
 /** Current obstacles as specs the solver understands (oncoming trains back to meeting points). */
 export function liveSpecs(obstacles: readonly Obstacle[], runnerS: number, speed: number): ObstacleSpec[] {
@@ -28,6 +36,7 @@ export class Autopilot implements CommandSource {
   private queue: GameCommand[] = [];
   private actions: PlanAction[] = [];
   private plannedAt = -Infinity;
+  private chappalSeen = 0;
 
   constructor(private readonly game: Game) {}
 
@@ -55,9 +64,14 @@ export class Autopilot implements CommandSource {
       this.queue.push({ type: 'start' });
       this.actions = [];
       this.plannedAt = -Infinity;
+      this.chappalSeen = 0;
       return;
     }
     if (g.state !== 'playing') return;
+    // Chappals picked up (or topped up) change how jumps go: the current plan is stale.
+    const chappal = g.powerups.chappal;
+    if (chappal > this.chappalSeen) this.plannedAt = -Infinity;
+    this.chappalSeen = chappal;
     const r = g.runner;
     const settled = !r.airborne && !r.rolling && !r.changingLane && !r.flying;
     if (settled && g.s - this.plannedAt >= REPLAN_EVERY) this.replan();
@@ -72,13 +86,18 @@ export class Autopilot implements CommandSource {
     const specs = liveSpecs(g.track.obstacles, g.s, g.speed);
     const horizon = Math.max(MIN_HORIZON, g.speed * HORIZON_SECONDS);
     const onRoof = g.runner.y >= TUNING.trainHeight - ROOF_TOLERANCE;
-    this.actions =
-      plan(toBlocks(specs, g.speed), g.s, g.s + horizon, {
-        speed: g.speed,
-        minGap: BOT_MIN_GAP,
-        startLane: g.runner.lane,
-        onRoof,
-      }) ?? [];
+    const options: PlanOptions = { speed: g.speed, minGap: BOT_MIN_GAP, startLane: g.runner.lane, onRoof };
+    const chappal = g.powerups.chappal;
+    if (chappal > 0) {
+      // The game picks the jump profile when a jump starts; chappals run out after `chappal` s.
+      const slack = TIMER_SLACK_FRAMES / TUNING.stepHz;
+      options.jump = CHAPPAL_JUMP;
+      options.jumpExpiry = {
+        from: g.s + (chappal - slack) * g.speed,
+        to: g.s + (chappal + SPEEDUP_DRIFT + slack) * g.speed,
+      };
+    }
+    this.actions = plan(toBlocks(specs, g.speed), g.s, g.s + horizon, options) ?? [];
     this.plannedAt = g.s;
   }
 }
