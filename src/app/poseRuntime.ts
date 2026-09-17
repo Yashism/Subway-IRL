@@ -111,6 +111,7 @@ export class PoseRuntime {
   private stream: MediaStream | null = null;
   private gen = 0;
   private live = false;
+  private readonly ownVideo: boolean;
   private readonly st: RuntimeStatus = { ...emptyPoseStatus(), dark: false };
 
   constructor(opts: PoseRuntimeOptions = {}) {
@@ -123,6 +124,7 @@ export class PoseRuntime {
     this.camera = opts.camera ?? browserCamera;
     this.storage = opts.storage ?? browserStorage;
     this.createSource = opts.createSource ?? ((v) => new LivePoseSource(v));
+    this.ownVideo = !opts.createVideo;
     this.video = this.isReplay ? null : (opts.createVideo ?? hiddenVideo)();
   }
 
@@ -240,6 +242,11 @@ export class PoseRuntime {
       if (!superseded()) video.srcObject = null;
       throw err;
     }
+  }
+
+  /** Moves the video back to its off-screen spot (after the PiP let go of it), so it keeps playing. */
+  parkVideo(): void {
+    if (this.video && typeof document !== 'undefined' && this.ownVideo) parkingSpot().append(this.video);
   }
 
   /** Stops detection and the camera. Frames that arrive later are ignored. */

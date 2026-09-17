@@ -110,6 +110,14 @@ export class AppLoop {
     for (let k = 0; k < fx.length; k++) this.run(fx[k]);
   }
 
+  /** Pauses a live run (Esc-style, resumed by Enter or a raised hand) and tells the flow and telemetry. */
+  pauseGame(): void {
+    const before = this.game.state;
+    this.game.pause();
+    // Game.pause() is a direct call and emits nothing: report the change like a step would.
+    if (this.game.state !== before) this.gameEvents([{ type: 'state', state: this.game.state }], this.lastNow);
+  }
+
   beginFrame(): void {
     this.frameEvents.length = 0;
   }
@@ -203,13 +211,9 @@ export class AppLoop {
       case 'startGame':
         this.startQueued = true;
         break;
-      case 'pauseGame': {
-        const before = this.game.state;
-        this.game.pause();
-        // Game.pause() is a direct call and emits nothing: report the change like a step would.
-        if (this.game.state !== before) this.gameEvents([{ type: 'state', state: this.game.state }], this.lastNow);
+      case 'pauseGame':
+        this.pauseGame();
         break;
-      }
       default:
         this.onEffect(fx);
     }
