@@ -4,6 +4,20 @@
  * shadows, Luckiest Guy headings. Tokens come from hud.css (--ink, --gold, --font-game…).
  */
 
+/*
+ * The palette lives on :root, not on .move-check: renderSummaryCard hands out a detached card that
+ * the pause screen shows as "Controls", and outside this layer it would otherwise have no colours.
+ */
+:root {
+  --mc-ink: var(--ink, #1b1035);
+  --mc-cream: #fff9ec;
+  --mc-cream-2: #ffe9c2;
+  --mc-brown: #8a6a3a;
+  --mc-green: var(--green, #3fb27f);
+  --mc-amber: #ffb020;
+  --mc-grey: #bdb6d8;
+}
+
 .move-check {
   position: fixed;
   inset: 0;
@@ -21,14 +35,6 @@
   font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
   background: radial-gradient(ellipse at 50% 45%, rgba(20, 12, 45, 0.6), rgba(20, 12, 45, 0.92));
   z-index: 4;
-
-  --mc-ink: var(--ink, #1b1035);
-  --mc-cream: #fff9ec;
-  --mc-cream-2: #ffe9c2;
-  --mc-brown: #8a6a3a;
-  --mc-green: var(--green, #3fb27f);
-  --mc-amber: #ffb020;
-  --mc-grey: #bdb6d8;
 }
 .move-check[data-on='on'] {
   display: flex;

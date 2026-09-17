@@ -219,6 +219,7 @@ export class MoveCheckScreen {
   private skipAllBtn!: HTMLButtonElement;
   private sheetBox!: HTMLElement;
   private sheetKey = '';
+  private lastWidth = '';
 
   constructor(root: HTMLElement, handlers: MoveCheckHandlers) {
     this.root = root;
@@ -232,6 +233,8 @@ export class MoveCheckScreen {
     const root = this.root;
     root.classList.add('move-check');
     root.dataset.phase = 'steps';
+    // Hidden until a model arrives, so the layer starts in a state the CSS can see.
+    this.attr(root, 'data-on', 'off');
 
     // ---- banner + step dots
     const top = el('div', 'mc-top', root);
@@ -295,10 +298,14 @@ export class MoveCheckScreen {
     button(sActions, 'mc-btn mc-btn-ghost', 'Reset to defaults', () => this.handlers.resetTuning());
   }
 
-  /** Renders one model; `null` hides the whole layer. */
+  /**
+   * Renders one model; `null` hides the whole layer.
+   * MoveCheck hands out the same model object every frame and mutates it in place, so identity
+   * says nothing about whether anything changed: the per-node caches below do the deduping.
+   */
   update(m: MoveCheckModel | null): void {
     this.mount();
-    if (m === this.last) return;
+    if (m === null && this.last === null) return;
     this.last = m;
     this.attr(this.root, 'data-on', m ? 'on' : 'off');
     if (!m) return;
@@ -335,7 +342,7 @@ export class MoveCheckScreen {
     }
 
     const p = clamp01(step.progress);
-    this.barFill.style.width = strengthPercent(p);
+    this.width(this.barFill, strengthPercent(p));
     this.attr(this.bar, 'data-level', strengthLevel(p));
     this.bar.setAttribute('aria-valuenow', String(Math.round(p * 100)));
     this.bar.setAttribute('aria-label', `${step.label}: how big your best attempt was`);
@@ -361,6 +368,7 @@ export class MoveCheckScreen {
     this.mounted = false;
     this.last = null;
     this.sheetKey = '';
+    this.lastWidth = '';
   }
 
   // ---------------------------------------------------------------- internals
@@ -377,6 +385,13 @@ export class MoveCheckScreen {
     if (this.lastText.get(e) === value) return;
     this.lastText.set(e, value);
     e.textContent = value;
+  }
+
+  /** The strength bar's only inline style; deduped so a 60 fps render does not dirty style every frame. */
+  private width(e: HTMLElement, value: string): void {
+    if (this.lastWidth === value) return;
+    this.lastWidth = value;
+    e.style.width = value;
   }
 
   private attr(e: Element, name: string, value: string): void {

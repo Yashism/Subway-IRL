@@ -264,3 +264,32 @@ describe('the controls card', () => {
     expect(c.querySelector('.mc-sheet-title')!.textContent).toBe('Controls');
   });
 });
+
+describe('MoveCheckScreen wired to a live check', () => {
+  it('re-renders when the very same model object is mutated in place', () => {
+    // MoveCheck hands out one model and mutates it every frame; an identity memo here would
+    // freeze the screen on the first frame it ever saw.
+    const m = model('jog');
+    const s = screen(m);
+    expect(s.root.querySelector('.mc-move-name')!.textContent).toBe(LABELS.jog);
+
+    const live = m as unknown as { index: number; steps: MoveStepModel[] };
+    live.steps[0].status = 'done';
+    live.steps[1].status = 'active';
+    live.steps[1].progress = 0.75;
+    live.index = 1;
+    s.ui.update(m);
+    expect(s.root.querySelector('.mc-move-name')!.textContent).toBe(LABELS.left);
+    expect(fillWidth(s.root)).toBe('75%');
+    expect(s.root.dataset.move).toBe('left');
+  });
+
+  it('shows and hides the layer as the check comes and goes', () => {
+    const s = screen(null);
+    expect(s.root.dataset.on).toBe('off');
+    s.ui.update(model('jump'));
+    expect(s.root.dataset.on).toBe('on');
+    s.ui.update(null);
+    expect(s.root.dataset.on).toBe('off');
+  });
+});
