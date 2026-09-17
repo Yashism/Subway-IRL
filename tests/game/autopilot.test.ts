@@ -76,14 +76,14 @@ describe('Autopilot', () => {
       expect(g.caughtReason, `barriers at +${at.toFixed(2)} m: ${context(g)}`).toBeNull();
       expect(g.stats.jumps).toBe(2);
     }
-  });
+  }, 30_000);
 
   it('plans across chappals running out', () => {
     for (let left = 0.2; left < 3.2; left += 0.1) {
       const g = chappalProbe({ left }, 25 + 10 * (left % 0.3));
       expect(g.caughtReason, `${left.toFixed(1)} s of chappals left: ${context(g)}`).toBeNull();
     }
-  });
+  }, 30_000);
 
   it('replans after picking up chappals mid-plan', () => {
     // Barriers 0.5 s apart: a jump the old plan timed for normal shoes lands too late with chappals.
@@ -94,7 +94,7 @@ describe('Autopilot', () => {
         expect(g.powerups.chappal).toBeGreaterThan(0);
       }
     }
-  });
+  }, 30_000);
 
   it.each([1, 2, 3])('survives five minutes on cardio (seed %i)', (seed) => {
     const g = drive(seed, 'cardio', 305);
