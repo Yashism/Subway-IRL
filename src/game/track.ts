@@ -67,6 +67,10 @@ export class Track {
     removeWhere(this.obstacles, (o) => o.front < toS && o.front + o.length > fromS);
   }
 
+  removeObstacle(id: number): void {
+    removeWhere(this.obstacles, (o) => o.id === id);
+  }
+
   addCoinTrail(fromS: number, toS: number, lane: Lane, y: number): void {
     for (let s = fromS; s <= toS + 1e-9; s += TUNING.coinSpacing) this.coins.push({ id: this.nextId++, lane, s, y, taken: false });
   }

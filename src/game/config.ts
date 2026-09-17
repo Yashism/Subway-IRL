@@ -45,6 +45,11 @@ export const TUNING = {
   obstacleHalfWidth: 0.8,
   stepUp: 0.5,
   rampLevelEarly: 1,
+  coinReach: 1,
+  coinReachHeight: 0.5,
+  magnetCollect: 1.5,
+  pickupReach: 1,
+  pickupMaxHeight: 1.5,
   // rules
   stumbleWindowSeconds: 8,
   idleWarnMs: 1000,
