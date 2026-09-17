@@ -43,6 +43,21 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) game.pause();
 });
 
+// The GPU can drop the context (driver reset, too many tabs). preventDefault lets the browser
+// restore it; three.js re-uploads its resources then, and the player resumes with Enter.
+let contextLost = false;
+canvas.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  contextLost = true;
+  game.pause();
+  console.warn('WebGL context lost; game paused until it is restored.');
+});
+canvas.addEventListener('webglcontextrestored', () => {
+  contextLost = false;
+  resize();
+  console.warn('WebGL context restored; press Enter to resume.');
+});
+
 let last = performance.now();
 const frameEvents: GameEvent[] = [];
 function frame(now: number): void {
@@ -55,7 +70,7 @@ function frame(now: number): void {
     const events = game.step(stepper.stepSec, input.drain(), input.activity(now));
     for (const e of events) frameEvents.push(e);
   }
-  world.render(game, dt, frameEvents);
+  if (!contextLost) world.render(game, dt, frameEvents);
   hud.update(game);
   if (perf && dt > 0) {
     fps += (1 / dt - fps) * 0.05;
