@@ -7,11 +7,15 @@ export const BUILDING_PALETTE = [0xf2c14e, 0xf78154, 0x5fad56, 0x4d9de0, 0xe1555
 /**
  * Items repeat every `spacing` metres along the track. Returns how far ahead of the
  * runner (at s) each one is, for those between `behind` metres back and `ahead` metres forward.
+ *
+ * Pass `out` to fill and reuse an existing array instead of allocating a new one each call
+ * (e.g. once per frame); its contents are cleared first. Without `out`, a fresh array is
+ * returned, same as before.
  */
-export function repeatingOffsets(s: number, spacing: number, behind: number, ahead: number): number[] {
+export function repeatingOffsets(s: number, spacing: number, behind: number, ahead: number, out: number[] = []): number[] {
+  out.length = 0;
   const first = Math.ceil((s - behind) / spacing);
   const last = Math.floor((s + ahead) / spacing);
-  const out: number[] = [];
   for (let k = first; k <= last; k++) out.push(k * spacing - s);
   return out;
 }
@@ -31,13 +35,19 @@ export interface BuildingLook {
   color: number;
 }
 
-/** The building in slot k on one side of the track; always the same for the same slot. */
-export function buildingAt(k: number, side: -1 | 1): BuildingLook {
+/**
+ * The building in slot k on one side of the track; always the same for the same slot.
+ *
+ * Pass `out` to fill and return an existing object instead of allocating a new one each
+ * call (e.g. once per building per frame). Without `out`, a fresh object is returned, same
+ * as before.
+ */
+export function buildingAt(k: number, side: -1 | 1, out?: BuildingLook): BuildingLook {
   const n = k * 2 + (side > 0 ? 1 : 0);
-  return {
-    height: 6 + hash01(n, 0) * 16,
-    width: 7 + hash01(n, 1) * 4,
-    depth: 6 + hash01(n, 2) * 6,
-    color: BUILDING_PALETTE[Math.floor(hash01(n, 3) * BUILDING_PALETTE.length)],
-  };
+  const b = out ?? ({} as BuildingLook);
+  b.height = 6 + hash01(n, 0) * 16;
+  b.width = 7 + hash01(n, 1) * 4;
+  b.depth = 6 + hash01(n, 2) * 6;
+  b.color = BUILDING_PALETTE[Math.floor(hash01(n, 3) * BUILDING_PALETTE.length)];
+  return b;
 }

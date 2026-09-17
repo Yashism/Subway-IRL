@@ -3,7 +3,7 @@ import { LANE_WIDTH, laneX, TUNING } from '../game/config';
 import type { Game } from '../game/game';
 import { OBSTACLES, type ObstacleKind } from '../game/obstacles';
 import type { PowerupKind } from '../game/track';
-import { BUILDING_SLOT, buildingAt, repeatingOffsets } from './worldMath';
+import { BUILDING_SLOT, buildingAt, repeatingOffsets, type BuildingLook } from './worldMath';
 
 const VIEW_AHEAD = 220;
 const VIEW_BEHIND = 12;
@@ -85,6 +85,14 @@ export class WorldView {
   private readonly chaser = new THREE.Group();
   private clock = 0;
 
+  /** Scratch fields reused per frame so render() allocates nothing (spec §6.4). */
+  private readonly camTargetPos = new THREE.Vector3();
+  private readonly camTargetLookAt = new THREE.Vector3();
+  private readonly seenObstacles = new Set<number>();
+  private readonly seenPickups = new Set<number>();
+  private readonly sleeperOffsets: number[] = [];
+  private readonly buildingScratch: BuildingLook = { height: 0, width: 0, depth: 0, color: 0 };
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.AgXToneMapping;
@@ -100,6 +108,7 @@ export class WorldView {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
     Object.assign(this.sun.shadow.camera, { left: -14, right: 14, top: 20, bottom: -20, near: 1, far: 70 });
+    this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.shadow.bias = -0.0005;
     scene.add(this.sun, this.sun.target);
 
@@ -225,8 +234,10 @@ export class WorldView {
   private updateCamera(g: Game, dtSec: number): void {
     const r = g.runner;
     const k = dtSec > 0 ? 1 - Math.exp(-8 * dtSec) : 1;
-    this.camera.position.lerp(new THREE.Vector3(r.x * 0.55, 4.2 + r.y * 0.7, 7.5), k);
-    this.lookAt.lerp(new THREE.Vector3(r.x * 0.55, 1.2 + r.y * 0.7, -14), k);
+    this.camTargetPos.set(r.x * 0.55, 4.2 + r.y * 0.7, 7.5);
+    this.camera.position.lerp(this.camTargetPos, k);
+    this.camTargetLookAt.set(r.x * 0.55, 1.2 + r.y * 0.7, -14);
+    this.lookAt.lerp(this.camTargetLookAt, k);
     this.camera.lookAt(this.lookAt);
   }
 
@@ -235,9 +246,10 @@ export class WorldView {
     t.rotation.set(0, 0, 0);
     t.scale.set(1, 1, 1);
     let n = 0;
-    for (const ahead of repeatingOffsets(s, SLEEPER_SPACING, VIEW_BEHIND, VIEW_AHEAD)) {
+    const offsets = repeatingOffsets(s, SLEEPER_SPACING, VIEW_BEHIND, VIEW_AHEAD, this.sleeperOffsets);
+    sleeperLoop: for (const ahead of offsets) {
       for (const lane of [-1, 0, 1]) {
-        if (n >= MAX_SLEEPERS) break;
+        if (n >= MAX_SLEEPERS) break sleeperLoop;
         t.position.set(laneX(lane), 0.06, -ahead);
         t.updateMatrix();
         this.sleepers.setMatrixAt(n++, t.matrix);
@@ -251,7 +263,7 @@ export class WorldView {
     const last = Math.ceil((s + VIEW_AHEAD) / BUILDING_SLOT);
     for (const side of [-1, 1] as const) {
       for (let k = first; k <= last && n < MAX_BUILDINGS; k++) {
-        const b = buildingAt(k, side);
+        const b = buildingAt(k, side, this.buildingScratch);
         t.position.set(side * (1.5 * LANE_WIDTH + 3 + b.width / 2), b.height / 2, toZ(k * BUILDING_SLOT + BUILDING_SLOT / 2, s));
         t.scale.set(b.width, b.height, b.depth);
         t.updateMatrix();
@@ -266,7 +278,8 @@ export class WorldView {
   }
 
   private updateObstacles(g: Game): void {
-    const seen = new Set<number>();
+    const seen = this.seenObstacles;
+    seen.clear();
     for (const o of g.track.obstacles) {
       const z = toZ(o.front, g.s);
       if (z < -VIEW_AHEAD || z - o.length > VIEW_BEHIND) continue;
@@ -332,7 +345,8 @@ export class WorldView {
   }
 
   private updatePickups(g: Game): void {
-    const seen = new Set<number>();
+    const seen = this.seenPickups;
+    seen.clear();
     for (const p of g.track.pickups) {
       if (p.taken) continue;
       const ahead = p.s - g.s;

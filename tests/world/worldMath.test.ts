@@ -9,6 +9,13 @@ describe('repeatingOffsets', () => {
     expect(offs[offs.length - 1]).toBeLessThanOrEqual(220);
     for (let i = 1; i < offs.length; i++) expect(offs[i] - offs[i - 1]).toBeCloseTo(1.5, 9);
   });
+
+  it('fills and returns a reused out array', () => {
+    const out: number[] = [];
+    const result = repeatingOffsets(10, 4, 3, 10, out);
+    expect(result).toBe(out);
+    expect(result).toEqual([-2, 2, 6, 10]);
+  });
 });
 
 describe('buildingAt', () => {
@@ -26,5 +33,12 @@ describe('buildingAt', () => {
       expect(BUILDING_PALETTE).toContain(b.color);
     }
     expect(heights.size).toBeGreaterThan(5);
+  });
+
+  it('fills and returns a reused out object', () => {
+    const out = { height: 0, width: 0, depth: 0, color: 0 };
+    const result = buildingAt(7, 1, out);
+    expect(result).toBe(out);
+    expect(result).toEqual(buildingAt(7, 1));
   });
 });
