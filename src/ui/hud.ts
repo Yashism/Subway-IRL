@@ -1,3 +1,4 @@
+import type { Profile, RecordResult } from '../app/profile';
 import { TUNING } from '../game/config';
 import type { CaughtReason, Game, GameState } from '../game/game';
 
@@ -22,6 +23,28 @@ export interface HudSummary {
   time: string;
 }
 
+export interface HudProfileModel {
+  /** "BEST 1,500" under the score during a run; '' before any best exists. */
+  best: string;
+  /** The current run has beaten the stored best. */
+  beatBest: boolean;
+  /** Menu pills ("Best score 1,500", lifetime coins "12,345"); '' before any recorded run. */
+  menuBest: string;
+  menuCoins: string;
+  /** Summary: the finished run set a new best. */
+  newBest: boolean;
+  /** Summary: "Previous best N" on a new best, else "Best: N". */
+  summaryBest: string;
+  lifetime: { runs: string; coins: string; distance: string };
+}
+
+/** What the HUD knows about the saved profile (see Hud.setProfile). */
+export interface HudProfileView {
+  profile: Readonly<Profile> | null;
+  /** Result of recording the run that just ended, or null if it was not recorded. */
+  last: RecordResult | null;
+}
+
 export interface HudModel {
   state: GameState;
   score: string;
@@ -42,6 +65,7 @@ export interface HudModel {
   /** Stopped jogging: flash the screen edges. */
   danger: boolean;
   summary: HudSummary;
+  profile: HudProfileModel;
 }
 
 const CAUGHT_TEXT: Record<CaughtReason, string> = {
@@ -98,7 +122,43 @@ const fmtTime = (sec: number): string => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 };
 
-export function hudModel(g: Game): HudModel {
+/** 12345 → "12,345". */
+export const fmtInt = (n: number): string => String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const NO_PROFILE: HudProfileModel = Object.freeze({
+  best: '',
+  beatBest: false,
+  menuBest: '',
+  menuCoins: '',
+  newBest: false,
+  summaryBest: '',
+  lifetime: Object.freeze({ runs: '', coins: '', distance: '' }),
+});
+
+function profileModel(g: Game, view: HudProfileView | undefined): HudProfileModel {
+  const p = view?.profile;
+  if (!p) return NO_PROFILE;
+  const hasBest = p.bestScore > 0;
+  const last = view.last;
+  const newBest = g.state === 'summary' && !!last?.newBest;
+  let summaryBest = '';
+  if (newBest && last) summaryBest = last.previousBest > 0 ? `Previous best ${fmtInt(last.previousBest)}` : 'First score on the board!';
+  else if (hasBest) summaryBest = `Best: ${fmtInt(p.bestScore)}`;
+  const played = p.totalRuns > 0;
+  return {
+    best: hasBest ? `BEST ${fmtInt(p.bestScore)}` : '',
+    beatBest: hasBest && g.stats.score > p.bestScore,
+    menuBest: hasBest ? `Best score ${fmtInt(p.bestScore)}` : '',
+    menuCoins: played ? fmtInt(p.totalCoins) : '',
+    newBest,
+    summaryBest,
+    lifetime: played
+      ? { runs: fmtInt(p.totalRuns), coins: fmtInt(p.totalCoins), distance: `${(p.totalDistance / 1000).toFixed(1)} km` }
+      : NO_PROFILE.lifetime,
+  };
+}
+
+export function hudModel(g: Game, view?: HudProfileView): HudModel {
   const p = g.powerups;
   const timers: PowerupTimer[] = [];
   for (const t of TIMERS) {
@@ -129,6 +189,7 @@ export function hudModel(g: Game): HudModel {
       rolls: String(s.rolls),
       time: fmtTime(s.timeSec),
     },
+    profile: profileModel(g, view),
   };
 }
 
@@ -186,6 +247,15 @@ export class Hud {
   private readonly pauseSub: HTMLElement;
   private readonly pauseIcon: HTMLElement;
   private readonly sum: Record<keyof HudSummary, HTMLElement>;
+  private readonly best: HTMLElement;
+  private readonly menuStats: HTMLElement;
+  private readonly menuBest: HTMLElement;
+  private readonly menuCoins: HTMLElement;
+  private readonly newBest: HTMLElement;
+  private readonly cardBest: HTMLElement;
+  private readonly life: HTMLElement;
+  private readonly lifeVals: Record<keyof HudProfileModel['lifetime'], HTMLElement>;
+  private readonly view: HudProfileView = { profile: null, last: null };
 
   private readonly lastText = new Map<HTMLElement, string>();
   private readonly lastStyle = new Map<string, string>();
@@ -224,6 +294,7 @@ export class Hud {
     el('div', 'hud-josh-core', this.josh, '🔥');
     this.joshLabel = el('div', 'hud-josh-x', this.josh, '×2');
     this.score = el('div', 'hud-score', scoreRow);
+    this.best = el('div', 'hud-best', tr);
     this.coinPill = el('div', 'hud-pill hud-coins', tr);
     const coinIcon = el('span', 'hud-coin', this.coinPill);
     el('span', 'hud-coin-glyph', coinIcon, '₹');
@@ -239,6 +310,14 @@ export class Hud {
     el('div', 'hud-logo-top', logo, 'SUBWAY');
     el('div', 'hud-logo-big', logo, 'IRL');
     el('div', 'hud-ribbon', menu, 'Run for real. Bhaago!');
+    this.menuStats = el('div', 'hud-menu-stats', menu);
+    const bestPill = el('div', 'hud-pill hud-menu-pill hud-menu-best', this.menuStats);
+    el('span', 'hud-menu-pill-icon', bestPill, '🏆');
+    this.menuBest = el('span', 'hud-menu-pill-text', bestPill);
+    const coinPill = el('div', 'hud-pill hud-menu-pill hud-menu-coins', this.menuStats);
+    el('span', 'hud-coin-glyph', el('span', 'hud-coin', coinPill), '₹');
+    this.menuCoins = el('span', 'hud-menu-pill-text', coinPill);
+    el('span', 'hud-menu-pill-unit', coinPill, 'coins');
     const cta = el('div', 'hud-cta', menu);
     // Keyboard first until pose control ships.
     el('span', 'hud-cta-text', cta, 'PRESS ENTER');
@@ -274,6 +353,8 @@ export class Hud {
     el('div', 'hud-card-title', card, 'RUN OVER');
     el('div', 'hud-card-label', card, 'SCORE');
     const sumScore = el('div', 'hud-card-score', card);
+    this.newBest = el('div', 'hud-newbest', card, 'NEW BEST!');
+    this.cardBest = el('div', 'hud-card-best', card);
     const grid = el('div', 'hud-card-grid', card);
     const tile = (icon: string, label: string, cls: string): HTMLElement => {
       const t = el('div', `hud-tile ${cls}`, grid);
@@ -289,6 +370,16 @@ export class Hud {
     const timeRow = el('div', 'hud-card-time', card);
     el('span', '', timeRow, 'Time ');
     const sumTime = el('span', 'hud-card-time-val', timeRow);
+    this.life = el('div', 'hud-card-life', card);
+    el('div', 'hud-card-life-title', this.life, 'All time');
+    const lifeRow = el('div', 'hud-card-life-row', this.life);
+    const lifeItem = (label: string): HTMLElement => {
+      const item = el('div', 'hud-life-item', lifeRow);
+      const v = el('div', 'hud-life-val', item);
+      el('div', 'hud-life-label', item, label);
+      return v;
+    };
+    this.lifeVals = { runs: lifeItem('Runs'), coins: lifeItem('Coins ₹'), distance: lifeItem('Distance') };
     const again = el('div', 'hud-again', card);
     el('span', 'hud-again-text', again, 'PLAY AGAIN');
     el('div', 'hud-again-hint', card, 'Press Enter to run again');
@@ -301,8 +392,17 @@ export class Hud {
     this.pauseSub = el('div', 'hud-pause-sub', paused);
   }
 
+  /**
+   * Hands the HUD the saved profile and the result of recording the run that just
+   * ended (null when that run was not recorded, e.g. an autopilot demo).
+   */
+  setProfile(profile: Readonly<Profile> | null, lastResult: RecordResult | null = null): void {
+    this.view.profile = profile;
+    this.view.last = lastResult;
+  }
+
   update(g: Game): void {
-    const m = hudModel(g);
+    const m = hudModel(g, this.view);
     if (m.state !== this.lastState) {
       this.lastState = m.state;
       this.root.dataset.state = m.state;
@@ -348,9 +448,22 @@ export class Hud {
       this.text(this.pauseIcon, g.pausedByLoss ? '📷' : '');
       this.flag(this.pauseIcon, 'lost', g.pausedByLoss);
     }
+    const pm = m.profile;
+    this.text(this.best, pm.best);
+    this.flag(this.best, 'beat', pm.beatBest);
+    if (m.state === 'menu') {
+      this.text(this.menuBest, pm.menuBest);
+      this.text(this.menuCoins, pm.menuCoins);
+      this.flag(this.menuStats, 'on', pm.menuBest !== '' || pm.menuCoins !== '');
+    }
     if (m.state === 'summary') {
       const s = m.summary;
       for (const key of Object.keys(this.sum) as (keyof HudSummary)[]) this.text(this.sum[key], s[key]);
+      this.flag(this.newBest, 'on', pm.newBest);
+      this.text(this.cardBest, pm.summaryBest);
+      this.flag(this.cardBest, 'record', pm.newBest);
+      this.flag(this.life, 'on', pm.lifetime.runs !== '');
+      for (const key of Object.keys(this.lifeVals) as (keyof HudProfileModel['lifetime'])[]) this.text(this.lifeVals[key], pm.lifetime[key]);
     }
   }
 

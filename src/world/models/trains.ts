@@ -857,9 +857,9 @@ function drawCab(ctx: Ctx, w: number, h: number, livery: Livery, station: string
   speckle(ctx, w, h, rand, 700, ['rgba(60,40,10,0.25)', 'rgba(255,255,255,0.15)'], 2);
 }
 
-function cabTexture(livery: Livery, idx: number): THREE.Texture {
-  const station = STATIONS[livery][idx];
-  return canvasTexture(`train-cab-${livery}-${idx}`, 512, 512, (ctx, w, h) => drawCab(ctx, w, h, livery, station, idx));
+function cabTexture(livery: Livery, idx: number, station: string): THREE.Texture {
+  const key = station === STATIONS[livery][idx] ? `train-cab-${livery}-${idx}` : `train-cab-${livery}-${idx}-${station}`;
+  return canvasTexture(key, 512, 512, (ctx, w, h) => drawCab(ctx, w, h, livery, station, idx));
 }
 
 function drawEnd(ctx: Ctx, w: number, h: number, livery: Livery): void {
@@ -949,7 +949,8 @@ function cachedMat<T extends THREE.Material>(key: string, make: () => T): T {
 const bodyMaterial = () => cachedMat('body', () => toonMaterial({ vertexColors: true }));
 const sideMaterial = (livery: Livery, variant: number, tint: boolean) =>
   cachedMat(`side-${livery}-${variant}-${tint}`, () => toonMaterial({ map: sideTexture(livery, variant), color: tint ? LIVERY[livery].tint : 0xffffff }));
-const cabMaterial = (livery: Livery, idx: number) => cachedMat(`cab-${livery}-${idx}`, () => toonMaterial({ map: cabTexture(livery, idx) }));
+const cabMaterial = (livery: Livery, idx: number, station = STATIONS[livery][idx]) =>
+  cachedMat(`cab-${livery}-${idx}-${station}`, () => toonMaterial({ map: cabTexture(livery, idx, station) }));
 const endMaterial = (livery: Livery) => cachedMat(`end-${livery}`, () => toonMaterial({ map: endTexture(livery) }));
 const headlightMaterial = () => cachedMat('headlight', () => toonMaterial({ color: 0xfff6d0, emissive: 0xfff1b0, emissiveIntensity: 2.2 }));
 const taillightMaterial = () => cachedMat('taillight', () => toonMaterial({ color: 0xff4030, emissive: 0xff2010, emissiveIntensity: 1.4 }));
@@ -1201,7 +1202,16 @@ function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, noOutline = false)
 }
 
 /** Parked coach (or a coupled run of coaches) filling `length` metres; near end at z=0, extending to -z; solid body fills y 0..3.2, width ≤ 2.3. */
-export function buildTrain(length: number, opts: { livery: Livery; seed: number; oncoming?: boolean }): THREE.Group {
+export function buildTrain(
+  length: number,
+  opts: {
+    livery: Livery;
+    seed: number;
+    oncoming?: boolean;
+    /** Front destination board choices (e.g. a suburban line's termini); default per livery. */
+    destinations?: readonly string[];
+  },
+): THREE.Group {
   const { livery, seed } = opts;
   const oncoming = !!opts.oncoming;
   const rand = seededRandom(seed * 7919 + 17);
@@ -1239,7 +1249,10 @@ export function buildTrain(length: number, opts: { livery: Livery; seed: number;
   }
 
   // textured end faces
-  const nearFace = oncoming ? mesh(faceGeometry(), cabMaterial(livery, Math.abs(Math.floor(seed)) % 3), true) : mesh(faceGeometry(), endMaterial(livery), true);
+  const cabIdx = Math.abs(Math.floor(seed)) % 3;
+  const dests = opts.destinations?.length ? opts.destinations : null;
+  const dest = dests ? dests[Math.abs(Math.floor(seed)) % dests.length] : STATIONS[livery][cabIdx];
+  const nearFace = oncoming ? mesh(faceGeometry(), cabMaterial(livery, cabIdx, dest), true) : mesh(faceGeometry(), endMaterial(livery), true);
   nearFace.position.z = 0.004;
   group.add(nearFace);
   if (!oncoming) {

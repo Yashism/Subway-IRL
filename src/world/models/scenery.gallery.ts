@@ -16,6 +16,7 @@ import {
   buildWall,
   createSideScenery,
 } from './scenery';
+import { LINES, isLineId } from '../stations';
 
 /** Wraps an object so its footprint is centred on the gallery pivot. */
 function centred(object: THREE.Object3D, shadows = true): THREE.Group {
@@ -37,7 +38,8 @@ function buildCorridor(): THREE.Object3D {
   const behind = 15;
   const ahead = runnerView ? 180 : 105;
   const s0 = Number(q.get('s') ?? 0);
-  const side = createSideScenery(Number(q.get('seed') ?? 1), { behind, ahead });
+  const line = q.get('line');
+  const side = createSideScenery(Number(q.get('seed') ?? 1), { behind, ahead, line: isLineId(line) ? line : undefined });
   const bed = createTrackBed(behind, ahead);
   const cat = createCatenary({ behind, ahead, signalFilter: (s) => !side.isStation(s) });
   const inner = new THREE.Group();
@@ -91,7 +93,17 @@ function buildCorridor(): THREE.Object3D {
 export const entries: GalleryEntry[] = [
   ...[0, 1, 2].map((i) => ({ id: `scene-chawl-${i}`, build: () => centred(buildChawl(i)) })),
   { id: 'scene-platform', build: () => centred(buildPlatform(40, 0)) },
-  { id: 'scene-fob', build: () => centred(buildFootOverbridge(0)) },
+  // Real station names, one platform per line (a long, a mid and a Marathi-conjunct-heavy name).
+  ...([
+    ['western', 'Vile Parle'],
+    ['central', 'Chhatrapati Shivaji Maharaj Terminus'],
+    ['harbour', 'Seawoods–Darave–Karave'],
+  ] as const).map(([line, name]) => ({
+    id: `scene-platform-${line}`,
+    build: () => centred(buildPlatform(40, 0, LINES[line].stations.find((s) => s.en === name)!)),
+  })),
+  { id: 'scene-fob', build: () => centred(buildFootOverbridge(0, LINES.central.stations[18])) },
+  { id: 'scene-fob-between', build: () => centred(buildFootOverbridge(1)) },
   { id: 'scene-wall', build: () => centred(buildWall(16, 0)) },
   { id: 'scene-fence', build: () => centred(buildFence(12)) },
   { id: 'scene-billboard', build: () => centred(buildBillboard(2)) },
