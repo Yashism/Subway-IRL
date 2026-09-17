@@ -54,6 +54,17 @@ function roofY(x: number): number {
 // ---------------------------------------------------------------------------
 const KEEP_ATTRS = new Set(['position', 'normal', 'uv', 'color']);
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
+/** Max length (m) of an unbroken edge along z, so the curved-world bend can't bulge long faces. */
+const CURVE_STEP = 3;
+const segBoxCache = new Map<number, THREE.BoxGeometry>();
+/** Unit box split along z so that, scaled to depth d, no segment exceeds CURVE_STEP. */
+function unitBoxFor(d: number): THREE.BoxGeometry {
+  const n = Math.ceil(Math.abs(d) / CURVE_STEP);
+  if (n <= 1) return unitBox;
+  let g = segBoxCache.get(n);
+  if (!g) segBoxCache.set(n, (g = new THREE.BoxGeometry(1, 1, 1, 1, 1, n)));
+  return g;
+}
 const cylCache = new Map<string, THREE.CylinderGeometry>();
 function unitCyl(seg: number, top = 1): THREE.CylinderGeometry {
   const k = `${seg}|${top}`;
@@ -105,7 +116,7 @@ class Parts {
   }
 
   box(w: number, h: number, d: number, x: number, y: number, z: number, color: THREE.ColorRepresentation, rot?: V3): void {
-    this.add(unitBox, color, [x, y, z], rot, [w, h, d]);
+    this.add(rot ? unitBox : unitBoxFor(d), color, [x, y, z], rot, [w, h, d]);
   }
 
   /** Cylinder with its axis along Y (rot to reorient). */
@@ -162,18 +173,25 @@ function roofGeometry(z0: number, z1: number, inset = 0): THREE.BufferGeometry {
   const uv: number[] = [];
   const idx: number[] = [];
   const base = EAVE - 0.03;
+  // Rings every <= CURVE_STEP m along z so the curved-world bend follows the roof.
+  const M = Math.max(1, Math.ceil(Math.abs(z1 - z0) / CURVE_STEP));
   for (let i = 0; i <= N; i++) {
     const [x, y, nx, ny] = pts[i];
-    pos.push(x, y, z0, x, y, z1);
-    nor.push(nx, ny, 0, nx, ny, 0);
-    uv.push(i / N, 0, i / N, 1);
+    for (let j = 0; j <= M; j++) {
+      pos.push(x, y, z0 + ((z1 - z0) * j) / M);
+      nor.push(nx, ny, 0);
+      uv.push(i / N, j / M);
+    }
   }
+  const R = M + 1;
   for (let i = 0; i < N; i++) {
-    const a = i * 2;
-    const b = a + 1;
-    const a1 = a + 2;
-    const b1 = a + 3;
-    idx.push(a, b, a1, a1, b, b1);
+    for (let j = 0; j < M; j++) {
+      const a = i * R + j;
+      const b = a + 1;
+      const a1 = a + R;
+      const b1 = a1 + 1;
+      idx.push(a, b, a1, a1, b, b1);
+    }
   }
   // caps
   for (const [z, sign] of [
@@ -968,7 +986,7 @@ function tinted(hex: string, tint: boolean, livery: Livery): THREE.Color {
 /** Side panel box with UVs mapped over the whole coach side. */
 function sidePanel(out: THREE.BufferGeometry[], side: number, z0: number, z1: number, y0: number, y1: number, L: number): void {
   const t = 0.12;
-  const g = prepare(unitBox);
+  const g = prepare(unitBoxFor(z1 - z0));
   g.applyMatrix4(_m.compose(_p.set(side * (HW - t / 2), (y0 + y1) / 2, (z0 + z1) / 2), _q.identity(), _s.set(t, y1 - y0, Math.abs(z1 - z0))));
   const p = g.attributes.position;
   const uv = g.attributes.uv;
