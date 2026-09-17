@@ -36,6 +36,35 @@ describe('Track', () => {
     expect(t.coins.every((c) => c.s >= 5000 - 30)).toBe(true);
   });
 
+  it('never moves up more than one tier between neighbouring chunks', () => {
+    const t = new Track(new Rng(2), 'cardio');
+    const tierOf = (id: string) => (id.startsWith('w-') ? 0 : Number(id[1]));
+
+    // First update at t = 0
+    t.update(0, 12, 0, DT);
+    let lastS = 0;
+    const allTiers: number[] = [];
+
+    // Drive updates at s = 300, 600, 900, ... with t = 300
+    for (let s = 300; s <= 3000; s += 300) {
+      t.update(s, 30, 300, DT);
+      // Record tiers of newly placed chunks (s > lastS)
+      for (const p of t.placed) {
+        if (p.s > lastS) allTiers.push(tierOf(p.id));
+      }
+      lastS = t.placed[t.placed.length - 1]?.s || lastS;
+    }
+
+    // Verify tier progression: each step is 0 or +1
+    for (let i = 1; i < allTiers.length; i++) {
+      expect(allTiers[i] - allTiers[i - 1]).toBeLessThanOrEqual(1);
+      expect(allTiers[i] - allTiers[i - 1]).toBeGreaterThanOrEqual(0);
+    }
+
+    // Verify we reach tier 4
+    expect(allTiers.some((t) => t === 4)).toBe(true);
+  });
+
   it('moves oncoming trains toward the runner', () => {
     const chunks: ChunkDef[] = [{ id: 'm', tier: 0, obstacles: [{ kind: 'trainMoving', lane: 0, s: 30 }], coins: [] }];
     const t = new Track(new Rng(1), 'cardio', chunks);

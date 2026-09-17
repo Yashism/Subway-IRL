@@ -5,7 +5,7 @@ import { lengthOf, movingFrontAt, OBSTACLES, type Obstacle } from './obstacles';
 import type { Rng } from './rng';
 import { NORMAL_JUMP } from './runner';
 import { POWERUP_KINDS, type PowerupKind } from './powerups';
-import { tierFor } from './speed';
+import { tierFor, type Tier } from './speed';
 
 export { POWERUP_KINDS, type PowerupKind };
 
@@ -46,6 +46,7 @@ export class Track {
   private nextS = FIRST_CHUNK_S;
   private nextId = 1;
   private lastChunk = '';
+  private lastTier: Tier = 0;
 
   constructor(
     private readonly rng: Rng,
@@ -79,10 +80,12 @@ export class Track {
     const base = this.nextS;
     this.nextS += CHUNK_LENGTH;
     const eta = tSec + Math.max(0, base - runnerS) / speed;
-    const tier = tierFor(eta, this.difficulty);
+    const wanted = tierFor(eta, this.difficulty);
+    const tier = Math.min(Math.max(wanted, this.lastTier), this.lastTier + 1) as Tier;
     let pool = this.chunks.filter((c) => c.tier === tier);
     if (pool.length > 1) pool = pool.filter((c) => c.id !== this.lastChunk);
     if (pool.length === 0) return;
+    this.lastTier = tier;
     const chunk = this.rng.pick(pool);
     this.lastChunk = chunk.id;
     this.placed.push({ id: chunk.id, s: base });
