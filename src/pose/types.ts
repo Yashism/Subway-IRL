@@ -36,6 +36,34 @@ export interface JogStatus {
   steps: number;
 }
 
+/**
+ * Read-only per-frame readout of the quantities the move detectors compare against their
+ * thresholds, in those thresholds' own units (torso lengths in full-body mode, shoulder widths in
+ * small-room mode, degrees for the lean). Only the active mode's fields move; the others stay 0.
+ * The Move Check measures a player's peak here so a tuned number is comparable to the threshold it
+ * replaces. Nothing in the game reads it: adding it changes no detection behaviour.
+ */
+export interface MoveMagnitudes {
+  /** Sideways offset from the calibrated spot, signed like the lane (`laneEnter`). Full body. */
+  lane: number;
+  /** Shoulder-line angle; negative is the player's left (`leanDeg`). Small room. */
+  tiltDeg: number;
+  /** Nose sideways shift, signed like `tiltDeg` (`noseShift`). Small room. */
+  noseShift: number;
+  /** Height above the vertical reference (`jumpRise` / `smallJumpRise`). */
+  rise: number;
+  /** Hip drop below the vertical reference (`rollDrop`). Full body; 0 in small-room mode. */
+  drop: number;
+  /** Head drop below its reference (`rollHeadDrop` in full body, `duckDrop` in small room). */
+  headDrop: number;
+  /** The primary jog signal: knee lift (`kneeLift`) or |wrist offset| (`wristPump`). */
+  jogPrimary: number;
+  /** Jog bounce amplitude (`bobMinAmp`). */
+  bobAmp: number;
+  /** Jog steps counted since calibration. Not a magnitude; the jog step of the check counts these. */
+  jogSteps: number;
+}
+
 export type DistanceHint = 'ok' | 'closer' | 'back';
 
 export interface CalibrationState {

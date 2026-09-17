@@ -2,7 +2,31 @@ import type { Baseline } from './calibration';
 import type { Body } from './landmarks';
 import { DropDetector, JumpDetector, VerticalRef } from './signals';
 import type { Thresholds } from './thresholds';
-import type { Lane, PoseEvent } from './types';
+import type { Lane, MoveMagnitudes, PoseEvent } from './types';
+
+export const emptyMagnitudes = (): MoveMagnitudes => ({
+  lane: 0,
+  tiltDeg: 0,
+  noseShift: 0,
+  rise: 0,
+  drop: 0,
+  headDrop: 0,
+  jogPrimary: 0,
+  bobAmp: 0,
+  jogSteps: 0,
+});
+
+/** Clears the live readouts (nobody in view). `jogSteps` is a running count, so it is left alone. */
+export function clearMagnitudes(m: MoveMagnitudes): void {
+  m.lane = 0;
+  m.tiltDeg = 0;
+  m.noseShift = 0;
+  m.rise = 0;
+  m.drop = 0;
+  m.headDrop = 0;
+  m.jogPrimary = 0;
+  m.bobAmp = 0;
+}
 
 export interface MoveContext {
   body: Body;
@@ -28,7 +52,8 @@ export class FullBodyMoves {
   private roll = new DropDetector();
   private vref = new VerticalRef();
 
-  constructor(private th: Thresholds) {}
+  /** Live magnitude readout; shared with the controller when one is passed in. */
+  constructor(private th: Thresholds, readonly mag: MoveMagnitudes = emptyMagnitudes()) {}
 
   get idle(): boolean {
     return this.jump.isArmed && this.roll.isArmed && !this.roll.isDropping;
@@ -61,7 +86,9 @@ export class FullBodyMoves {
     const T = base.torso;
     const events: PoseEvent[] = [];
 
-    const lane = nextLane(this.lane, (body.hip.x - base.hip.x) / T, th.laneEnter / sens, th.laneExit / sens);
+    const offset = (body.hip.x - base.hip.x) / T;
+    this.mag.lane = offset;
+    const lane = nextLane(this.lane, offset, th.laneEnter / sens, th.laneExit / sens);
     if (lane !== this.lane) {
       this.lane = lane;
       events.push({ type: 'lane', lane });
@@ -70,12 +97,15 @@ export class FullBodyMoves {
     const h = -body.hip.y / T;
     const ref = this.vref.value(h, t, -base.hip.y / T, jogging, !this.idle);
     const minRise = Math.max(th.jumpRise / sens, th.bobJumpFactor * bobAmp);
+    this.mag.rise = h - ref;
     if (this.jump.update(h, ref, t, th.jumpVel / sens, minRise, th.jumpRearm / sens)) events.push({ type: 'jump' });
 
     const refHipY = -ref * T;
     const noseRef = base.nose.y + (refHipY - base.hip.y);
     const drop = ref - h;
     const headDrop = (body.nose.y - noseRef) / T;
+    this.mag.drop = drop;
+    this.mag.headDrop = headDrop;
     const rolled = this.roll.update(drop, headDrop, t, {
       drop: th.rollDrop / sens,
       holdMs: th.rollHoldMs,
@@ -95,7 +125,8 @@ export class SmallRoomMoves {
   private roll = new DropDetector();
   private vref = new VerticalRef();
 
-  constructor(private th: Thresholds) {}
+  /** Live magnitude readout; shared with the controller when one is passed in. */
+  constructor(private th: Thresholds, readonly mag: MoveMagnitudes = emptyMagnitudes()) {}
 
   /** Also requires the lean to be re-armed, so a held lean is never absorbed by baseline drift. */
   get idle(): boolean {
@@ -136,6 +167,8 @@ export class SmallRoomMoves {
     const events: PoseEvent[] = [];
 
     const noseShift = (body.nose.x - base.nose.x) / S;
+    this.mag.tiltDeg = body.tiltDeg;
+    this.mag.noseShift = noseShift;
     if (this.leanArmed) {
       const left = body.tiltDeg <= -th.leanDeg / sens || noseShift <= -th.noseShift / sens;
       const right = body.tiltDeg >= th.leanDeg / sens || noseShift >= th.noseShift / sens;
@@ -150,10 +183,12 @@ export class SmallRoomMoves {
     const h = -body.shoulder.y / S;
     const ref = this.vref.value(h, t, -base.shoulder.y / S, jogging, !this.idle);
     const minRise = Math.max(th.smallJumpRise / sens, th.bobJumpFactor * bobAmp);
+    this.mag.rise = h - ref;
     if (this.jump.update(h, ref, t, th.smallJumpVel / sens, minRise, th.smallJumpRearm / sens)) events.push({ type: 'jump' });
 
     const noseRef = base.nose.y + (-ref * S - base.shoulder.y);
     const duck = (body.nose.y - noseRef) / S;
+    this.mag.headDrop = duck;
     const ducked = this.roll.update(0, duck, t, {
       drop: Infinity,
       holdMs: 0,

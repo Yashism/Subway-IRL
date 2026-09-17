@@ -2,7 +2,7 @@ import type { Baseline } from './calibration';
 import type { Body } from './landmarks';
 import { BobTracker } from './signals';
 import type { Thresholds } from './thresholds';
-import type { JogStatus } from './types';
+import type { JogStatus, MoveMagnitudes } from './types';
 
 const MIN_STEP_GAP_MS = 180;
 const FALLBACK_AFTER_MS = 1000;
@@ -19,12 +19,20 @@ export class JogDetector {
   private lastKnee: 'L' | 'R' | null = null;
   private wristSide: -1 | 0 | 1 = 0;
   private wristSideT = -Infinity;
+  /** Last frame's primary jog signal, in its threshold's units: knee lift, or |wrist offset|. */
+  private primaryMag = 0;
 
-  constructor(private th: Thresholds) {}
+  /** `mag` is the controller's shared magnitude readout; the detector fills its jog fields. */
+  constructor(private th: Thresholds, private mag: MoveMagnitudes | null = null) {}
 
   reset(): void {
     this.bob.reset();
     this.total = 0;
+    if (this.mag) {
+      this.mag.jogPrimary = 0;
+      this.mag.bobAmp = 0;
+      this.mag.jogSteps = 0;
+    }
     this.stepTimes = [];
     this.lastStepT = -Infinity;
     this.lastPrimaryT = -Infinity;
@@ -40,12 +48,23 @@ export class JogDetector {
     const height = -(full ? body.hip.y : body.shoulder.y) / unit;
     const bobStep = this.bob.update(height, t, this.th.bobMinAmp / sens, this.th.bobMaxStepGapMs, this.th.bobMaxSwing);
     const primary = full ? this.kneeStep(body, base, sens) : this.wristStep(body, base, t, sens);
+    if (this.mag) {
+      this.mag.jogPrimary = this.primaryMag;
+      this.mag.bobAmp = this.bob.amplitudeAt(t);
+    }
     if (primary) {
       this.lastPrimaryT = t;
-      return this.addStep(t);
+      return this.step(t);
     }
-    if (bobStep && t - this.lastPrimaryT > FALLBACK_AFTER_MS) return this.addStep(t);
+    if (bobStep && t - this.lastPrimaryT > FALLBACK_AFTER_MS) return this.step(t);
     return false;
+  }
+
+  /** `addStep`, keeping the shared magnitude readout's step count in sync. */
+  private step(t: number): boolean {
+    const counted = this.addStep(t);
+    if (counted && this.mag) this.mag.jogSteps = this.total;
+    return counted;
   }
 
   status(t: number): JogStatus {
@@ -71,6 +90,7 @@ export class JogDetector {
 
   private kneeStep(body: Body, base: Baseline, sens: number): boolean {
     let stepped = false;
+    this.primaryMag = 0;
     for (const side of ['L', 'R'] as const) {
       const knee = side === 'L' ? body.kneeL : body.kneeR;
       const rest = side === 'L' ? base.kneeRelL : base.kneeRelR;
@@ -79,6 +99,7 @@ export class JogDetector {
         continue;
       }
       const lift = (rest - (knee.y - body.hip.y)) / base.torso;
+      if (lift > this.primaryMag) this.primaryMag = lift;
       if (!this.kneeUp[side] && lift > this.th.kneeLift / sens) {
         this.kneeUp[side] = true;
         if (this.lastKnee !== side) {
@@ -94,6 +115,7 @@ export class JogDetector {
 
   private wristStep(body: Body, base: Baseline, t: number, sens: number): boolean {
     const d = (body.wristL.y - body.wristR.y) / base.shoulderWidth;
+    this.primaryMag = Math.abs(d);
     const a = this.th.wristPump / sens;
     const side = d > a ? 1 : d < -a ? -1 : 0;
     if (side === 0 || side === this.wristSide) return false;

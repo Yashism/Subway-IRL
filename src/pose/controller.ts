@@ -2,10 +2,10 @@ import { Calibrator, driftBaseline, driftBaselineX, rebaseBaselineX, type Baseli
 import { GestureDetector } from './gestures';
 import { JogDetector } from './jog';
 import { dist, toBody, VISIBLE, type Body } from './landmarks';
-import { FullBodyMoves, SmallRoomMoves } from './moves';
+import { clearMagnitudes, emptyMagnitudes, FullBodyMoves, SmallRoomMoves } from './moves';
 import { PoseSmoother } from './oneEuro';
 import { DEFAULT_THRESHOLDS, type Thresholds } from './thresholds';
-import type { PlayMode, Pose, PoseEvent, PoseFrame, PoseStatus } from './types';
+import type { MoveMagnitudes, PlayMode, Pose, PoseEvent, PoseFrame, PoseStatus } from './types';
 
 export interface PoseControllerOptions {
   /** Overrides merged over DEFAULT_THRESHOLDS. Tune live through `ctrl.th`, not this object. */
@@ -41,6 +41,7 @@ export class PoseController {
   private full: FullBodyMoves;
   private small: SmallRoomMoves;
   private smoother = new PoseSmoother();
+  private readonly mag = emptyMagnitudes();
   private pose: Pose | null = null;
   private lastSeenT: number | null = null;
   private lost = false;
@@ -55,10 +56,19 @@ export class PoseController {
     this.sensitivity = opts.sensitivity ?? 1;
     this.forcedMode = opts.forcedMode ?? null;
     this.calibrator = new Calibrator(this.th);
-    this.jog = new JogDetector(this.th);
+    this.jog = new JogDetector(this.th, this.mag);
     this.gestures = new GestureDetector(this.th);
-    this.full = new FullBodyMoves(this.th);
-    this.small = new SmallRoomMoves(this.th);
+    // Both modes write into the same readout; only the calibrated one ever runs.
+    this.full = new FullBodyMoves(this.th, this.mag);
+    this.small = new SmallRoomMoves(this.th, this.mag);
+  }
+
+  /**
+   * Live readout of what the move detectors measured on the last frame, in their thresholds' own
+   * units (see `MoveMagnitudes`). The same object every time: read it, never keep it as a snapshot.
+   */
+  get magnitudes(): Readonly<MoveMagnitudes> {
+    return this.mag;
   }
 
   /** Move sensitivity, clamped to [0.75, 1.25]; higher makes moves easier to trigger. */
@@ -78,6 +88,7 @@ export class PoseController {
     this.jog.reset();
     this.full.reset();
     this.small.reset();
+    clearMagnitudes(this.mag);
     return events;
   }
 
@@ -169,6 +180,7 @@ export class PoseController {
     if (!raw) {
       this.pose = null;
       this.body = null;
+      clearMagnitudes(this.mag);
       // A brief dropout (a blink of the model) should not throw away calibration progress.
       if (!this.baseline && t - this.lastSeenT > CALIB_GAP_MS) this.calibrator.update(null, t, this.forcedMode);
       if (!this.lost && t - this.lastSeenT >= this.th.lostMs) {
