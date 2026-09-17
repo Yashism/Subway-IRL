@@ -1785,8 +1785,9 @@ git commit -m "feat(game): add track chunks and passability solver"
   - `Rng`, `tierFor`, `TUNING`, `Difficulty` (Task 2)
   - `OBSTACLES`, `lengthOf`, `movingFrontAt`, `Obstacle` (Task 4)
   - `NORMAL_JUMP` (Task 3)
+  - `PowerupKind`, `POWERUP_KINDS` from `src/game/powerups.ts` (Task 7)
 - Produces:
-  - Power-ups: `PowerupKind` (`'magnet' | 'rocket' | 'chappal'`), `POWERUP_KINDS`
+  - Power-ups: re-exports `PowerupKind` and `POWERUP_KINDS` from `powerups.ts`
   - Items: `Coin { id; lane; s; y; taken }`, `Pickup { id; kind; lane; s; taken }`
   - `TRACK_AHEAD` (200)
   - `class Track(rng, difficulty, chunks = CHUNKS)`
@@ -1914,10 +1915,10 @@ import { TUNING, type Difficulty } from './config';
 import { lengthOf, movingFrontAt, OBSTACLES, type Obstacle } from './obstacles';
 import type { Rng } from './rng';
 import { NORMAL_JUMP } from './runner';
+import { POWERUP_KINDS, type PowerupKind } from './powerups';
 import { tierFor } from './speed';
 
-export type PowerupKind = 'magnet' | 'rocket' | 'chappal';
-export const POWERUP_KINDS: readonly PowerupKind[] = ['magnet', 'rocket', 'chappal'];
+export { POWERUP_KINDS, type PowerupKind };
 
 export interface Coin {
   id: number;
@@ -2052,8 +2053,9 @@ git commit -m "feat(game): add track generator"
 - Test: `tests/game/powerups.test.ts`, `tests/game/rules.test.ts`
 
 **Interfaces:**
-- Consumes: `TUNING` (Task 2); `PowerupKind` (Task 6); `ActivityStatus` (Task 1)
+- Consumes: `TUNING` (Task 2); `ActivityStatus` (Task 1). No dependency on Tasks 5–6, so this task can run in parallel with them.
 - Produces:
+  - `PowerupKind`, `POWERUP_KINDS` (defined here; `track.ts` re-exports them)
   - `class Powerups`
     - timers: `magnet`, `rocket`, `chappal`, `hoverboard`, `grace`
     - `hoverboardsLeft`
@@ -2217,7 +2219,9 @@ Expected: FAIL because the modules are not found.
 
 ```ts
 import { TUNING } from './config';
-import type { PowerupKind } from './track';
+
+export type PowerupKind = 'magnet' | 'rocket' | 'chappal';
+export const POWERUP_KINDS: readonly PowerupKind[] = ['magnet', 'rocket', 'chappal'];
 
 /** Remaining seconds for each timed power-up. */
 export class Powerups {
