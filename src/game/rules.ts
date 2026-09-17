@@ -1,26 +1,22 @@
 import type { ActivityStatus } from '../input/commands';
 import { TUNING } from './config';
 
-const RECEDE_RATE = 0.6;
-const APPROACH_RATE = 3;
-const CAUGHT_GAP = 0.5;
-
 /** The TT and dog: how far behind the runner they are. */
 export class Chaser {
   gap = TUNING.chaserStartGap;
 
   get visible(): boolean {
-    return this.gap < TUNING.chaserFarGap - 1;
+    return this.gap < TUNING.chaserFarGap - TUNING.chaserHideMargin;
   }
 
   update(dt: number, close: boolean): void {
     const target = close ? TUNING.chaserNearGap : TUNING.chaserFarGap;
-    const rate = target < this.gap ? APPROACH_RATE : RECEDE_RATE;
+    const rate = target < this.gap ? TUNING.chaserApproachRate : TUNING.chaserRecedeRate;
     this.gap += (target - this.gap) * (1 - Math.exp(-rate * dt));
   }
 
   catchUp(): void {
-    this.gap = CAUGHT_GAP;
+    this.gap = TUNING.chaserCaughtGap;
   }
 
   reset(): void {

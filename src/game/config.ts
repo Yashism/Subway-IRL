@@ -69,4 +69,8 @@ export const TUNING = {
   chaserStartGap: 1.5,
   chaserNearGap: 3,
   chaserFarGap: 12,
+  chaserRecedeRate: 0.6,
+  chaserApproachRate: 3,
+  chaserCaughtGap: 0.5,
+  chaserHideMargin: 1,
 };
