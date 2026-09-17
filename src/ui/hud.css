@@ -148,6 +148,25 @@ body {
   min-width: 2ch;
   text-align: right;
 }
+.hud-best {
+  margin-top: -6px;
+  padding: 4px 10px 2px;
+  border-radius: 999px;
+  font: 400 15px/1 var(--font-game);
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(20, 12, 45, 0.45);
+  transition: color 0.2s, background-color 0.2s;
+}
+.hud-best:empty {
+  display: none;
+}
+.hud-best.beat {
+  color: var(--ink);
+  background: linear-gradient(180deg, #fff27a, var(--gold) 55%, var(--gold-deep));
+  box-shadow: 0 2px 0 var(--ink);
+  animation: hud-pop-in 0.35s cubic-bezier(0.3, 1.8, 0.5, 1) both;
+}
 .hud-coins {
   padding-right: 18px;
 }
@@ -460,6 +479,52 @@ body {
   clip-path: polygon(0 0, 100% 0, 96% 50%, 100% 100%, 0 100%, 4% 50%);
   animation: hud-logo-in 0.7s 0.12s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
+.hud-menu-stats {
+  display: none;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: -2px;
+  animation: hud-rise 0.4s 0.3s ease-out both;
+}
+.hud-menu-stats.on {
+  display: flex;
+}
+.hud-menu-stats.on + .hud-cta {
+  margin-top: 1vh;
+}
+.hud-menu-pill {
+  padding: 0 18px 0 5px;
+  color: #fff;
+}
+.hud-menu-pill:has(.hud-menu-pill-text:empty) {
+  display: none;
+}
+.hud-menu-pill-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 17px;
+  background: radial-gradient(circle at 35% 30%, #fff27a, var(--gold) 55%, var(--gold-deep));
+  box-shadow: inset 0 0 0 3px #b86e00, 0 2px 0 var(--ink);
+}
+.hud-menu-pill-text {
+  font: 800 19px/1 var(--font-ui);
+  padding-top: 3px;
+  text-shadow: 0 2px 0 var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.hud-menu-coins .hud-menu-pill-text {
+  color: var(--gold);
+}
+.hud-menu-pill-unit {
+  font: 700 15px/1 var(--font-ui);
+  padding-top: 3px;
+  margin-left: -3px;
+  color: rgba(255, 255, 255, 0.8);
+}
 .hud-cta {
   display: flex;
   align-items: center;
@@ -583,6 +648,18 @@ body {
 .hud-caught {
   background: radial-gradient(circle at 50% 45%, rgba(120, 0, 20, 0.1), rgba(90, 0, 20, 0.55));
 }
+/* Deepens slowly over the hold so the long caught screen does not feel frozen. */
+.hud-caught::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(20, 12, 45, 0), rgba(20, 12, 45, 0.5));
+  animation: hud-fade-in 4.5s 0.5s ease-in both;
+}
+@keyframes hud-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .hud-flash {
   position: absolute;
   inset: 0;
@@ -594,6 +671,7 @@ body {
   to { opacity: 0; }
 }
 .hud-stamp {
+  position: relative;
   font: 400 clamp(64px, 11vw, 140px)/1 var(--font-game);
   color: #ff3a2e;
   padding: 22px 34px 8px;
@@ -607,7 +685,14 @@ body {
     0 24px 40px rgba(0, 0, 0, 0.4);
   text-shadow: 0 4px 0 #9d1c16;
   transform: rotate(-8deg);
-  animation: hud-stamp 0.45s cubic-bezier(0.5, 0, 0.6, 1.6) both;
+  /* Slam in, then breathe gently for the rest of the caught screen (TUNING.catchSeconds). */
+  animation:
+    hud-stamp 0.45s cubic-bezier(0.5, 0, 0.6, 1.6) both,
+    hud-stamp-hold 1.6s 0.45s ease-in-out infinite alternate;
+}
+@keyframes hud-stamp-hold {
+  from { transform: rotate(-8deg) scale(1); }
+  to { transform: rotate(-6.5deg) scale(1.04); }
 }
 @keyframes hud-stamp {
   0% { transform: rotate(-20deg) scale(3); opacity: 0; }
@@ -615,6 +700,7 @@ body {
   100% { transform: rotate(-8deg) scale(1); opacity: 1; }
 }
 .hud-caught-reason {
+  position: relative;
   margin-top: 40px;
   font: 800 clamp(20px, 2.4vw, 28px)/1 var(--font-ui);
   padding: 12px 26px 9px;
@@ -683,6 +769,44 @@ body {
   padding-top: 8px;
   animation: hud-pop-in 0.5s 0.25s cubic-bezier(0.3, 1.8, 0.5, 1) both;
 }
+.hud-newbest {
+  display: none;
+  position: relative;
+  margin: -8px auto 12px;
+  width: max-content;
+  padding: 10px 30px 6px;
+  font: 400 26px/1 var(--font-game);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: linear-gradient(180deg, #fff27a, var(--gold) 55%, var(--gold-deep));
+  border: 4px solid var(--ink);
+  box-shadow: 0 5px 0 var(--ink);
+  clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%, 6% 50%);
+  transform: rotate(-3deg);
+}
+.hud-newbest.on {
+  display: block;
+  animation: hud-newbest 0.6s 0.55s cubic-bezier(0.3, 1.8, 0.5, 1) both, hud-newbest-glow 1.4s 1.2s ease-in-out infinite alternate;
+}
+@keyframes hud-newbest {
+  from { transform: rotate(-3deg) scale(0); opacity: 0; }
+  to { transform: rotate(-3deg) scale(1); opacity: 1; }
+}
+@keyframes hud-newbest-glow {
+  from { transform: rotate(-3deg) scale(1); }
+  to { transform: rotate(-1deg) scale(1.06); }
+}
+.hud-card-best {
+  margin: -8px 0 14px;
+  font: 800 16px/1 var(--font-ui);
+  color: #8a6a3a;
+}
+.hud-card-best:empty {
+  display: none;
+}
+.hud-card-best.record {
+  margin-top: -4px;
+}
 .hud-card-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -729,6 +853,12 @@ body {
   padding-top: 4px;
   white-space: nowrap;
 }
+.hud-tile-dist .hud-tile-val {
+  font-size: 19px;
+  -webkit-text-stroke-width: 4px;
+  padding-top: 7px;
+  padding-bottom: 2px;
+}
 .hud-tile-label {
   font: 800 11px/1 var(--font-ui);
   letter-spacing: 0.08em;
@@ -743,6 +873,41 @@ body {
 .hud-card-time-val {
   color: var(--ink);
   font-weight: 800;
+}
+.hud-card-life {
+  display: none;
+  margin-top: 14px;
+  padding: 10px 12px 10px;
+  border-radius: 16px;
+  background: rgba(138, 106, 58, 0.12);
+  border: 2px dashed rgba(138, 106, 58, 0.45);
+}
+.hud-card-life.on {
+  display: block;
+}
+.hud-card-life-title {
+  font: 800 11px/1 var(--font-ui);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8a6a3a;
+}
+.hud-card-life-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+.hud-life-val {
+  font: 800 20px/1.1 var(--font-ui);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hud-life-label {
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a6a3a;
 }
 .hud-again {
   display: inline-block;
@@ -761,6 +926,20 @@ body {
   margin-top: 12px;
   font: 700 13px/1 var(--font-ui);
   color: #8a6a3a;
+}
+
+/* Short screens (laptops with browser chrome): keep the whole card, title included, on screen. */
+@media (max-height: 760px) {
+  .hud-summary { padding-top: 26px; box-sizing: border-box; }
+  .hud-card { padding: 46px 24px 16px; }
+  .hud-card-score { font-size: 64px; margin: 2px 0 12px; }
+  .hud-newbest { font-size: 22px; margin: -6px auto 8px; padding: 8px 26px 5px; }
+  .hud-card-best { margin-bottom: 10px; }
+  .hud-tile { padding: 7px 4px 6px; }
+  .hud-card-time { margin-top: 10px; }
+  .hud-card-life { margin-top: 10px; padding: 8px 10px; }
+  .hud-again { margin-top: 12px; padding: 13px 34px 9px; font-size: 26px; }
+  .hud-again-hint { margin-top: 8px; }
 }
 
 /* ------------------------------------------------------------ paused */

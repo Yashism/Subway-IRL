@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ChunkDef } from '../../src/game/chunks';
+import { TUNING } from '../../src/game/config';
 import { Game } from '../../src/game/game';
 import type { ActivityStatus } from '../../src/input/commands';
+import { emptyProfile, type Profile } from '../../src/app/profile';
 import { hudModel } from '../../src/ui/hud';
 
 const EMPTY: ChunkDef[] = [{ id: 'empty', tier: 0, obstacles: [], coins: [] }];
@@ -36,10 +38,14 @@ describe('hudModel', () => {
     for (let i = 0; i < 180 + 70; i++) g.step(1 / 60, [], STILL);
     expect(hudModel(g).center).toBe('Bhaago!');
     expect(hudModel(g).danger).toBe(true);
-    for (let i = 0; i < 60; i++) g.step(1 / 60, [], STILL);
+    for (let i = 0; i < 60 && g.state === 'playing'; i++) g.step(1 / 60, [], STILL);
     expect(hudModel(g).center).toBe('Pakda gaya!');
     expect(hudModel(g).sub).toBe('You stopped jogging');
-    for (let i = 0; i < 90; i++) g.step(1 / 60, [], STILL);
+    // The caught screen holds for the whole catch duration, then the summary follows.
+    const catchFrames = Math.round(TUNING.catchSeconds * TUNING.stepHz);
+    for (let i = 0; i < catchFrames - 2; i++) g.step(1 / 60, [], STILL);
+    expect(hudModel(g).center).toBe('Pakda gaya!');
+    for (let i = 0; i < 3; i++) g.step(1 / 60, [], STILL);
     const m = hudModel(g);
     expect(m.center).toMatch(/^Score \d+$/);
     expect(m.sub).toMatch(/Enter to play again/);
@@ -85,5 +91,74 @@ describe('hudModel', () => {
     const m = hudModel(g);
     expect(m.center).toBe('Score 1234');
     expect(m.summary).toEqual({ score: '1234', coins: '56', distance: '789 m', jumps: '7', rolls: '3', time: '1:15' });
+  });
+
+  it('leaves the profile bits blank without a profile', () => {
+    const m = hudModel(new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY }));
+    expect(m.profile).toEqual({
+      best: '',
+      beatBest: false,
+      menuBest: '',
+      menuCoins: '',
+      newBest: false,
+      summaryBest: '',
+      lifetime: { runs: '', coins: '', distance: '' },
+    });
+  });
+});
+
+describe('hudModel with a profile', () => {
+  const profile = (over: Partial<Profile> = {}): Profile => ({
+    ...emptyProfile(),
+    bestScore: 1500,
+    totalCoins: 12345,
+    totalRuns: 12,
+    totalDistance: 4321.9,
+    ...over,
+  });
+
+  it('shows best score and lifetime coins on the menu', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    const m = hudModel(g, { profile: profile(), last: null });
+    expect(m.profile.menuBest).toBe('Best score 1,500');
+    expect(m.profile.menuCoins).toBe('12,345');
+  });
+
+  it('hides the menu pills before the first recorded run', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    const m = hudModel(g, { profile: emptyProfile(), last: null });
+    expect(m.profile.menuBest).toBe('');
+    expect(m.profile.menuCoins).toBe('');
+    expect(m.profile.best).toBe('');
+  });
+
+  it('shows BEST under the score and flags it once the run beats it', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.state = 'playing';
+    g.stats.score = 1500;
+    const view = { profile: profile(), last: null };
+    expect(hudModel(g, view).profile.best).toBe('BEST 1,500');
+    expect(hudModel(g, view).profile.beatBest).toBe(false);
+    g.stats.score = 1501;
+    expect(hudModel(g, view).profile.beatBest).toBe(true);
+  });
+
+  it('celebrates a new best on the summary card', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.state = 'summary';
+    g.stats.score = 2000;
+    const m = hudModel(g, { profile: profile({ bestScore: 2000, totalRuns: 13 }), last: { newBest: true, previousBest: 1500 } });
+    expect(m.profile.newBest).toBe(true);
+    expect(m.profile.summaryBest).toBe('Previous best 1,500');
+    expect(m.profile.lifetime).toEqual({ runs: '13', coins: '12,345', distance: '4.3 km' });
+  });
+
+  it('shows the standing best when the run fell short', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.state = 'summary';
+    g.stats.score = 20;
+    const m = hudModel(g, { profile: profile(), last: { newBest: false, previousBest: 1500 } });
+    expect(m.profile.newBest).toBe(false);
+    expect(m.profile.summaryBest).toBe('Best: 1,500');
   });
 });

@@ -17,6 +17,8 @@ import {
   vertexColorMaterial,
   type UVRect,
 } from './trackKit';
+import { LINES, lineForSeed, platformNumber, stationForPlatform, type LineId, type Station } from '../stations';
+import { BOARD_ASPECT, stationBoardMaterial } from './stationBoards';
 
 /**
  * Mumbai rail-corridor scenery. Side pieces face +x (toward the track when placed on the
@@ -453,14 +455,8 @@ function corrugatedTexture(): THREE.CanvasTexture {
 const SIGN_SIZE = 2048;
 const S = (px: number, py: number, pw: number, ph: number) => atlasRect(px, py, pw, ph, SIGN_SIZE, SIGN_SIZE);
 export const AD_VARIANTS = 5;
-export const STATION_NAMES = [
-  ['नवापुर', 'NAVAPUR'],
-  ['धावडी रोड', 'DHAVDI ROAD'],
-  ['भागोनगर', 'BHAAGONAGAR'],
-] as const;
 export const SIGN = {
   ads: Array.from({ length: AD_VARIANTS }, (_, i) => S(0, i * 384, 1024, 384)),
-  station: STATION_NAMES.map((_, i) => S(1024, i * 256, 1024, 256)),
   indicator: S(1024, 768, 1024, 192),
   shops: Array.from({ length: 4 }, (_, i) => S(1024 + (i % 2) * 512, 960 + Math.floor(i / 2) * 96, 512, 96)),
   chai: S(1024, 1152, 512, 160),
@@ -688,18 +684,6 @@ function adVadaPav(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   label(ctx, 'मुंबई का बर्गर · ₹15', 340, 300, 50, 540, '#FFD400', { family: FONT_DEVA, weight: 'bold' });
 }
 
-function stationBoard(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, deva: string, eng: string): void {
-  ctx.fillStyle = '#141414';
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = '#FFD400';
-  ctx.fillRect(x + 10, y + 10, w - 20, h - 20);
-  ctx.fillStyle = '#141414';
-  ctx.fillRect(x + 22, y + 22, w - 44, 4);
-  ctx.fillRect(x + 22, y + h - 26, w - 44, 4);
-  label(ctx, deva, x + w / 2, y + h * 0.33, 92, w - 80, '#141414', { family: FONT_DEVA, weight: 'bold' });
-  label(ctx, eng, x + w / 2, y + h * 0.72, 84, w - 80, '#141414', { family: FONT_SANS, weight: 'bold' });
-}
-
 function signTexture(): THREE.CanvasTexture {
   return canvasTexture('scenery-signs', SIGN_SIZE, SIGN_SIZE, (ctx) => {
     const ads = [adChai, adCricket, adEnergy, adFilm, adVadaPav];
@@ -717,14 +701,13 @@ function signTexture(): THREE.CanvasTexture {
       for (let x = 256; x < 1024; x += 256) ctx.fillRect(x, 0, 2, 384);
       ctx.restore();
     });
-    STATION_NAMES.forEach(([d, e], i) => stationBoard(ctx, 1024, i * 256, 1024, 256, d, e));
     // Train indicator (amber LED rows).
     ctx.fillStyle = '#0c0c0c';
     ctx.fillRect(1024, 768, 1024, 192);
     const rows = [
-      ['12:04', 'NAVAPUR', 'S', '12'],
-      ['12:09', 'DHAVDI RD', 'F', '15'],
-      ['12:13', 'BHAAGONAGAR', 'S', '12'],
+      ['12:04', 'SLOW LOCAL', 'S', '12'],
+      ['12:09', 'FAST LOCAL', 'F', '15'],
+      ['12:13', 'LADIES SPL', 'S', '12'],
     ];
     ctx.textBaseline = 'middle';
     rows.forEach((r, i) => {
@@ -1231,20 +1214,26 @@ function skyTexture(): THREE.CanvasTexture {
         const puffs = 5 + Math.floor(rand() * 4);
         const pts: [number, number, number][] = [];
         for (let k = 0; k < puffs; k++) pts.push([bx + (k - puffs / 2) * 16 * s, cy - Math.sin((k / (puffs - 1)) * Math.PI) * 14 * s, (12 + rand() * 12) * s]);
-        ctx.fillStyle = 'rgba(236,222,214,0.95)';
-        for (const [x, y, r] of pts) {
+        // Flat cloud base: a pill under the puffs. It is part of each silhouette (shadow first,
+        // then white), never painted over the finished cloud, which drew a tan stripe across it.
+        const x0 = pts[0][0];
+        const x1 = pts[pts.length - 1][0];
+        const baseR = Math.min(pts[0][2], pts[pts.length - 1][2]) * 0.8;
+        const silhouette = (dx: number, dy: number) => {
+          for (const [x, y, r] of pts) {
+            ctx.beginPath();
+            ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
           ctx.beginPath();
-          ctx.arc(x + 2, y + 4, r, 0, Math.PI * 2);
+          ctx.roundRect(x0 + dx, cy + dy - baseR, x1 - x0, baseR * 2, baseR);
           ctx.fill();
-        }
-        ctx.fillStyle = 'rgba(255,255,255,0.97)';
-        for (const [x, y, r] of pts) {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.fillStyle = 'rgba(236,222,214,0.95)';
-        ctx.fillRect(pts[0][0], cy, pts[pts.length - 1][0] - pts[0][0], 5 * s);
+        };
+        // Opaque fills, so overlapping puffs never show darker seams.
+        ctx.fillStyle = '#ECDED6';
+        silhouette(2, 4);
+        ctx.fillStyle = '#FFFFFF';
+        silhouette(0, 0);
       }
     }
   });
@@ -1564,7 +1553,6 @@ function platformParts(L: number, seed: number): Parts {
   const rand = seededRandom(L * 7 + seed);
   const zc = -L / 2;
   const Dp = PLATFORM_DEPTH;
-  const station = SIGN.station[seed % SIGN.station.length];
   // Body, coping, tactile strip, paving band.
   b.box(cm, Dp - 0.25, 1.4, L, -(0.25 + (Dp - 0.25) / 2), 0.3, zc, { color: '#b7ad9d' });
   b.box(cm, 0.9, 0.12, L, -0.45, 0.94, zc, { color: '#dcd6ca' });
@@ -1591,22 +1579,23 @@ function platformParts(L: number, seed: number): Parts {
   b.box(cm, 0.06, 0.4, L + 0.6, -0.28, 5.28, zc, { color: '#f0ece0' });
   b.box(cm, 0.07, 0.1, L + 0.6, -0.27, 5.3, zc, { color: '#2F80C9' });
   // Hanging boards facing the runner (+z): station name and train indicator.
-  const hang = (z: number, y: number, w: number, h: number, uv: UVRect, frame: string) => {
+  const hang = (z: number, y: number, w: number, h: number, uv: UVRect | null, frame: string) => {
     b.box(cm, w + 0.12, h + 0.12, 0.08, -3.2, y, z, { color: frame });
-    b.quad(sm, w, h, -3.2, y, z + 0.045, 0, { uv });
-    b.quad(sm, w, h, -3.2, y, z - 0.045, Math.PI, { uv });
+    if (uv) {
+      b.quad(sm, w, h, -3.2, y, z + 0.045, 0, { uv });
+      b.quad(sm, w, h, -3.2, y, z - 0.045, Math.PI, { uv });
+    }
     b.box(cm, 0.03, 5.1 - y - h / 2, 0.03, -3.2 - w * 0.35, (5.1 + y + h / 2) / 2, z, { color: '#333' });
     b.box(cm, 0.03, 5.1 - y - h / 2, 0.03, -3.2 + w * 0.35, (5.1 + y + h / 2) / 2, z, { color: '#333' });
   };
-  hang(-2.2, 4.0, 2.8, 0.7, station, '#141414');
+  // The station name itself is a separate board mesh (platformBoardGeometry), one per station.
+  hang(PLATFORM_BOARDS.hang.z, PLATFORM_BOARDS.hang.y, 2.8, 0.7, null, '#141414');
   hang(-L * 0.5 + 2, 4.1, 2.8, 0.53, SIGN.indicator, '#222222');
   // Name boards facing the track.
-  for (const f of [0.3, 0.78]) {
+  for (const f of PLATFORM_BOARDS.trackside) {
     const z = -L * f;
     for (const dz of [-1.5, 1.5]) b.rod(cm, -2.05, 1.0, z + dz, -2.05, 3.35, z + dz, 0.05, 0.05, 6, { color: '#333' });
     b.box(cm, 0.08, 0.95, 3.4, -2.05, 2.85, z, { color: '#141414' });
-    b.quad(sm, 3.3, 0.83, -2.005, 2.85, z, HALF_PI, { uv: station });
-    b.quad(sm, 3.3, 0.83, -2.095, 2.85, z, -HALF_PI, { uv: station });
   }
   // Benches.
   for (let z = -8; z > -L + 2; z -= 10) {
@@ -1647,9 +1636,63 @@ function platformParts(L: number, seed: number): Parts {
   return b.merged();
 }
 
-/** Station platform (1 m high) with canopy, name boards, benches, chai stall and commuters. Edge at x = 0. */
-export function buildPlatform(length = PLATFORM_LENGTH, seed = 0): THREE.Group {
-  return groupFromParts(cachedParts(`platform:${length}:${seed}`, () => platformParts(length, seed)), 'platform');
+/** Where a platform's name boards hang (shared by the frames and the board meshes). */
+const PLATFORM_BOARDS = {
+  hang: { z: -2.2, y: 4.0, w: 2.8 },
+  trackside: [0.3, 0.78],
+} as const;
+
+/** The name-board faces of a platform of length L, UV 0..1 per face (Marathi above English). */
+export function platformBoardGeometry(L = PLATFORM_LENGTH): THREE.BufferGeometry {
+  const b = new PartBuilder();
+  const m = BOARD_KEY;
+  const { z, y, w } = PLATFORM_BOARDS.hang;
+  const h = w / BOARD_ASPECT;
+  b.quad(m, w, h, -3.2, y, z + 0.045, 0);
+  b.quad(m, w, h, -3.2, y, z - 0.045, Math.PI);
+  for (const f of PLATFORM_BOARDS.trackside) {
+    const tz = -L * f;
+    b.quad(m, 3.3, 3.3 / BOARD_ASPECT, -2.005, 2.85, tz, HALF_PI);
+    b.quad(m, 3.3, 3.3 / BOARD_ASPECT, -2.095, 2.85, tz, -HALF_PI);
+  }
+  return boardGeometry(b);
+}
+
+/** The station name board on a foot overbridge's near face. */
+export function fobBoardGeometry(): THREE.BufferGeometry {
+  const b = new PartBuilder();
+  b.quad(BOARD_KEY, 5.0, 5.0 / BOARD_ASPECT, 0, FOB_DECK_Y + 1.5, -0.5 + 0.2, 0);
+  return boardGeometry(b);
+}
+
+const BOARD_KEY = new THREE.MeshBasicMaterial();
+const boardGeoCache = new Map<string, THREE.BufferGeometry>();
+function boardGeometry(b: PartBuilder): THREE.BufferGeometry {
+  const g = b.merged()[0].geometry;
+  g.deleteAttribute('color');
+  return g;
+}
+function cachedBoardGeometry(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
+  let g = boardGeoCache.get(key);
+  if (!g) boardGeoCache.set(key, (g = make()));
+  return g;
+}
+
+function withBoard(group: THREE.Group, geometry: THREE.BufferGeometry, station: Station | null): THREE.Group {
+  if (!station) return group;
+  const mesh = new THREE.Mesh(geometry, stationBoardMaterial(station));
+  mesh.name = `${group.name}:stationBoard`;
+  group.add(mesh);
+  return group;
+}
+
+/**
+ * Station platform (1 m high) with canopy, name boards, benches, chai stall and commuters. Edge at x = 0.
+ * The boards show `station` (default: the first station of the Western line).
+ */
+export function buildPlatform(length = PLATFORM_LENGTH, seed = 0, station: Station | null = LINES.western.stations[0]): THREE.Group {
+  const g = groupFromParts(cachedParts(`platform:${length}:${seed}`, () => platformParts(length, seed)), 'platform');
+  return withBoard(g, cachedBoardGeometry(`platform:${length}`, () => platformBoardGeometry(length)), station);
 }
 
 export const FOB_DECK_Y = 7.0;
@@ -1695,8 +1738,13 @@ function fobParts(seed: number): Parts {
     roof.dispose();
   }
   // Boards on the near face (seen by the runner) and a safety banner on the far face.
-  b.box(cm, 5.2, 1.3, 0.1, 0, Y0 + 1.5, zN + 0.14, { color: '#141414' });
-  b.quad(signMat(), 5.0, 1.2, 0, Y0 + 1.5, zN + 0.2, 0, { uv: SIGN.station[seed % SIGN.station.length] });
+  if (seed === FOB_STATION) {
+    // Frame for the station name board (a separate per-station mesh, fobBoardGeometry).
+    b.box(cm, 5.2, 5.0 / BOARD_ASPECT + 0.1, 0.1, 0, Y0 + 1.5, zN + 0.14, { color: '#141414' });
+  } else {
+    b.box(cm, 3.7, 1.45, 0.08, 0, Y0 + 1.47, zN + 0.12, { color: '#e8e8e8' });
+    b.quad(signMat(), 3.6, 1.35, 0, Y0 + 1.47, zN + 0.17, 0, { uv: SIGN.ads[(seed * 2) % AD_VARIANTS] });
+  }
   for (const [x, ad] of [
     [-7.6, 1],
     [7.6, 3],
@@ -1752,9 +1800,17 @@ function fobParts(seed: number): Parts {
   return b.merged();
 }
 
-/** Steel truss foot overbridge spanning x -12..12, deck underside at 7 m, stairs at both ends (z 0 → -17). */
-export function buildFootOverbridge(seed = 0): THREE.Group {
-  return groupFromParts(cachedParts(`fob:${seed}`, () => fobParts(seed)), 'fob');
+/** FOB variant with a station name board; other variants stand between stations. */
+export const FOB_STATION = 0;
+export const FOB_VARIANTS = 2;
+
+/**
+ * Steel truss foot overbridge spanning x -12..12, deck underside at 7 m, stairs at both ends (z 0 → -17).
+ * Variant FOB_STATION carries a name board showing `station`.
+ */
+export function buildFootOverbridge(seed = 0, station: Station | null = LINES.western.stations[0]): THREE.Group {
+  const g = groupFromParts(cachedParts(`fob:${seed}`, () => fobParts(seed)), 'fob');
+  return seed === FOB_STATION ? withBoard(g, cachedBoardGeometry('fob', fobBoardGeometry), station) : g;
 }
 
 const BB_LEN = 8;
@@ -1989,6 +2045,8 @@ export interface Placement {
   minAbsX: number;
   /** Instanced-set keys this piece draws with. */
   keys: string[];
+  /** Index into plan.stations for pieces showing that station's name board, else -1. */
+  station: number;
 }
 
 export interface CorridorPlan {
@@ -2016,11 +2074,11 @@ const BILLBOARD_RADIUS = 4.3;
 const TREE_RADIUS = 4.5;
 
 function frontPiece(kind: PieceKind, variant: number, side: -1 | 1, s: number, length: number, xFront: number, y: number, layer: PieceLayer, keys: string[], scale = 1): Placement {
-  return { index: 0, kind, variant, side, layer, s0: s, s1: s + length, anchorS: side > 0 ? s + length : s, x: side * xFront, y, rotY: side > 0 ? Math.PI : 0, scale, minAbsX: xFront, keys };
+  return { index: 0, kind, variant, side, layer, s0: s, s1: s + length, anchorS: side > 0 ? s + length : s, x: side * xFront, y, rotY: side > 0 ? Math.PI : 0, scale, minAbsX: xFront, keys, station: -1 };
 }
 
 function centred(kind: PieceKind, variant: number, side: -1 | 1, s: number, radius: number, absX: number, y: number, rotY: number, reach: number, layer: PieceLayer, keys: string[]): Placement {
-  return { index: 0, kind, variant, side, layer, s0: s - radius, s1: s + radius, anchorS: s, x: side * absX, y, rotY, scale: 1, minAbsX: absX - reach, keys };
+  return { index: 0, kind, variant, side, layer, s0: s - radius, s1: s + radius, anchorS: s, x: side * absX, y, rotY, scale: 1, minAbsX: absX - reach, keys, station: -1 };
 }
 
 const overlaps = (a0: number, a1: number, zones: readonly (readonly [number, number])[]) => zones.some(([z0, z1]) => a0 < z1 && a1 > z0);
@@ -2034,21 +2092,26 @@ export function planCorridor(seed = 1, period = CORRIDOR_PERIOD): CorridorPlan {
 
   const fobs: number[] = [];
   const fobVariant: number[] = [];
+  const fobStation: number[] = [];
   // Foot overbridges sit mid-span between OHE portals so the girders never clash.
   const midSpan = (s: number) => Math.floor(s / MAST_SPACING) * MAST_SPACING + FOB_MAST_OFFSET;
   stations.forEach(([a, b], i) => {
     fobs.push(midSpan(a + 22));
-    fobVariant.push(i % SIGN.station.length);
+    fobVariant.push(FOB_STATION);
+    fobStation.push(i);
     const next = i + 1 < stations.length ? stations[i + 1][0] : period;
     const f = midSpan((b + next) / 2 - FOB_LENGTH / 2);
     if (rand() < 0.6 && f + FOB_LENGTH < next - 10 && f + FOB_LENGTH < period) {
       fobs.push(f);
-      fobVariant.push(Math.floor(rand() * SIGN.station.length));
+      // Between stations: no name board (keeps the rand() sequence of the original layout).
+      rand();
+      fobVariant.push(FOB_STATION + 1);
+      fobStation.push(-1);
     }
   });
   const fobZones = fobs.map((f) => [f - 2, f + FOB_LENGTH + 2] as [number, number]);
   fobs.forEach((f, i) => {
-    out.push({ index: 0, kind: 'fob', variant: fobVariant[i], side: 0, layer: 'span', s0: f, s1: f + FOB_LENGTH, anchorS: f, x: 0, y: 0, rotY: 0, scale: 1, minAbsX: 5.0, keys: [`fob:${fobVariant[i]}`] });
+    out.push({ index: 0, kind: 'fob', variant: fobVariant[i], side: 0, layer: 'span', s0: f, s1: f + FOB_LENGTH, anchorS: f, x: 0, y: 0, rotY: 0, scale: 1, minAbsX: 5.0, keys: [`fob:${fobVariant[i]}`], station: fobStation[i] });
   });
 
   const addTree = (side: -1 | 1, s: number, layer: PieceLayer, baseX: number) => {
@@ -2065,8 +2128,9 @@ export function planCorridor(seed = 1, period = CORRIDOR_PERIOD): CorridorPlan {
       const si = stations.findIndex(([a, b]) => a <= c && c < b);
       if (si >= 0) {
         const [a, b] = stations[si];
-        const v = si % SIGN.station.length;
-        out.push(frontPiece('platform', v, side, a, PLATFORM_LENGTH, PLATFORM_X, 0, 'near', [`platform:${v}`]));
+        const piece = frontPiece('platform', 0, side, a, PLATFORM_LENGTH, PLATFORM_X, 0, 'near', ['platform:0']);
+        piece.station = si;
+        out.push(piece);
         c = b + 0.5 + rand() * 1.5;
         continue;
       }
@@ -2207,6 +2271,25 @@ export function isStationAt(plan: CorridorPlan, s: number, margin = 3): boolean 
   return plan.stations.some(([a, b]) => local > a - margin && local < b + margin);
 }
 
+/**
+ * Running-order number of the platform at, or next ahead of, track position s: the platform
+ * the runner is at or approaching. Platforms are numbered 0, 1, 2… from the start of the
+ * track, continuing across period repeats. Allocation-free.
+ */
+export function platformNumberAt(plan: CorridorPlan, s: number): number {
+  const count = plan.stations.length;
+  if (count === 0) return 0;
+  let repeat = Math.floor(s / plan.period);
+  const local = s - repeat * plan.period;
+  let i = 0;
+  while (i < count && plan.stations[i][1] <= local) i++;
+  if (i === count) {
+    i = 0;
+    repeat++;
+  }
+  return platformNumber(repeat, i, count);
+}
+
 // ---------------------------------------------------------------------------------
 // Instanced side scenery
 
@@ -2248,8 +2331,57 @@ export interface SideScenery {
   root: THREE.Group;
   plan: CorridorPlan;
   meshes: THREE.InstancedMesh[];
+  /** The suburban line whose station names the platforms show. */
+  line: LineId;
   update(runnerS: number): void;
   isStation(s: number): boolean;
+  /** The station of the platform at, or next ahead of, track position s. */
+  stationAt(s: number): Station;
+}
+
+export interface SideSceneryOptions {
+  behind?: number;
+  ahead?: number;
+  lodFar?: number;
+  /** Line whose stations the platforms show (default: chosen from the seed). */
+  line?: LineId;
+}
+
+/** Name-board meshes reused by whichever station pieces are in view. */
+class BoardSlots {
+  private readonly slots: THREE.Mesh[] = [];
+  private used = 0;
+
+  constructor(root: THREE.Group, geometry: THREE.BufferGeometry, count: number, material: THREE.Material, name: string) {
+    for (let i = 0; i < count; i++) {
+      const m = new THREE.Mesh(geometry, material);
+      m.name = `${name}:stationBoard`;
+      m.matrixAutoUpdate = false;
+      m.frustumCulled = false;
+      m.castShadow = false;
+      m.receiveShadow = true;
+      m.visible = false;
+      this.slots.push(m);
+      root.add(m);
+    }
+  }
+
+  begin(): void {
+    this.used = 0;
+  }
+
+  place(matrix: THREE.Matrix4, material: THREE.Material): void {
+    if (this.used >= this.slots.length) return;
+    const m = this.slots[this.used++];
+    m.matrix.copy(matrix);
+    m.matrixWorldNeedsUpdate = true;
+    m.material = material;
+    m.visible = true;
+  }
+
+  end(): void {
+    for (let i = this.used; i < this.slots.length; i++) this.slots[i].visible = false;
+  }
 }
 
 interface InstSet {
@@ -2266,10 +2398,11 @@ interface InstSet {
  * Nothing here casts shadows (each caster would be drawn again in the shadow pass);
  * ground contact is baked into the pieces instead.
  */
-export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number; lodFar?: number } = {}): SideScenery {
+export function createSideScenery(seed = 1, o: SideSceneryOptions = {}): SideScenery {
   const behind = o.behind ?? VIEW_BEHIND;
   const ahead = o.ahead ?? VIEW_AHEAD;
   const lodFar = o.lodFar ?? Infinity;
+  const line = o.line ?? lineForSeed(seed);
   const plan = planCorridor(seed);
   const root = new THREE.Group();
   root.name = 'sideScenery';
@@ -2295,6 +2428,15 @@ export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number
   }
   const setsFor = plan.placements.map((p) => p.keys.map((k) => sets.get(k)!));
   const setList = [...sets.values()];
+  // Station name boards: one mesh per station piece in view, each with its station's board.
+  const firstBoard = stationBoardMaterial(stationForPlatform(line, 0));
+  const slotsFor = (kind: PieceKind, key: string, geometry: () => THREE.BufferGeometry) =>
+    plan.placements.some((p) => p.kind === kind && p.station >= 0)
+      ? new BoardSlots(root, cachedBoardGeometry(key, geometry), Math.max(1, maxConcurrent(plan, `${kind}:0`, behind, ahead)), firstBoard, kind)
+      : null;
+  const platformBoards = slotsFor('platform', `platform:${PLATFORM_LENGTH}`, () => platformBoardGeometry(PLATFORM_LENGTH));
+  const fobBoards = slotsFor('fob', 'fob', fobBoardGeometry);
+  const perPeriod = plan.stations.length;
   const obj = new THREE.Object3D();
   let runner = 0;
   const visit = (p: Placement, off: number) => {
@@ -2302,6 +2444,11 @@ export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number
     obj.rotation.set(0, p.rotY, 0);
     obj.scale.setScalar(p.scale);
     obj.updateMatrix();
+    if (p.station >= 0) {
+      const n = platformNumber(Math.round(off / plan.period), p.station, perPeriod);
+      const board = stationBoardMaterial(stationForPlatform(line, n));
+      (p.kind === 'fob' ? fobBoards : platformBoards)?.place(obj.matrix, board);
+    }
     const near = p.s0 + off - runner < lodFar;
     const list = setsFor[p.index];
     for (let i = 0; i < list.length; i++) {
@@ -2329,13 +2476,19 @@ export function createSideScenery(seed = 1, o: { behind?: number; ahead?: number
     update(runnerS: number) {
       runner = runnerS;
       for (let i = 0; i < setList.length; i++) setList[i].count = setList[i].nearCount = 0;
+      platformBoards?.begin();
+      fobBoards?.begin();
       forEachVisible(plan, runnerS - behind, runnerS + ahead, visit);
+      platformBoards?.end();
+      fobBoards?.end();
       for (let i = 0; i < setList.length; i++) {
         const set = setList[i];
         show(set.major, set.count);
         show(set.minor, set.nearCount);
       }
     },
+    line,
     isStation: (s: number) => isStationAt(plan, s),
+    stationAt: (s: number) => stationForPlatform(line, platformNumberAt(plan, s)),
   };
 }

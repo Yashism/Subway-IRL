@@ -156,11 +156,16 @@ describe('Collisions', () => {
   it('ends the run on a head-on crash and starts a fresh run afterwards', () => {
     const g = playing();
     place(g, { kind: 'auto', lane: 0, s: g.s + 10 });
-    const ev = steps(g, 90);
+    const ev: GameEvent[] = [];
+    for (let i = 0; i < 90 && g.state === 'playing'; i++) ev.push(...steps(g, 1));
     expect(g.state).toBe('caught');
     expect(g.caughtReason).toBe('crash');
     expect(ev).toContainEqual({ type: 'caught', reason: 'crash' });
-    steps(g, 90);
+    // The caught screen holds for TUNING.catchSeconds before the summary.
+    const catchFrames = Math.round(TUNING.catchSeconds * TUNING.stepHz);
+    steps(g, catchFrames - 2);
+    expect(g.state).toBe('caught');
+    steps(g, 3);
     expect(g.state).toBe('summary');
     const distance = g.stats.distance;
     expect(distance).toBeGreaterThan(9);
