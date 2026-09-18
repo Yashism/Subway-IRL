@@ -126,6 +126,16 @@ export class AppLoop {
     else if (wasLoss !== game.pausedByLoss) this.dispatch({ type: 'gameState', state: game.state, pausedByLoss: false });
   }
 
+  /**
+   * Abandons the run on screen and goes back to the menu. Like pauseGame() this is a direct call
+   * that emits nothing of its own, so the state change is reported the way a step would report it —
+   * which is also what keeps the run off the profile: it never passes through `summary`.
+   */
+  toMenu(): void {
+    const events = this.game.toMenu();
+    if (events.length) this.gameEvents(events, this.lastNow);
+  }
+
   beginFrame(): void {
     this.frameEvents.length = 0;
   }
@@ -223,6 +233,9 @@ export class AppLoop {
         break;
       case 'pauseGame':
         this.pauseGame();
+        break;
+      case 'homeGame':
+        this.toMenu();
         break;
       default:
         this.onEffect(fx);

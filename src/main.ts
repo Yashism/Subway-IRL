@@ -27,6 +27,7 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?posereplay=<fixture>    pose frames from tests/fixtures/<fixture>.json instead of the camera
 //   ?session=<file>          replay a monitor recording from tests/fixtures/sessions/
 //   ?mode=full|small         force the play mode; ?monitor opens the live monitor
+//   ?movecheck=skip|force    never / always run the guided move check after calibration
 //   ?difficulty= ?seed= ?god ?tone= ?line= ?pip=0 ?perf ?saveAutopilot
 //   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
 //                            webcam mode, because the keyboard then claims to track jogging.
@@ -124,7 +125,7 @@ const world = new WorldView(canvas, {
   tone: toneParam && TONES.includes(toneParam) ? toneParam : undefined,
   line: isLineId(lineParam) ? lineParam : undefined,
 });
-const hud = new Hud(document.getElementById('hud')!);
+const hud = new Hud(document.getElementById('hud')!, { onHome: () => loop.dispatch({ type: 'home' }) });
 const stepper = new FixedStepper();
 
 // The pose UI stacks above the HUD, so it goes after #hud in the DOM.
@@ -136,7 +137,9 @@ const screens = new PoseScreens(uiRoot, {
 });
 // The move check gets its own layer above the pose UI: it owns the whole screen while it is up.
 const moveCheckRoot = document.body.appendChild(document.createElement('div'));
-const moveCheckLayer = new MoveCheckScreen(moveCheckRoot, moveCheck.handlers);
+const moveCheckLayer = new MoveCheckScreen(moveCheckRoot, moveCheck.handlers, {
+  onHome: () => loop.dispatch({ type: 'home' }),
+});
 const pip = new PosePip(pipRoot, { visible: pipVisibleFromUrl(location.search) });
 pip.attachToggleKey(window);
 runtime.sampleLuma = (t) => pip.sampleLuma(t);

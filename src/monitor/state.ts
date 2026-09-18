@@ -148,7 +148,9 @@ export function describeMoveCheck(mode: PlayMode, e: MoveCheckEvent): { label: s
     const peak = e.peak === null ? '' : ` peak ${e.peak.toFixed(3)}`;
     return { label: `move check: ${e.move} ${e.result === 'done' ? '✓' : 'skipped'}${peak}`, tone: e.result === 'done' ? 'good' : 'warn' };
   }
-  const keys = Object.keys(e.tuned).sort();
+  // The tuned set is not fixed — the pose half derives companions and may add more — so this
+  // formats whatever arrives rather than naming keys, and skips anything that is not a number.
+  const keys = Object.keys(e.tuned).filter((k) => Number.isFinite(e.tuned[k])).sort();
   const tuned = keys.length ? keys.map((k) => `${k}=${e.tuned[k].toFixed(3)}`).join(' ') : 'nothing';
   return { label: `move check done — tuned ${tuned}${e.note ? ` · ${e.note}` : ''}`, tone: 'info' };
 }

@@ -291,6 +291,8 @@ export class PoseScreens {
     );
     this.button(toolRow, 'ps-btn ps-btn-small ps-recal-ready', 'Recalibrate', () => this.emit({ type: 'recalibrate' }));
     this.button(toolRow, 'ps-btn ps-btn-small ps-btn-ghost', 'Use keyboard', () => this.emit({ type: 'useKeyboard' }));
+    // Never stuck in the camera flow: the same way out Esc gives, spelled out.
+    this.button(toolRow, 'ps-btn ps-btn-small ps-btn-ghost', '\u2302 Main menu', () => this.emit({ type: 'home' }));
 
     const status = el('div', 'ps-status', cal);
     this.calRing = ring(status, 'ps-ring-cal');

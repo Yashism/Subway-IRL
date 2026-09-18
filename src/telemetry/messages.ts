@@ -159,8 +159,33 @@ type Rec = Record<string, unknown>;
 const isObj = (x: unknown): x is Rec => typeof x === 'object' && x !== null;
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 
+/**
+ * A move-check event the monitor can render without checking every field again. The other kinds
+ * are trusted on their `kind` alone, but this one carries numbers the monitor formats directly.
+ */
+function isMoveCheckEvent(e: unknown): boolean {
+  if (!isObj(e)) return false;
+  switch (e.phase) {
+    case 'start':
+      return typeof e.move === 'string';
+    case 'result':
+      return (
+        typeof e.move === 'string' &&
+        (e.result === 'done' || e.result === 'skipped') &&
+        (e.peak === null || isNum(e.peak)) &&
+        isNum(e.progress)
+      );
+    case 'done':
+      return isObj(e.tuned) && (e.note === null || typeof e.note === 'string');
+    default:
+      return false;
+  }
+}
+
 export function isGameMessage(x: unknown): x is GameMessage {
-  return isObj(x) && typeof x.kind === 'string' && GAME_KINDS.has(x.kind);
+  if (!isObj(x) || typeof x.kind !== 'string' || !GAME_KINDS.has(x.kind)) return false;
+  if (x.kind !== 'moveCheck') return true;
+  return (x.mode === 'full' || x.mode === 'small') && isMoveCheckEvent(x.event);
 }
 
 export function isControlMessage(x: unknown): x is ControlMessage {

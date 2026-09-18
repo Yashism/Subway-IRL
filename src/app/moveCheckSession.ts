@@ -131,8 +131,19 @@ export class MoveCheckSession {
     this.freeze(true);
   }
 
-  /** The flow's `endMoveCheck` effect. Whatever was measured has already been saved. */
+  /**
+   * The flow's `endMoveCheck` effect. A check abandoned part-way keeps what it already measured —
+   * a move the player really performed is better data than the shipped default, and the store
+   * merges, so the steps they never reached keep whatever was saved for them before. A check that
+   * measured nothing saves nothing, so a player who backed straight out of their first one is
+   * still taught the moves next time rather than being marked as having seen them.
+   */
   end(): void {
+    const check = this.check;
+    if (check && !check.finished && check.model.steps.some((s) => s.status === 'done')) {
+      check.skipAll();
+      this.sync();
+    }
     this.check = null;
     this.freeze(false);
   }

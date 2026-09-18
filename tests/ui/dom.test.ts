@@ -170,3 +170,45 @@ describe('Hud: the pause screen’s Controls card', () => {
     expect(box.children).toHaveLength(0);
   });
 });
+
+describe('Hud: the Home button', () => {
+  function hud() {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const log: string[] = [];
+    const h = new Hud(root, { onHome: () => log.push('home') });
+    return { root, h, log, buttons: [...root.querySelectorAll<HTMLButtonElement>('.hud-home')] };
+  }
+
+  it('sits on the pause card and the run summary, and lets go of focus on click', () => {
+    const h = hud();
+    expect(h.buttons).toHaveLength(2);
+    expect(h.root.querySelector('.hud-paused .hud-home')).not.toBeNull();
+    expect(h.root.querySelector('.hud-summary .hud-home')).not.toBeNull();
+    for (const b of h.buttons) {
+      expect(b.textContent).toBe('⌂ Main menu');
+      b.focus();
+      b.click();
+      // A focused button would swallow the Enter that starts the next run.
+      expect(document.activeElement).not.toBe(b);
+    }
+    expect(h.log).toEqual(['home', 'home']);
+  });
+
+  it('is inert rather than broken when the page wired no handler', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    new Hud(root);
+    const btn = root.querySelector<HTMLButtonElement>('.hud-home')!;
+    expect(() => btn.click()).not.toThrow();
+  });
+
+  it('keeps the summary card’s Home well clear of the PLAY AGAIN target', () => {
+    // Reflex on the summary is Enter or the big PLAY AGAIN badge; Home must not be next to it.
+    const h = hud();
+    const card = h.root.querySelector('.hud-summary .hud-card')!;
+    const kids = [...card.children];
+    expect(kids.at(-1)!.classList.contains('hud-home')).toBe(true);
+    expect(kids.indexOf(card.querySelector('.hud-again')!)).toBeLessThan(kids.length - 2);
+  });
+});

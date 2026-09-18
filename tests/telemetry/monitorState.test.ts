@@ -385,3 +385,31 @@ describe('monitor: move-check progress', () => {
     expect(rec.eventCount).toBe(0);
   });
 });
+
+describe('monitor: malformed move-check telemetry', () => {
+  const bad: unknown[] = [
+    { kind: 'moveCheck', t: 1, mode: 'full' },
+    { kind: 'moveCheck', t: 1, mode: 'full', event: null },
+    { kind: 'moveCheck', t: 1, mode: 'full', event: { phase: 'nope' } },
+    { kind: 'moveCheck', t: 1, mode: 'full', event: { phase: 'result', move: 'jump', result: 'done', peak: 'x', progress: 1 } },
+    { kind: 'moveCheck', t: 1, mode: 'full', event: { phase: 'result', move: 'jump', result: 'maybe', peak: null, progress: 1 } },
+    { kind: 'moveCheck', t: 1, mode: 'full', event: { phase: 'done', tuned: 'lots', note: null } },
+    { kind: 'moveCheck', t: 1, mode: 'sideways', event: { phase: 'start', move: 'jog' } },
+  ];
+
+  it('is dropped at the door rather than thrown on', () => {
+    // Anything on the channel is another tab's word for it; the monitor formats these numbers.
+    for (const m of bad) expect(isGameMessage(m), JSON.stringify(m)).toBe(false);
+  });
+
+  it('survives a tuned value that is not a number', () => {
+    const msg: GameMessage = {
+      kind: 'moveCheck',
+      t: 1,
+      mode: 'full',
+      event: { phase: 'done', tuned: { kneeLift: 0.2, junk: NaN } as unknown as Record<string, number>, note: null },
+    };
+    const s = run([msg], 1);
+    expect(s.timeline[0].label).toBe('move check done — tuned kneeLift=0.200');
+  });
+});

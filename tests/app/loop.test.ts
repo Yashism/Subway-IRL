@@ -403,15 +403,12 @@ describe('AppLoop: the move check', () => {
     expect(r.effects.at(-1)).toEqual({ type: 'startMoveCheck' });
   });
 
-  it('Enter finishes the check and tears it down, then starts the run', () => {
+  it('Enter finishes the check, tears it down and starts the run in one press', () => {
     const r = firstRun();
     r.key('Enter');
     r.frame();
-    expect(r.flow.screen).toBe('ready');
-    expect(r.effects.at(-1)).toEqual({ type: 'endMoveCheck' });
-    r.key('Enter');
-    r.frame();
     expect(r.flow.screen).toBe('playing');
+    expect(r.effects.at(-1)).toEqual({ type: 'endMoveCheck' });
     expect(r.game.state).toBe('countdown');
   });
 
@@ -447,5 +444,78 @@ describe('AppLoop: the move check', () => {
     expect(r.effects.at(-1)).toEqual({ type: 'startMoveCheck' });
     // Still paused behind the check's scrim, not restarted.
     expect(r.game.state).toBe('paused');
+  });
+});
+
+describe('AppLoop: Home', () => {
+  /** A live keyboard run, a few seconds in. */
+  function running() {
+    const r = setup({ input: 'keyboard' });
+    r.key('Enter');
+    r.frame(240);
+    expect(r.game.state).toBe('playing');
+    return r;
+  }
+
+  it('abandons the run and reports the state change like a step would', () => {
+    const r = running();
+    const mark = r.tel.log.length;
+    r.loop.dispatch({ type: 'home' });
+    expect(r.game.state).toBe('menu');
+    expect(r.flow.screen).toBe('menu');
+    expect(r.flow.model.gameState).toBe('menu');
+    // The run never passes through `summary`, which is what keeps it off the profile.
+    expect(r.tel.log.slice(mark)).toEqual(['state:menu']);
+  });
+
+  it('never routes the abandoned run through the summary that records it', () => {
+    const states: string[] = [];
+    const r = setup({ input: 'keyboard' });
+    // The same hook main.ts records a run from.
+    const loop = new AppLoop({
+      game: r.game,
+      flow: r.flow,
+      keyboard: new KeyboardInput(),
+      onGameEvent: (e) => {
+        if (e.type === 'state') states.push(e.state);
+      },
+    });
+    loop.dispatch({ type: 'startPressed' });
+    loop.beginFrame();
+    loop.step(DT, 16);
+    loop.dispatch({ type: 'home' });
+    expect(states).toContain('menu');
+    expect(states).not.toContain('summary');
+  });
+
+  it('starts a fresh run straight afterwards', () => {
+    const r = running();
+    r.loop.dispatch({ type: 'home' });
+    const mark = r.tel.log.length;
+    r.key('Enter');
+    r.frame(240);
+    expect(r.flow.screen).toBe('playing');
+    expect(r.game.state).toBe('playing');
+    // A whole new run, counted down from the top — not the abandoned one resumed.
+    expect(r.tel.log.slice(mark)).toEqual(['keyboard:start', 'state:countdown', 'state:playing']);
+  });
+
+  it('leaves a live move check behind it', () => {
+    const r = setup({ input: 'webcam', moveCheckSeen: false });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.frame();
+    expect(r.flow.screen).toBe('moveCheck');
+    r.loop.dispatch({ type: 'home' });
+    expect(r.flow.screen).toBe('menu');
+    expect(r.effects.at(-1)).toEqual({ type: 'endMoveCheck' });
+  });
+
+  it('does nothing when there is no run and the menu is already showing', () => {
+    const r = setup({ input: 'keyboard' });
+    r.loop.dispatch({ type: 'home' });
+    expect(r.game.state).toBe('menu');
+    expect(r.tel.log).toEqual([]);
   });
 });

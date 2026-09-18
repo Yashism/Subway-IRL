@@ -174,6 +174,39 @@ describe('MoveCheckSession: running a check', () => {
   });
 });
 
+describe('MoveCheckSession: an abandoned check', () => {
+  it('keeps what it already measured, so four green ticks are not thrown away', () => {
+    const r = new Rig();
+    r.session.begin('full');
+    r.frame();
+    for (let i = 1; i <= 4; i++) r.frame({ jogPrimary: 0.4, jogSteps: i });
+    expect(r.session.model!.steps[0].status).toBe('done');
+    // Esc, Recalibrate, a mode change — every one of them ends the check where it stands.
+    r.session.end();
+    expect(r.session.store.get('full')!.thresholds.kneeLift).toBeCloseTo(tunedValue('kneeLift', 0.4), 6);
+    expect(r.th.kneeLift).toBeCloseTo(tunedValue('kneeLift', 0.4), 6);
+    expect(r.session.seen).toBe(true);
+  });
+
+  it('saves nothing when nothing was measured, so a first-timer is still taught next time', () => {
+    const r = new Rig();
+    r.session.begin('full');
+    r.frame();
+    r.session.end();
+    expect(r.session.store.empty).toBe(true);
+    expect(r.session.seen).toBe(false);
+    expect(r.th.kneeLift).toBe(DEFAULT_THRESHOLDS.kneeLift);
+  });
+
+  it('does not re-save a check that already finished', () => {
+    const r = new Rig();
+    r.walkThrough('full');
+    const saves = r.tuningChanges.length;
+    r.session.end();
+    expect(r.tuningChanges).toHaveLength(saves);
+  });
+});
+
 describe('MoveCheckSession: the baseline pin', () => {
   it('holds the baseline still while a step is being measured, and lets go after', () => {
     // Drift chases a slow, sub-threshold lean, which is exactly the excursion being measured.

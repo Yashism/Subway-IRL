@@ -1,6 +1,9 @@
 import './moveCheck.css';
 import { MOVE_ORDER, type MoveCheckHandlers, type MoveCheckModel, type MoveCheckSummary, type MoveId, type MoveStepModel } from '../pose/moveCheckTypes';
+import { PRIMARY_KEYS } from '../pose/tuning';
 import type { PlayMode } from '../pose/types';
+
+const PRIMARY = new Set<string>(PRIMARY_KEYS);
 
 // ---------------------------------------------------------------- pure view helpers
 
@@ -169,7 +172,9 @@ export function renderSummaryCard(summary: MoveCheckSummary, opts: { title?: str
     el('span', 'mc-note-text', note, summary.asymmetryNote);
   }
 
-  const tunedCount = Object.keys(summary.tuned).length;
+  // Re-arm and velocity keys are derived from the key they follow (see tuning.ts), so counting
+  // them would tell a player who measured one move that two settings changed.
+  const tunedCount = Object.keys(summary.tuned).filter((k) => PRIMARY.has(k)).length;
   el('div', 'mc-tuned', card, tunedCount ? `Tuned ${tunedCount} setting${tunedCount === 1 ? '' : 's'} to the way you move.` : 'Nothing measured — the default settings stay.');
 
   const keys = el('div', 'mc-keys', card);
@@ -192,9 +197,18 @@ const JOG_PIPS = 4;
  * The guided move rehearsal, rendered from a MoveCheckModel and nothing else.
  * Spec: docs/superpowers/specs/2026-09-17-move-check.md
  */
+export interface MoveCheckScreenOptions {
+  /**
+   * The Home button. Not part of MoveCheckHandlers: it asks nothing of the check, it leaves it —
+   * and the check's scrim owns the screen, so no button underneath could offer the way out.
+   */
+  onHome?(): void;
+}
+
 export class MoveCheckScreen {
   private readonly root: HTMLElement;
   private readonly handlers: MoveCheckHandlers;
+  private readonly opts: MoveCheckScreenOptions;
   private readonly lastText = new Map<Element, string>();
   private readonly attrs = new Map<Element, Map<string, string>>();
   private mounted = false;
@@ -217,13 +231,15 @@ export class MoveCheckScreen {
   private skipBtn!: HTMLButtonElement;
   private acceptBtn!: HTMLButtonElement;
   private skipAllBtn!: HTMLButtonElement;
+  private homeBtn!: HTMLButtonElement;
   private sheetBox!: HTMLElement;
   private sheetKey = '';
   private lastWidth = '';
 
-  constructor(root: HTMLElement, handlers: MoveCheckHandlers) {
+  constructor(root: HTMLElement, handlers: MoveCheckHandlers, opts: MoveCheckScreenOptions = {}) {
     this.root = root;
     this.handlers = handlers;
+    this.opts = opts;
   }
 
   /** Builds the DOM. Idempotent; `update` calls it for you. */
@@ -288,6 +304,8 @@ export class MoveCheckScreen {
     this.skipBtn = button(actions, 'mc-btn mc-btn-alt mc-btn-skip', 'Skip this move', () => this.handlers.skipStep());
     this.acceptBtn = button(actions, 'mc-btn mc-btn-accept', 'Use my best attempt', () => this.handlers.acceptBest());
     this.skipAllBtn = button(actions, 'mc-btn mc-btn-ghost mc-btn-skip-all', 'Skip all', () => this.handlers.skipAll());
+    this.homeBtn = button(actions, 'mc-btn mc-btn-ghost mc-btn-home', '\u2302 Main menu', () => this.opts.onHome?.());
+    this.homeBtn.hidden = !this.opts.onHome;
 
     // ---- summary
     const sum = el('div', 'mc-summary', root);
@@ -296,6 +314,8 @@ export class MoveCheckScreen {
     button(sActions, 'mc-btn mc-btn-go', 'START PLAYING', () => this.handlers.start());
     button(sActions, 'mc-btn mc-btn-alt', 'Redo the check', () => this.handlers.redo());
     button(sActions, 'mc-btn mc-btn-ghost', 'Reset to defaults', () => this.handlers.resetTuning());
+    const sHome = button(sActions, 'mc-btn mc-btn-ghost mc-btn-home', '\u2302 Main menu', () => this.opts.onHome?.());
+    sHome.hidden = !this.opts.onHome;
   }
 
   /**
@@ -349,7 +369,8 @@ export class MoveCheckScreen {
     this.text(this.barValue, strengthPercent(p));
     this.text(this.hint, step.hint ?? '');
     this.attr(this.hint, 'data-on', step.hint ? 'on' : 'off');
-    this.text(this.peak, step.peak === null ? '' : `best ${formatPeak(step.peak)}`);
+    // Nothing to report until the player has actually moved: "best 0.00" reads as a verdict.
+    this.text(this.peak, step.peak === null || step.peak <= 0 ? '' : `best ${formatPeak(step.peak)}`);
 
     this.skipBtn.hidden = !step.canSkip;
     this.acceptBtn.hidden = !step.canAccept;

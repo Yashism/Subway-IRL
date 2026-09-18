@@ -1080,3 +1080,46 @@ body {
   width: 100%;
   animation: none;
 }
+
+/*
+ * The move check owns the screen. Its scrim is translucent on purpose (the world still reads
+ * behind it), but the menu's key legend and logo read straight through it and compete with the
+ * card, so the menu card steps aside while a check is up.
+ */
+html[data-pose-screen='moveCheck'] .hud[data-state='menu'] .hud-menu {
+  display: none;
+}
+
+/* ------------------------------------------------------------ home button */
+
+/*
+ * "Main menu", on the pause card and the run summary. Kept to the quiet foot of each card, well
+ * away from the big PLAY AGAIN target, so it is never the button a hand lands on by reflex.
+ */
+.hud-btn {
+  appearance: none;
+  cursor: pointer;
+  pointer-events: auto;
+  padding: 7px 18px 6px;
+  border-radius: 999px;
+  font: 700 14px/1.2 var(--font-ui);
+  color: #fff;
+  text-shadow: none;
+  background: rgba(20, 12, 45, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.hud-btn:hover,
+.hud-btn:focus-visible {
+  background: rgba(60, 40, 120, 0.9);
+  border-color: var(--gold);
+}
+.hud-pause-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.hud-summary .hud-home {
+  margin-top: 10px;
+}

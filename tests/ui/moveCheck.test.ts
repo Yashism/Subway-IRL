@@ -65,11 +65,11 @@ function calls(): Calls {
   };
 }
 
-function screen(m: MoveCheckModel | null = model('jog')) {
+function screen(m: MoveCheckModel | null = model('jog'), onHome?: () => void) {
   const root = document.createElement('div');
   document.body.append(root);
   const c = calls();
-  const ui = new MoveCheckScreen(root, c.handlers);
+  const ui = new MoveCheckScreen(root, c.handlers, onHome ? { onHome } : {});
   ui.update(m);
   const btn = (cls: string) => root.querySelector<HTMLButtonElement>(cls)!;
   return { root, ui, log: c.log, btn };
@@ -147,7 +147,7 @@ describe('MoveCheckScreen: buttons', () => {
   it('swaps the step buttons for the summary ones when the check is over', () => {
     const s = screen(summaryModel([]));
     expect(s.root.dataset.phase).toBe('summary');
-    const actions = s.root.querySelectorAll('.mc-actions-summary .mc-btn');
+    const actions = s.root.querySelectorAll('.mc-actions-summary .mc-btn:not([hidden])');
     expect([...actions].map((b) => b.textContent)).toEqual(['START PLAYING', 'Redo the check', 'Reset to defaults']);
     for (const b of actions) {
       (b as HTMLButtonElement).focus();
@@ -262,6 +262,45 @@ describe('the controls card', () => {
   it('can be titled for the pause screen', () => {
     const c = renderSummaryCard(summaryModel([]).summary!, { title: 'Controls' });
     expect(c.querySelector('.mc-sheet-title')!.textContent).toBe('Controls');
+  });
+});
+
+describe('MoveCheckScreen: the strength readout', () => {
+  it('says nothing about a best attempt until the player has actually moved', () => {
+    // `best 0.00` before a muscle has twitched reads as a verdict on the player.
+    const idle = screen(model('jump', { peak: 0 }));
+    expect(idle.root.querySelector('.mc-peak')!.textContent).toBe('');
+    const none = screen(model('jump', { peak: null }));
+    expect(none.root.querySelector('.mc-peak')!.textContent).toBe('');
+    const moved = screen(model('jump', { peak: 0.31 }));
+    expect(moved.root.querySelector('.mc-peak')!.textContent).toBe('best 0.31');
+  });
+
+  it('counts the moves tuned, not the companions derived from them', () => {
+    // kneeRelease follows kneeLift; telling a player who did one move "2 settings" is a lie.
+    const one = renderSummaryCard({ ...summaryModel([]).summary!, tuned: { kneeLift: 0.2, kneeRelease: 0.1 } });
+    expect(one.querySelector('.mc-tuned')!.textContent).toBe('Tuned 1 setting to the way you move.');
+    const two = renderSummaryCard({ ...summaryModel([]).summary!, tuned: { kneeLift: 0.2, kneeRelease: 0.1, jumpRise: 0.3, jumpVel: 1.1 } });
+    expect(two.querySelector('.mc-tuned')!.textContent).toBe('Tuned 2 settings to the way you move.');
+  });
+});
+
+describe('MoveCheckScreen: the way out', () => {
+  it('offers Main menu on the step and the summary, and only when the page wired one', () => {
+    const shown = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.mc-btn-home')].filter((b) => !b.hidden);
+    // The check's scrim owns the screen, so a button underneath could not be reached.
+    expect(shown(screen(model('jog')).root)).toHaveLength(0);
+
+    const log: string[] = [];
+    const s = screen(model('jog'), () => log.push('home'));
+    const buttons = shown(s.root);
+    expect(buttons).toHaveLength(2); // one on the step row, one on the summary row
+    for (const b of buttons) {
+      b.focus();
+      (b as HTMLButtonElement).click();
+      expect(document.activeElement).not.toBe(b);
+    }
+    expect(log).toEqual(['home', 'home']);
   });
 });
 

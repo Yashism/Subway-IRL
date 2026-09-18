@@ -52,6 +52,8 @@ export type FlowInput =
   | { type: 'recalibrate' }
   /** "Check my moves" from the ready screen: run the check without recalibrating. */
   | { type: 'checkMoves' }
+  /** Back to the main menu from anywhere, abandoning whatever is on screen. */
+  | { type: 'home' }
   | { type: 'cameraOk' }
   | { type: 'cameraFailed'; message: string }
   | { type: 'pose'; status: PoseSnapshot }
@@ -72,7 +74,9 @@ export type FlowEffect =
   /** The move-check screen is up: build a MoveCheck and start feeding it pose frames. */
   | { type: 'startMoveCheck' }
   /** The move-check screen is gone: stop feeding it (whatever it measured is kept). */
-  | { type: 'endMoveCheck' };
+  | { type: 'endMoveCheck' }
+  /** Call Game.toMenu(): abandon the run on screen without scoring it. */
+  | { type: 'homeGame' };
 
 export interface ScreenModel {
   screen: FlowScreen;
@@ -117,6 +121,7 @@ export const MSG_PLAY_AGAIN = '✋ Raise your right hand to play again';
 
 const NONE: readonly FlowEffect[] = Object.freeze([]);
 const START_CHECK: FlowEffect = Object.freeze({ type: 'startMoveCheck' });
+const HOME_GAME: FlowEffect = Object.freeze({ type: 'homeGame' });
 const END_CHECK: FlowEffect = Object.freeze({ type: 'endMoveCheck' });
 const initialPose = (): PoseSnapshot => ({
   tracking: false,
@@ -188,6 +193,8 @@ export class SessionFlow {
       this.lossPaused = i.state === 'paused' && !!i.pausedByLoss;
       return NONE as FlowEffect[];
     }
+    // Home works the same with or without a camera: it is the way out of every screen there is.
+    if (i.type === 'home') return this.home();
     return this.input === 'keyboard' ? this.keyboard(i) : this.webcam(i);
   }
 
@@ -253,9 +260,9 @@ export class SessionFlow {
         return NONE as FlowEffect[];
       case 'moveCheck':
         if (i.type === 'chooseCamera') return this.switchCamera(i.id);
-        // Enter leaves the check for the ready screen, which teaches the start gesture. The gesture
-        // itself is ignored here: the hoverboard step has both hands up, which is one hand away
-        // from it, and a check must never be dropped by the move it is asking for.
+        // "START PLAYING" (and Enter) means what it says: out of the check and into the run. The
+        // start gesture is ignored here instead — the hoverboard step has both hands up, which is
+        // one hand away from it, and a check must never be dropped by the move it is asking for.
         if (i.type === 'startPressed') return this.endCheck();
         return NONE as FlowEffect[];
       case 'playing':
@@ -317,12 +324,32 @@ export class SessionFlow {
     return [START_CHECK];
   }
 
-  /** Done with the check (however it ended): on to the ready screen, which teaches the start gesture. */
+  /**
+   * "START PLAYING" on the summary card: done with the check, straight into the run — the card
+   * itself lists the start gesture, so there is nothing left for the ready screen to teach.
+   * Without a calibration there is nothing to play with, so that falls back to the ready screen,
+   * which the next pose frame turns into a fresh calibration.
+   */
   private endCheck(): FlowEffect[] {
-    this.screen = 'ready';
     this.recheck = false;
     this.cached = null;
+    if (this.pose.calibrated) return this.play();
+    this.screen = 'ready';
     return NONE as FlowEffect[];
+  }
+
+  /**
+   * Back to the main menu from anywhere. The camera stays open, so a raised hand starts the next
+   * run straight from the menu; the run on screen is abandoned without being scored.
+   */
+  private home(): FlowEffect[] {
+    const running = this.gameState !== 'menu';
+    if (this.screen === 'menu' && !running) return NONE as FlowEffect[];
+    this.screen = 'menu';
+    this.recheck = false;
+    this.lossPaused = false;
+    this.cached = null;
+    return running ? [HOME_GAME] : (NONE as FlowEffect[]);
   }
 
   private play(): FlowEffect[] {

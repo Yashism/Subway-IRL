@@ -350,8 +350,8 @@ describe('SessionFlow: playing', () => {
     // A recalibration always teaches the moves again, and the gesture is ignored while it is up.
     expect(f.screen).toBe('moveCheck');
     expect(f.dispatch({ type: 'startGesture' })).toEqual([]);
-    expect(types(f.dispatch({ type: 'startPressed' }))).toEqual(['endMoveCheck']);
-    expect(f.dispatch({ type: 'startGesture' })).toEqual([{ type: 'startGame' }]);
+    // "START PLAYING" on the summary card resumes the run it interrupted.
+    expect(types(f.dispatch({ type: 'startPressed' }))).toEqual(['endMoveCheck', 'startGame']);
     expect(f.screen).toBe('playing');
   });
 
@@ -451,12 +451,14 @@ describe('SessionFlow: play again', () => {
   });
 
   it('a fresh calibration clears the re-check flag', () => {
-    const f = atSummary();
+    // `movecheck=skip` keeps this about the re-check flag: a recalibration otherwise runs the
+    // check, whose own "START PLAYING" goes to the run rather than to the ready screen.
+    const f = webcamAt('playing', { moveCheck: 'skip' });
+    f.dispatch({ type: 'gameState', state: 'summary' });
     f.dispatch(pose({ tracking: false, calibrated: true, mode: 'full' }));
     f.dispatch({ type: 'startGesture' });
     f.dispatch({ type: 'recalibrate' });
     f.dispatch(CALIBRATED);
-    f.dispatch({ type: 'startPressed' }); // past the move check the recalibration brings up
     expect(f.model.recheck).toBe(false);
     expect(f.model.message).toMatch(/^Calibrated!/);
   });
@@ -581,15 +583,23 @@ describe('SessionFlow: the move check', () => {
     expect(f.screen).toBe('moveCheck');
   });
 
-  it('Enter leaves the check for the ready screen; the start gesture is ignored while it is up', () => {
+  it('"START PLAYING" really starts the run; the start gesture is ignored while the check is up', () => {
     const f = webcamAt('calibrating', { moveCheckSeen: false });
     f.dispatch(CALIBRATED);
     // The hoverboard step asks for both hands up, one hand away from the start gesture.
     expect(f.dispatch({ type: 'startGesture' })).toEqual([]);
     expect(f.screen).toBe('moveCheck');
-    expect(types(f.dispatch({ type: 'startPressed' }))).toEqual(['endMoveCheck']);
-    expect(f.screen).toBe('ready');
-    expect(f.model.message).toMatch(/^Calibrated!/);
+    // The summary card lists the start gesture itself, so there is nothing left to teach: the one
+    // obvious green button must not land the player on another screen telling them to press again.
+    expect(types(f.dispatch({ type: 'startPressed' }))).toEqual(['endMoveCheck', 'startGame']);
+    expect(f.screen).toBe('playing');
+  });
+
+  it('falls back to the ready screen when there is nothing calibrated to play with', () => {
+    const f = webcamAt('calibrating', { moveCheckSeen: false });
+    f.dispatch(CALIBRATED);
+    f.dispatch(pose({ tracking: true, calibrated: false }));
+    expect(f.screen).toBe('calibrating');
   });
 
   it('every other way out of the check tears it down too', () => {
@@ -624,10 +634,12 @@ describe('SessionFlow: the move check', () => {
   it('runs the check once, then leaves a returning player alone', () => {
     const f = firstRun();
     f.dispatch(CALIBRATED);
-    f.dispatch({ type: 'startPressed' });
+    expect(f.screen).toBe('moveCheck');
+    f.dispatch({ type: 'back' });
     // What main.ts does once a tuning has been saved.
     f.setMoveCheckSeen(true);
-    f.dispatch(STANDING);
+    f.dispatch(pose({ tracking: true, calibrated: false }));
+    f.dispatch({ type: 'startPressed' });
     expect(f.screen).toBe('calibrating');
     expect(f.dispatch(CALIBRATED)).toEqual([]);
     expect(f.screen).toBe('ready');
@@ -647,5 +659,62 @@ describe('SessionFlow: the move check', () => {
     expect(types(f.dispatch({ type: 'recalibrate' }))).toEqual(['pauseGame', 'recalibrate']);
     expect(f.dispatch(CALIBRATED)).toEqual([{ type: 'startMoveCheck' }]);
     expect(f.screen).toBe('moveCheck');
+  });
+});
+
+describe('SessionFlow: Home', () => {
+  it('goes back to the menu from every screen there is, abandoning the run on screen', () => {
+    for (const screen of ['cameraPrompt', 'cameraStarting', 'cameraError', 'calibrating', 'moveCheck', 'ready'] as const) {
+      const f = webcamAt(screen, { moveCheckSeen: screen !== 'moveCheck' });
+      const fx = types(f.dispatch({ type: 'home' }));
+      expect(f.screen, screen).toBe('menu');
+      // Only the check screen has anything to tear down, and no run is on screen on any of these.
+      expect(fx, screen).toEqual(screen === 'moveCheck' ? ['endMoveCheck'] : []);
+    }
+  });
+
+  it('abandons a live run without scoring it, and the camera stays open for the next one', () => {
+    const f = webcamAt('playing');
+    f.dispatch({ type: 'gameState', state: 'playing' });
+    expect(f.dispatch({ type: 'home' })).toEqual([{ type: 'homeGame' }]);
+    expect(f.screen).toBe('menu');
+    expect(f.cameraReady).toBe(true);
+    // A raised hand from the menu goes straight back into a run, camera and calibration intact.
+    f.dispatch({ type: 'gameState', state: 'menu' });
+    expect(f.dispatch({ type: 'startGesture' })).toEqual([{ type: 'startGame' }]);
+    expect(f.screen).toBe('playing');
+  });
+
+  it('works the same from a paused run, a summary and a countdown', () => {
+    for (const state of ['paused', 'summary', 'countdown'] as const) {
+      const f = webcamAt('playing');
+      f.dispatch({ type: 'gameState', state });
+      expect(types(f.dispatch({ type: 'home' })), state).toEqual(['homeGame']);
+      expect(f.screen, state).toBe('menu');
+    }
+  });
+
+  it('clears the loss-pause, so nothing resumes itself behind the menu', () => {
+    const f = webcamAt('playing');
+    f.dispatch({ type: 'gameState', state: 'paused', pausedByLoss: true });
+    expect(types(f.dispatch({ type: 'home' }))).toEqual(['homeGame']);
+    f.dispatch({ type: 'gameState', state: 'menu' });
+    // A recalibration from the menu now has no run to pin down.
+    expect(types(f.dispatch({ type: 'recalibrate' }))).toEqual([]);
+  });
+
+  it('is available in keyboard mode too', () => {
+    const f = new SessionFlow({ input: 'keyboard' });
+    f.dispatch({ type: 'startPressed' });
+    f.dispatch({ type: 'gameState', state: 'playing' });
+    expect(f.dispatch({ type: 'home' })).toEqual([{ type: 'homeGame' }]);
+    expect(f.screen).toBe('menu');
+    expect(f.dispatch({ type: 'startPressed' })).toEqual([{ type: 'startGame' }]);
+  });
+
+  it('does nothing at all when the menu is already showing and no run is live', () => {
+    const f = new SessionFlow();
+    expect(f.dispatch({ type: 'home' })).toEqual([]);
+    expect(f.screen).toBe('menu');
   });
 });

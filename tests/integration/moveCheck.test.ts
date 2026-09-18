@@ -314,7 +314,7 @@ describe('move check: wired into the session flow', () => {
     expect(shallowLaneRun({ ...w.ctrl.th }, false)).toContain('setLane:-1');
 
     w.run({ type: 'startPressed' });
-    expect(w.flow.screen).toBe('ready');
+    expect(w.flow.screen).toBe('playing');
     expect(w.session.running).toBe(false);
   });
 

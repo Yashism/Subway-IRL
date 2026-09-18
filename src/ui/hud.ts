@@ -237,6 +237,22 @@ const el = (tag: string, cls: string, parent: HTMLElement, text?: string): HTMLE
   return e;
 };
 
+/** A HUD button that lets go of focus, so the next Enter reaches the game and not the button. */
+function hudButton(parent: HTMLElement, cls: string, label: string, onClick: () => void): HTMLButtonElement {
+  const b = el('button', cls, parent, label) as HTMLButtonElement;
+  b.type = 'button';
+  b.addEventListener('click', () => {
+    b.blur();
+    onClick();
+  });
+  return b;
+}
+
+export interface HudHandlers {
+  /** The Home button: back to the main menu, abandoning the run on screen. */
+  onHome?(): void;
+}
+
 /** "Live monitor (M)": opens monitor.html in its own popup window. */
 function monitorLink(parent: HTMLElement): HTMLAnchorElement {
   const a = el('a', 'hud-monitor-link', parent, '📈 Live monitor (M)') as HTMLAnchorElement;
@@ -298,6 +314,7 @@ export class Hud {
   private readonly pauseSub: HTMLElement;
   private readonly pauseIcon: HTMLElement;
   private readonly pauseControls: HTMLElement;
+  private readonly handlers: HudHandlers;
   private controlsCard: HTMLElement | null = null;
   private readonly sum: Record<keyof HudSummary, HTMLElement>;
   private readonly best: HTMLElement;
@@ -317,8 +334,9 @@ export class Hud {
   private lastBoards = -1;
   private lastState = '';
 
-  constructor(root: HTMLElement) {
+  constructor(root: HTMLElement, handlers: HudHandlers = {}) {
     this.root = root;
+    this.handlers = handlers;
     root.classList.add('hud');
     this.vignette = el('div', 'hud-vignette', root);
 
@@ -438,6 +456,7 @@ export class Hud {
     const again = el('div', 'hud-again', card);
     el('span', 'hud-again-text', again, 'PLAY AGAIN');
     el('div', 'hud-again-hint', card, 'Press Enter to run again');
+    hudButton(card, 'hud-btn hud-home', '\u2302 Main menu', () => this.handlers.onHome?.());
     this.sum = { score: sumScore, coins: sumCoins, distance: sumDist, jumps: sumJumps, rolls: sumRolls, time: sumTime };
 
     // Paused.
@@ -446,7 +465,9 @@ export class Hud {
     this.pauseTitle = el('div', 'hud-pause-title', paused);
     this.pauseSub = el('div', 'hud-pause-sub', paused);
     this.pauseControls = el('div', 'hud-pause-controls', paused);
-    monitorLink(paused);
+    const pauseFoot = el('div', 'hud-pause-foot', paused);
+    monitorLink(pauseFoot);
+    hudButton(pauseFoot, 'hud-btn hud-home', '\u2302 Main menu', () => this.handlers.onHome?.());
   }
 
   /**
