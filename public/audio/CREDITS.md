@@ -46,7 +46,7 @@ it is given here because it should be.
 
 | File(s) | Source | Author | License |
 |---|---|---|---|
-| `crow.*` | "Crow caw", https://opengameart.org/content/crow-caw | as credited on the submission page | CC0 1.0 |
+| `crow.*` | "Crow caw", https://opengameart.org/content/crow-caw (recorded near the pyramids, Cairo, per the submission) | zeroisnotnull | CC0 1.0 |
 
 ## archive.org / radio aporee
 
