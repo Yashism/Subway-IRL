@@ -55,9 +55,18 @@ export function applyUrlFlags(settings: AudioSettings, search: string): AudioSet
   return out;
 }
 
-/** The persisted mixer. Reads once at construction; writes are best-effort. */
+/**
+ * The persisted mixer. Reads once at construction; writes are best-effort.
+ *
+ * Two values are kept, not one: what is in force now, and what belongs on disk. A URL flag
+ * (`?mute`, `?vol=`) changes the first and not the second, so a shared link is heard the way the
+ * sender meant and is forgotten afterwards. Without that split, the next change of *any* kind
+ * writes the whole current state back and a link silently becomes the player's saved setting.
+ */
 export class AudioSettingsStore {
   private current: AudioSettings;
+  /** What the next write should be built from: the stored values, never a URL override. */
+  private persisted: AudioSettings;
   private readonly storage: SettingsStorage | null;
 
   /** `storage` undefined means window.localStorage (when reachable); null means memory only. */
@@ -71,15 +80,20 @@ export class AudioSettingsStore {
       parsed = null; // Unreadable or not JSON: defaults.
     }
     this.current = cleanSettings(parsed);
+    this.persisted = { ...this.current };
   }
 
   get(): AudioSettings {
     return { ...this.current };
   }
 
-  /** Merges a partial change, cleans it and persists. Returns what is now in force. */
+  /**
+   * Merges a deliberate change, cleans it and persists it. What is written is the change laid over
+   * the *stored* values — a session override the player never asked for does not ride along.
+   */
   set(patch: Partial<AudioSettings>): AudioSettings {
     this.current = cleanSettings({ ...this.current, ...patch });
+    this.persisted = cleanSettings({ ...this.persisted, ...patch });
     this.write();
     return this.get();
   }
@@ -93,7 +107,7 @@ export class AudioSettingsStore {
   private write(): void {
     if (!this.storage) return;
     try {
-      this.storage.setItem(this.key, JSON.stringify(this.current));
+      this.storage.setItem(this.key, JSON.stringify(this.persisted));
     } catch {
       // Quota or privacy mode: the session keeps the settings in memory.
     }

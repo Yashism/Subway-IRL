@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CAMERA_KEY, PoseRuntime, type CameraApi, type KeyValueStore } from '../../src/app/poseRuntime';
+import { CAMERA_KEY, PoseRuntime, STALL_MS, type CameraApi, type KeyValueStore } from '../../src/app/poseRuntime';
 import type { CameraInfo } from '../../src/pose/camera';
 import { MODEL_LOAD_FAILED } from '../../src/pose/liveSource';
 import type { PoseSource } from '../../src/pose/poseSource';
@@ -270,12 +270,16 @@ describe('PoseRuntime: camera', () => {
 });
 
 describe('PoseRuntime: stall and darkness', () => {
-  it('the command source counts a 1 s stall (controller lostMs) as lost', async () => {
+  it('gives a silent stream longer than a lost body before it counts as a stall', async () => {
     const r = rig();
     await r.rt.start();
     r.sources[0].emit(emptyFrame(100));
-    expect(r.rt.commands.activity(1000).lost).toBe(false);
-    expect(r.rt.commands.activity(1101).lost).toBe(true);
+    // A gap is not a loss. A second of silence on a busy laptop is a hitch, not a player who
+    // walked away, and pausing the run for it accuses someone standing still in frame.
+    expect(STALL_MS).toBeGreaterThan(r.rt.ctrl.th.lostMs);
+    expect(r.rt.commands.activity(100 + r.rt.ctrl.th.lostMs + 50).lost).toBe(false);
+    expect(r.rt.commands.activity(100 + STALL_MS - 1).lost).toBe(false);
+    expect(r.rt.commands.activity(100 + STALL_MS + 1).lost).toBe(true);
   });
 
   it('dark() uses the luma sampler, is false without one and unknown before the first sample', async () => {

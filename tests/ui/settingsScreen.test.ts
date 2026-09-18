@@ -378,3 +378,28 @@ describe('the mixer sliders drive the real audio settings', () => {
     expect(JSON.parse(w.storage.getItem('subway-irl.audio.v1')!).muted).toBe(false);
   });
 });
+
+describe('a toggle changed from outside the screen', () => {
+  it('asks for the opposite of what the player can see, not of its own attribute', () => {
+    // Mute is reachable from the N key and the HUD speaker as well as from here, so the screen
+    // must be able to be told. Once it has been, one press undoes it — the two-press bug was the
+    // app forgetting to re-render, and the screen is now decisive about which state it is showing.
+    const s = screen();
+    s.ui.update(view({ audio: { ...DEFAULT_AUDIO, muted: false } }));
+    const mute = toggle(s.root, 'Mute everything');
+    expect(mute.dataset.on).toBe('off');
+
+    s.ui.update(view({ audio: { ...DEFAULT_AUDIO, muted: true } }));
+    expect(mute.dataset.on).toBe('on');
+    mute.click();
+    expect(s.calls.audio).toEqual([{ muted: false }]);
+  });
+
+  it('still toggles normally when nothing outside has touched it', () => {
+    const s = screen();
+    s.ui.update(view());
+    const mirror = toggle(s.root, 'Mirror the preview');
+    mirror.click();
+    expect(s.calls.change.at(-1)).toEqual({ mirror: false });
+  });
+});

@@ -5,7 +5,7 @@ import { IntroRunner, introMode, shouldPlayIntro } from './app/intro';
 import { applyLiveSettings } from './app/liveSettings';
 import { AppLoop } from './app/loop';
 import { MoveCheckSession } from './app/moveCheckSession';
-import { fixtureReplay, loadSession, PoseRuntime, sessionReplay } from './app/poseRuntime';
+import { fixtureReplay, loadSession, PoseRuntime, sessionReplay, STALL_MS } from './app/poseRuntime';
 import { ProfileStore } from './app/profile';
 import { ProgressionStore, dailyView, fmtCoins, levelProgress, shopItem, shopModel } from './app/progression';
 import { RunSession, type RunBoosts } from './app/session';
@@ -214,6 +214,8 @@ const missionBoard = new MissionBoard(hud.menuPanel, {
 
 type Overlay = 'none' | 'settings' | 'workout' | 'shop';
 let overlay: Overlay = 'none';
+/** "Redo the move check" was asked for before there was a camera to do it with. */
+let wantsMoveCheck = false;
 
 const settingsRoot = document.body.appendChild(document.createElement('div'));
 const workoutRoot = document.body.appendChild(document.createElement('div'));
@@ -238,10 +240,21 @@ const settingsScreen = new SettingsScreen(settingsRoot, {
     syncOverlays();
   },
   redoMoveCheck: () => {
+    // The check needs a camera. The screen disables this button in keyboard mode, but the view it
+    // was drawn from can be a moment stale — and a `startPressed` in keyboard mode means *play*.
+    // This button asks to be measured; it must never be a way to start a run.
+    if (flow.input !== 'webcam') return;
     setOverlay('none');
-    // From the ready screen the check runs on the spot; from anywhere else the calibration that
-    // precedes it has to happen first, and the flow queues the check behind it.
-    loop.dispatch(flow.screen === 'ready' ? { type: 'checkMoves' } : { type: 'recalibrate' });
+    // Three ways in, and Settings is reached from all of them. From the ready screen the check
+    // runs on the spot. With a camera open — including on the menu — a recalibration runs it
+    // behind the calibration. Without one, the camera has to be started first, so the player is
+    // sent to the explainer and the request is held until the flow has something to measure.
+    if (flow.screen === 'ready') loop.dispatch({ type: 'checkMoves' });
+    else if (flow.cameraReady) loop.dispatch({ type: 'recalibrate' });
+    else {
+      wantsMoveCheck = true;
+      loop.dispatch({ type: 'startPressed' });
+    }
   },
   resetTuning: () => {
     moveCheck.store.clear(currentMode() ?? undefined);
@@ -438,9 +451,15 @@ telemetry.onControl((msg) => {
   }
   sendMeta();
 });
-window.addEventListener('pagehide', () => {
+window.addEventListener('pagehide', (event) => {
   telemetry.close();
   runtime.stop();
+  // Going into the back/forward cache: this page may be shown again exactly as it is. Tearing the
+  // audio graph down there leaves a restored page permanently silent, so it is only suspended.
+  if (event.persisted) {
+    audio.suspend();
+    return;
+  }
   gesture.detach();
   audio.dispose();
 });
@@ -457,6 +476,9 @@ function openCamera(cameraId: string | null): void {
     },
     (err: unknown) => {
       console.warn('Camera or pose model failed to start:', err);
+      // The error card tells the player to pick another camera, so it had better have the list.
+      // `start()` enumerates before it can fail, and boot() enumerated before that.
+      screens.setCameras(runtime.cameras, runtime.activeCameraId ?? cameraId);
       loop.dispatch({ type: 'cameraFailed', message: runtime.describeError(err) });
     },
   );
@@ -579,7 +601,9 @@ const loop: AppLoop = new AppLoop({
     else if (e.state === 'menu') runs.abandonRun();
     runs.event(e);
   },
-  stallMs: runtime.ctrl.th.lostMs,
+  // The same threshold the pose source pauses on, so the "camera stalled" toast and the pause
+  // agree with each other rather than the toast arriving half a second early.
+  stallMs: STALL_MS,
 });
 
 /**
@@ -617,6 +641,9 @@ function toggleSound(): void {
   gesture.fire();
   audio.toggleMute();
   hud.setSound({ muted: audio.muted, ready: audio.audible });
+  // Mute is reachable from three places at once. If the settings screen is open behind the key,
+  // it has to be told, or its toggle argues with the game about which way round it is.
+  if (overlay !== 'none') syncOverlays();
 }
 
 // N, because M opens the live monitor.
@@ -733,6 +760,12 @@ async function boot(): Promise<void> {
     loop.dispatch({ type: 'startPressed' });
     return;
   }
+  // A camera needs a secure context. Opened over a LAN address — which is the natural thing to do
+  // from Windows against a WSL dev server — `navigator.mediaDevices` is simply undefined, and
+  // "this browser cannot use a camera" sends the player hunting entirely the wrong problem.
+  if (typeof isSecureContext === 'boolean' && !isSecureContext) {
+    return fallBackToKeyboard(`A camera needs https or localhost — open the game at http://localhost${location.port ? `:${location.port}` : ''}`);
+  }
   if (!navigator.mediaDevices?.getUserMedia) return fallBackToKeyboard('This browser cannot use a camera');
   let cams: Awaited<ReturnType<typeof listCameras>> = [];
   try {
@@ -827,6 +860,14 @@ function frame(now: number): void {
   const st = loop.status;
   screens.setWarnings(webcam && flow.cameraReady && !!st?.slowPose, loop.stalled);
   const checking = m.screen === 'moveCheck';
+  // A move check asked for from Settings before the camera was open: run it the moment the flow
+  // has a calibration to measure against, rather than dropping the request on the floor.
+  if (wantsMoveCheck && m.screen === 'ready') {
+    wantsMoveCheck = false;
+    loop.dispatch({ type: 'checkMoves' });
+  } else if (wantsMoveCheck && (m.screen === 'menu' || m.screen === 'playing')) {
+    wantsMoveCheck = false; // they went somewhere else; the request is stale
+  }
   moveCheckLayer.update(checking ? moveCheck.model : null);
   hud.setControls(game.state === 'paused' ? controlsCard() : null);
   // The check's scrim owns the screen: the PiP drops to its corner form (the player is copying the

@@ -124,3 +124,43 @@ describe('URL flags', () => {
     expect(applyUrlFlags(DEFAULT_SETTINGS, '?a=%%%').master).toBe(DEFAULT_SETTINGS.master);
   });
 });
+
+describe('a URL flag is heard for the session and never saved', () => {
+  const storage = () => {
+    const map = new Map<string, string>();
+    return {
+      map,
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+    };
+  };
+  const stored = (st: { getItem(k: string): string | null }) => JSON.parse(st.getItem(AUDIO_SETTINGS_KEY) ?? '{}');
+
+  it('a later change writes the saved values plus that change, not the override', () => {
+    const st = storage();
+    const s = new AudioSettingsStore(st);
+    s.set({ master: 0.9, music: 0.7 });
+    // The shared link: quiet and muted for this session only.
+    s.override(applyUrlFlags(s.get(), '?vol=0.2&mute'));
+    expect(s.get().master).toBe(0.2);
+    expect(s.get().muted).toBe(true);
+
+    // Pressing mute writes mute — and leaves the master where the player actually put it.
+    s.set({ muted: false });
+    expect(stored(st).muted).toBe(false);
+    expect(stored(st).master).toBe(0.9);
+    // …while the session keeps playing at the volume the link asked for.
+    expect(s.get().master).toBe(0.2);
+  });
+
+  it('a change the player really makes is saved, override or no override', () => {
+    const st = storage();
+    const s = new AudioSettingsStore(st);
+    s.override(applyUrlFlags(s.get(), '?vol=0.2'));
+    s.set({ music: 0.33 });
+    expect(stored(st).music).toBe(0.33);
+    expect(new AudioSettingsStore(st).get().music).toBe(0.33);
+    expect(new AudioSettingsStore(st).get().master).not.toBe(0.2);
+  });
+});

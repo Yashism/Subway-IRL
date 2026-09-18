@@ -84,6 +84,9 @@ function hiddenVideo(): HTMLVideoElement {
  * hidden <video>, a LivePoseSource (or a replay), the PoseController and the PoseCommandSource.
  * Every pose frame goes through `commands.push()`; `onFrame` sees it afterwards (telemetry).
  */
+/** How long the pose stream may go quiet before a run pauses for it. See the constructor. */
+export const STALL_MS = 1500;
+
 export class PoseRuntime {
   readonly ctrl: PoseController;
   readonly commands: PoseCommandSource;
@@ -116,8 +119,13 @@ export class PoseRuntime {
 
   constructor(opts: PoseRuntimeOptions = {}) {
     this.ctrl = new PoseController(opts.controller);
-    // Same threshold as the controller's own lost event (ruling): a stalled stream pauses after 1 s.
-    this.commands = new PoseCommandSource(this.ctrl, { staleMs: this.ctrl.th.lostMs });
+    // Deliberately longer than the controller's own `lostMs`. A pose *gap* and a pose *loss* are
+    // different events: losing the body means the player walked out of frame, while a 1.1 s gap on
+    // a laptop rendering at 2880×1800 next to the MediaPipe worker is a shader compile or a GC
+    // pause. Pausing a run for that, under "STEP BACK INTO FRAME", accuses a player who is
+    // standing perfectly still in frame. The controller's threshold is untouched: this is only how
+    // long a silent stream is given before it counts as a stall.
+    this.commands = new PoseCommandSource(this.ctrl, { staleMs: STALL_MS });
     this.replay = opts.replay ?? null;
     this.isReplay = this.replay !== null;
     this.replayName = opts.replayName ?? '';

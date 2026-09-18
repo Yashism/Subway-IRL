@@ -699,8 +699,10 @@ describe('SessionFlow: Home', () => {
     f.dispatch({ type: 'gameState', state: 'paused', pausedByLoss: true });
     expect(types(f.dispatch({ type: 'home' }))).toEqual(['homeGame']);
     f.dispatch({ type: 'gameState', state: 'menu' });
-    // A recalibration from the menu now has no run to pin down.
-    expect(types(f.dispatch({ type: 'recalibrate' }))).toEqual([]);
+    // A recalibration from the menu still works — the camera is open — but there is no longer a
+    // run to pin down, so it must not ask for a pause.
+    expect(types(f.dispatch({ type: 'recalibrate' }))).toEqual(['recalibrate']);
+    expect(f.screen).toBe('calibrating');
   });
 
   it('is available in keyboard mode too', () => {
@@ -715,6 +717,61 @@ describe('SessionFlow: Home', () => {
   it('does nothing at all when the menu is already showing and no run is live', () => {
     const f = new SessionFlow();
     expect(f.dispatch({ type: 'home' })).toEqual([]);
+    expect(f.screen).toBe('menu');
+  });
+});
+
+describe('the menu is a screen with a live camera on it', () => {
+  /** The camera opened at boot because permission was already granted: menu, camera ready. */
+  const menuWithCamera = () => {
+    const f = new SessionFlow({ moveCheckSeen: true });
+    f.dispatch({ type: 'cameraOk' });
+    expect(f.screen).toBe('menu');
+    expect(f.cameraReady).toBe(true);
+    return f;
+  };
+
+  it('applies a camera chosen in Settings instead of quietly dropping it', () => {
+    const f = menuWithCamera();
+    expect(f.dispatch({ type: 'chooseCamera', id: 'cam-b' })).toEqual([
+      { type: 'openCamera', cameraId: 'cam-b' },
+      { type: 'recalibrate' },
+    ]);
+    // …and it swaps the stream where the player is standing, rather than walking them back
+    // through the setup cards they already finished.
+    expect(f.screen).toBe('menu');
+    expect(f.cameraReady).toBe(false);
+    f.dispatch({ type: 'cameraOk' });
+    expect(f.cameraReady).toBe(true);
+    expect(f.model.cameraId).toBe('cam-b');
+  });
+
+  it('ignores a choice of the camera already in use', () => {
+    const f = menuWithCamera();
+    f.dispatch({ type: 'chooseCamera', id: 'cam-b' });
+    f.dispatch({ type: 'cameraOk' });
+    expect(f.dispatch({ type: 'chooseCamera', id: 'cam-b' })).toEqual([]);
+  });
+
+  it('runs the move check when Settings asks for it from the menu', () => {
+    const f = menuWithCamera();
+    expect(types(f.dispatch({ type: 'recalibrate' }))).toEqual(['recalibrate']);
+    expect(f.screen).toBe('calibrating');
+    // The check is queued behind the calibration, which is what "redo it" has to mean.
+    f.dispatch(CALIBRATED);
+    expect(f.screen).toBe('moveCheck');
+  });
+
+  it('does not drag the player into a calibration for changing the play mode', () => {
+    const f = menuWithCamera();
+    expect(f.dispatch({ type: 'chooseMode', mode: 'small' })).toEqual([{ type: 'setForcedMode', mode: 'small' }]);
+    expect(f.screen).toBe('menu');
+  });
+
+  it('still refuses all of it without a camera', () => {
+    const f = new SessionFlow({ moveCheckSeen: true });
+    expect(f.cameraReady).toBe(false);
+    expect(f.dispatch({ type: 'recalibrate' })).toEqual([]);
     expect(f.screen).toBe('menu');
   });
 });

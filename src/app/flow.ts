@@ -227,6 +227,9 @@ export class SessionFlow {
     switch (this.screen) {
       case 'menu':
         if (i.type === 'cameraOk') this.cameraReady = true;
+        // The camera is already open here when permission was granted at boot, so a camera chosen
+        // in Settings has to take effect now. Dropping it looked like it was accepted and was not.
+        if (i.type === 'chooseCamera') return this.switchCamera(i.id);
         if (i.type === 'startPressed') return this.cameraReady ? this.quickStart() : this.go('cameraPrompt');
         if (i.type === 'startGesture' && this.cameraReady) return this.quickStart();
         return NONE as FlowEffect[];
@@ -378,6 +381,15 @@ export class SessionFlow {
     this.cameraId = id;
     const fx: FlowEffect[] = [];
     if (this.mustPause()) fx.push({ type: 'pauseGame' });
+    // On the menu the camera is a background service rather than a screen the player is looking
+    // at: swap the stream where they stand instead of walking them back through the setup cards.
+    if (this.screen === 'menu') {
+      this.error = '';
+      this.cameraReady = false;
+      this.cached = null;
+      fx.push({ type: 'openCamera', cameraId: id }, { type: 'recalibrate' });
+      return fx;
+    }
     fx.push(...this.openCamera(), { type: 'recalibrate' });
     return fx;
   }
@@ -418,8 +430,10 @@ export class SessionFlow {
     if (mode === this.modeChoice) return NONE as FlowEffect[];
     this.modeChoice = mode;
     const force: FlowEffect = { type: 'setForcedMode', mode: mode === 'auto' ? null : mode };
-    // Without a camera there is nothing to recalibrate yet; the forced mode applies to the next calibration.
-    return this.canCalibrate() ? this.recalibrate([force]) : [force];
+    // Without a camera there is nothing to recalibrate yet; the forced mode applies to the next
+    // calibration. Nor does a mode picked from the menu drag the player into one — they were
+    // changing a setting, not asking to stand up and be measured.
+    return this.screen !== 'menu' && this.canCalibrate() ? this.recalibrate([force]) : [force];
   }
 
   /**
@@ -431,10 +445,14 @@ export class SessionFlow {
     return this.screen === 'playing' && (running(this.gameState) || this.lossPaused);
   }
 
-  /** Calibration needs a running camera and a screen that can show it. */
+  /**
+   * Calibration needs a running camera and a screen that can show it. The menu counts: the camera
+   * is open there whenever permission was already granted, and "Redo the move check" in Settings
+   * is reached from the menu more often than from anywhere else.
+   */
   private canCalibrate(): boolean {
     const s = this.screen;
-    return this.cameraReady && (s === 'calibrating' || s === 'ready' || s === 'moveCheck' || s === 'playing');
+    return this.cameraReady && (s === 'menu' || s === 'calibrating' || s === 'ready' || s === 'moveCheck' || s === 'playing');
   }
 
   private build(): ScreenModel {

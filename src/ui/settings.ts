@@ -117,6 +117,8 @@ export class SettingsScreen {
   private readonly root: HTMLElement;
   private readonly handlers: SettingsHandlers;
   private readonly lastText = new Map<Element, string>();
+  /** What each toggle was last *rendered* as, so a click asks for the opposite of the truth. */
+  private readonly toggles = new Map<HTMLButtonElement, boolean>();
   private readonly attrs = new Map<Element, Map<string, string>>();
   private mounted = false;
   private pending: Confirm | null = null;
@@ -418,7 +420,11 @@ export class SettingsScreen {
     const text = el('div', 'sw-row-text', row);
     el('div', 'sw-row-label', text, label);
     el('div', 'sw-row-sub', text, blurb);
-    const b = button(row, 'sw-toggle', '', () => onSet(b.dataset.on !== 'on'));
+    // What it asks for is the opposite of what the *view* last said, not of this element's own
+    // attribute: mute can be changed from outside this screen (the N key, the HUD speaker), and a
+    // toggle that argues with its own stale DOM takes two presses to do one thing.
+    const b = button(row, 'sw-toggle', '', () => onSet(this.toggles.get(b) !== true));
+    this.toggles.set(b, false);
     el('span', 'sw-toggle-knob', b);
     el('span', 'sw-toggle-word', b);
     b.setAttribute('aria-label', label);
@@ -426,6 +432,7 @@ export class SettingsScreen {
   }
 
   private setToggle(b: HTMLButtonElement, on: boolean): void {
+    this.toggles.set(b, on);
     this.attr(b, 'data-on', on ? 'on' : 'off');
     b.setAttribute('aria-pressed', String(on));
     this.text(b.lastElementChild as Element, onOff(on));
