@@ -97,7 +97,7 @@ function render(): void {
     canvas.height = Math.round(h * dpr);
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawOverlay(ctx, { width: w, height: h, aspect }, ctrl.status, ctrl.baseline, ctrl.th);
+  drawOverlay(ctx, { width: w, height: h, aspect }, ctrl.status, ctrl.baseline, ctrl.th, ctrl.laneSpots);
   renderStatus();
   requestAnimationFrame(render);
 }

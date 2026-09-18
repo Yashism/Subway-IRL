@@ -12,13 +12,19 @@
  * and the camera goes through the flow's camera picker.
  */
 import type { Difficulty, ObstacleSettings } from '../game/config';
+import type { LaneSpots } from '../pose/laneSpots';
 import type { LineId } from '../world/stations';
 import type { GameSettings } from './settings';
 
 /** Everything a live settings change writes to. Structural on purpose: the tests pass plain objects. */
 export interface LiveTargets {
-  /** The pose controller. Sensitivity is the same value the debug monitor sends. */
-  controller: { sensitivity: number };
+  /**
+   * The pose controller. Sensitivity is the same value the debug monitor sends; `laneSpots` is the
+   * full-body lane spots in force, null for the automatic lanes.
+   */
+  controller: { sensitivity: number; laneSpots: Readonly<LaneSpots> | null };
+  /** The player's recorded lane spots (their own store), or null when none are recorded. */
+  laneSpots?: Readonly<LaneSpots> | null;
   /** The Game's options object, read at the start of every run and every frame. */
   game: { options: { difficulty: Difficulty; obstacles?: ObstacleSettings } };
   world: {
@@ -38,11 +44,19 @@ export interface LiveTargets {
    * replay on another difficulty would be a different track. Defaults to true.
    */
   ownsRun?: boolean;
+  /**
+   * False while a recorded session is replaying: it decides lanes with the spots it was recorded
+   * with (or without any), so neither the Lanes setting nor this machine's spots may reach it.
+   * Defaults to true.
+   */
+  ownsLanes?: boolean;
 }
 
 /** Applies every live-applicable setting. Safe to call repeatedly with the same values. */
 export function applyLiveSettings(t: LiveTargets, s: GameSettings): void {
   if (t.ownsSensitivity !== false) t.controller.sensitivity = s.sensitivity;
+  // "My spots" with none recorded is the automatic lanes, never a broken zone.
+  if (t.ownsLanes !== false) t.controller.laneSpots = s.lanes === 'spots' ? (t.laneSpots ?? null) : null;
   if (t.ownsRun !== false) {
     t.game.options.difficulty = s.difficulty;
     t.game.options.obstacles = { level: s.obstacleLevel, amount: s.obstacleAmount };

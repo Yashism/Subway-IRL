@@ -1,0 +1,536 @@
+/*
+ * Lane spots setup. The Move Check's family: the same scrim, banner, step dots and buttons
+ * (moveCheck.css), a chunky cream card, 5px ink borders and hard drop shadows. What is new here is
+ * the floor strip — a bird's-eye line across the room with the spots pinned on it and the player
+ * sliding along it live.
+ */
+
+.lane-setup {
+  --ls-left: var(--cyan, #29c7e0);
+  --ls-centre: var(--gold, #ffd400);
+  --ls-right: var(--magenta, #e5399b);
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: clamp(10px, 1.8vh, 22px);
+  box-sizing: border-box;
+  padding: clamp(12px, 2.4vh, 34px) 16px clamp(12px, 2vh, 26px);
+  overflow-y: auto;
+  pointer-events: auto;
+  color: #fff;
+  user-select: none;
+  font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
+  background: radial-gradient(ellipse at 50% 45%, rgba(20, 12, 45, 0.6), rgba(20, 12, 45, 0.92));
+  z-index: 4;
+}
+.lane-setup[data-on='on'] {
+  display: flex;
+}
+
+/* The menu's logo and legends read straight through the scrim; they step aside, as for the check. */
+html[data-pose-screen='laneSetup'] .hud-menu,
+html[data-pose-screen='laneSetup'] .hud-paused,
+html[data-pose-screen='laneSetup'] .hud-summary,
+html[data-pose-screen='laneSetup'] .hud-caught {
+  display: none !important;
+}
+
+.ls-tab {
+  background: linear-gradient(180deg, #5fdcf0, var(--cyan, #29c7e0) 55%, #1583a0);
+  text-shadow: 0 3px 0 #0f5f75;
+}
+.lane-setup[data-phase='summary'] .ls-tab {
+  background: linear-gradient(180deg, #6fe0a3, var(--mc-green) 55%, #2a8c60);
+  text-shadow: 0 3px 0 #1d6b48;
+}
+.lane-setup .mc-dot {
+  width: clamp(64px, 7vw, 104px);
+}
+
+/* ------------------------------------------------------------ the card */
+
+.ls-card {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.8vh, 20px);
+  width: min(1000px, 96vw);
+  box-sizing: border-box;
+  padding: clamp(18px, 2.4vh, 30px) clamp(18px, 2.4vw, 36px);
+  border-radius: 34px;
+  background: linear-gradient(180deg, var(--mc-cream), var(--mc-cream-2));
+  border: 5px solid var(--mc-ink);
+  box-shadow: 0 10px 0 var(--mc-ink), 0 30px 60px rgba(0, 0, 0, 0.45);
+  color: var(--mc-ink);
+  flex: none;
+  animation: mc-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.ls-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 2vw, 30px);
+}
+.ls-live {
+  flex: 1;
+  min-width: 0;
+}
+.ls-name {
+  font: 400 clamp(34px, 4vw, 62px) / 1 var(--font-game, sans-serif);
+  text-transform: uppercase;
+  padding-top: 4px;
+  text-shadow: 0 3px 0 rgba(27, 16, 53, 0.14);
+}
+.lane-setup[data-step='left'] .ls-name {
+  color: #0f7b92;
+}
+.lane-setup[data-step='right'] .ls-name {
+  color: #b01f73;
+}
+.ls-how {
+  margin-top: 8px;
+  font: 800 clamp(18px, 1.7vw, 26px) / 1.25 var(--font-ui, sans-serif);
+  color: #5d4a2c;
+}
+
+/* ---- the hold ring: the same interaction as calibration */
+.ls-hold {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.ls-ring {
+  position: relative;
+  width: clamp(92px, 9vw, 124px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--mc-ink);
+  box-shadow: 0 6px 0 rgba(27, 16, 53, 0.35);
+}
+.ls-ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.ls-ring-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 8;
+}
+.ls-ring-arc {
+  fill: none;
+  stroke: var(--gold, #ffd400);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.1s linear, stroke 0.2s;
+}
+.ls-ring[data-state='blocked'] .ls-ring-core {
+  color: var(--orange, #ff7a29);
+  font-size: clamp(30px, 3vw, 42px);
+  animation: mc-nudge 1.2s ease-in-out infinite;
+}
+.lane-setup[data-step='right'] .ls-ring[data-state='blocked'] .ls-ring-core {
+  animation-direction: reverse;
+}
+.ls-ring[data-state='taken'] .ls-ring-arc {
+  stroke: var(--mc-green);
+}
+.ls-ring-core {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-top: 4px;
+  box-sizing: border-box;
+  font: 400 clamp(22px, 2.2vw, 30px) / 1 var(--font-game, sans-serif);
+  color: #fff;
+}
+.ls-ring[data-state='taken'] .ls-ring-core {
+  font-size: clamp(40px, 4vw, 56px);
+  color: var(--mc-green);
+  animation: mc-pop 0.35s cubic-bezier(0.3, 1.8, 0.5, 1) both;
+}
+.ls-hold-label {
+  font: 800 clamp(12px, 1vw, 15px) / 1 var(--font-ui, sans-serif);
+  letter-spacing: 0.14em;
+  color: var(--mc-brown);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ the floor strip */
+
+.ls-floor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ls-strip {
+  position: relative;
+  height: clamp(140px, 18vh, 190px);
+  border-radius: 26px;
+  border: 4px solid var(--mc-ink);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(255, 255, 255, 0.05) calc(10% - 2px) 10%),
+    radial-gradient(ellipse 60% 90% at 50% 100%, rgba(255, 212, 0, 0.14), transparent 70%),
+    linear-gradient(180deg, #3b2b6b, #1d1240);
+  box-shadow: inset 0 6px 0 rgba(255, 255, 255, 0.08), 0 6px 0 var(--mc-ink);
+  overflow: hidden;
+}
+/* Where the player calibrated: the zero every spot is measured from. */
+.ls-strip::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  bottom: 10px;
+  width: 0;
+  border-left: 3px dotted rgba(255, 255, 255, 0.35);
+}
+.ls-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.ls-zone-left {
+  left: 0;
+  width: var(--ls-bl, 0%);
+  background: linear-gradient(90deg, rgba(41, 199, 224, 0.3), rgba(41, 199, 224, 0.1));
+}
+.ls-zone-right {
+  right: 0;
+  width: calc(100% - var(--ls-br, 100%));
+  background: linear-gradient(270deg, rgba(229, 57, 155, 0.3), rgba(229, 57, 155, 0.1));
+}
+.ls-near {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--ls-near-w, 0%);
+  background: repeating-linear-gradient(135deg, rgba(255, 122, 41, 0.22) 0 8px, transparent 8px 16px);
+  border-left: 2px solid rgba(255, 122, 41, 0.45);
+  border-right: 2px solid rgba(255, 122, 41, 0.45);
+  box-sizing: border-box;
+}
+.ls-near[data-on='off'] {
+  display: none;
+}
+.ls-bound {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 4px dashed rgba(255, 212, 0, 0.75);
+  transform: translateX(-2px);
+}
+.ls-bound[data-on='off'],
+.ls-pin[data-on='off'],
+.ls-you[data-on='off'] {
+  display: none;
+}
+
+/* ---- a taken spot: a lettered pin standing on the floor */
+.ls-pin {
+  position: absolute;
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  animation: ls-pin-drop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ls-pin-head {
+  display: grid;
+  place-items: center;
+  width: clamp(36px, 3.2vw, 46px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-sizing: border-box;
+  padding-top: 3px;
+  font: 400 clamp(20px, 2vw, 28px) / 1 var(--font-game, sans-serif);
+  color: var(--mc-ink);
+  border: 4px solid var(--mc-ink);
+  box-shadow: 0 4px 0 var(--mc-ink);
+}
+.ls-pin-stem {
+  width: 6px;
+  height: clamp(14px, 3vh, 34px);
+  background: var(--mc-ink);
+  border-radius: 0 0 3px 3px;
+}
+.ls-pin-left .ls-pin-head {
+  background: var(--ls-left);
+}
+.ls-pin-centre .ls-pin-head {
+  background: var(--ls-centre);
+}
+.ls-pin-right .ls-pin-head {
+  background: var(--ls-right);
+  color: #fff;
+}
+
+/* ---- the player, live */
+.ls-you {
+  position: absolute;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translateX(-50%);
+  transition: left 0.1s linear;
+  z-index: 1;
+}
+.ls-you-dot {
+  display: grid;
+  place-items: center;
+  width: clamp(34px, 3.2vw, 46px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  font-size: 0;
+  background: #fff;
+  border: 4px solid var(--mc-ink);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.25);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.ls-you-label {
+  font: 800 clamp(11px, 0.95vw, 14px) / 1 var(--font-ui, sans-serif);
+  letter-spacing: 0.16em;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+.ls-you[data-state='holding'] .ls-you-dot {
+  background: var(--gold, #ffd400);
+  box-shadow: 0 0 0 7px rgba(255, 212, 0, 0.35);
+  animation: ls-hold-pulse 0.9s ease-in-out infinite;
+}
+.ls-you[data-state='blocked'] .ls-you-dot {
+  background: var(--orange, #ff7a29);
+  box-shadow: 0 0 0 6px rgba(255, 122, 41, 0.35);
+}
+.ls-you[data-state='taken'] .ls-you-dot {
+  background: var(--mc-green);
+  box-shadow: 0 0 0 8px rgba(63, 178, 127, 0.4);
+}
+/* Off the strip: the marker waits at the end and points the way. */
+.ls-you[data-edge='left'] .ls-you-label::before {
+  content: '\25c0  ';
+}
+.ls-you[data-edge='right'] .ls-you-label::after {
+  content: '  \25b6';
+}
+/* The summary is the result, not a live readout: the pins alone, and no ticks left to earn. */
+.lane-setup[data-phase='summary'] .ls-you,
+.lane-setup[data-phase='summary'] .mc-dots {
+  display: none;
+}
+
+.ls-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font: 800 clamp(11px, 0.95vw, 14px) / 1 var(--font-ui, sans-serif);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mc-brown);
+}
+.ls-scale-mid {
+  text-align: center;
+  opacity: 0.8;
+}
+
+/* ---- the nudge */
+.ls-hint {
+  /* Exactly one line reserved, so the hint appearing never moves the card. */
+  height: 1.2em;
+  font: 800 clamp(20px, 2vw, 30px) / 1.2 var(--font-ui, sans-serif);
+  color: #b8600c;
+  text-align: center;
+}
+.ls-hint[data-on='off'] {
+  visibility: hidden;
+}
+.ls-hint[data-on='on'] {
+  animation: mc-nudge 1.6s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------ summary */
+
+.ls-rows,
+.ls-note,
+.ls-actions-summary {
+  display: none;
+}
+.lane-setup[data-phase='summary'] .ls-rows {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.lane-setup[data-phase='summary'] .ls-note {
+  display: block;
+}
+.lane-setup[data-phase='summary'] .ls-actions-summary {
+  display: flex;
+}
+.lane-setup[data-phase='summary'] .ls-actions-steps,
+.lane-setup[data-phase='summary'] .ls-hold,
+.lane-setup[data-phase='summary'] .ls-hint {
+  display: none;
+}
+.ls-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 9px 10px;
+  border-radius: 20px;
+  background: #fff;
+  border: 3px solid var(--mc-ink);
+  box-shadow: 0 3px 0 rgba(27, 16, 53, 0.18);
+}
+.ls-row-pin {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding-top: 3px;
+  box-sizing: border-box;
+  font: 400 21px/1 var(--font-game, sans-serif);
+  border: 3px solid var(--mc-ink);
+}
+.ls-row[data-spot='left'] .ls-row-pin {
+  background: var(--ls-left);
+}
+.ls-row[data-spot='centre'] .ls-row-pin {
+  background: var(--ls-centre);
+}
+.ls-row[data-spot='right'] .ls-row-pin {
+  background: var(--ls-right);
+  color: #fff;
+}
+.ls-row-label {
+  font: 800 clamp(16px, 1.3vw, 20px) / 1.1 var(--font-ui, sans-serif);
+}
+.ls-row-from {
+  font: 700 clamp(12px, 1vw, 15px) / 1.2 var(--font-ui, sans-serif);
+  color: #5d4a2c;
+}
+.ls-row-value {
+  font: 400 clamp(24px, 2.2vw, 34px) / 1 var(--font-game, sans-serif);
+  padding-top: 3px;
+}
+.ls-note {
+  font: 800 clamp(12px, 1vw, 15px) / 1.35 var(--font-ui, sans-serif);
+  color: var(--mc-brown);
+}
+
+/* ------------------------------------------------------------ narrow / short / wide */
+
+@media (max-width: 760px) {
+  .lane-setup[data-phase='summary'] .ls-rows {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .ls-row {
+    padding: 6px 12px 5px 8px;
+  }
+  .ls-scale-mid {
+    display: none;
+  }
+  .ls-ring {
+    width: 84px;
+  }
+}
+@media (max-width: 520px) {
+  .ls-head {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+@media (max-height: 820px) {
+  .ls-name {
+    font-size: clamp(30px, 3.4vw, 50px);
+  }
+  .ls-card {
+    gap: 10px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+}
+@media (max-height: 640px) {
+  .lane-setup .mc-dots {
+    display: none;
+  }
+  .ls-strip {
+    height: 118px;
+  }
+  .ls-pin-stem {
+    height: 8px;
+  }
+}
+@media (min-width: 1900px) {
+  .ls-card {
+    width: min(1300px, 92vw);
+  }
+  .ls-name {
+    font-size: 74px;
+  }
+  .ls-how {
+    font-size: 31px;
+  }
+  .ls-ring {
+    width: 150px;
+  }
+  .ls-strip {
+    height: 200px;
+  }
+  .ls-hint {
+    font-size: 34px;
+  }
+  .ls-row-value {
+    font-size: 42px;
+  }
+  .ls-row-label {
+    font-size: 24px;
+  }
+  .ls-row-from,
+  .ls-note,
+  .ls-scale,
+  .ls-hold-label {
+    font-size: 18px;
+  }
+}
+
+@keyframes ls-pin-drop {
+  from {
+    transform: translate(-50%, -30px) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+@keyframes ls-hold-pulse {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lane-setup *,
+  .lane-setup *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}

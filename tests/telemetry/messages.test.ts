@@ -145,6 +145,29 @@ describe('SessionRecording', () => {
     expect(back.meta?.seed).toBe(sample().meta?.seed); // and nothing else was lost
   });
 
+  it('keeps the lane spots a run was played with, and drops malformed ones rather than failing', () => {
+    const rec = JSON.parse(JSON.stringify(sample())) as { meta: Record<string, unknown> };
+    const spots = { left: -0.7, centre: 0.05, right: 0.55 };
+    rec.meta.laneSpots = spots;
+    expect(decodeSession(JSON.parse(JSON.stringify(rec))).meta?.laneSpots).toEqual(spots);
+    // Automatic lanes are recorded as null, and stay null.
+    rec.meta.laneSpots = null;
+    expect(decodeSession(JSON.parse(JSON.stringify(rec))).meta?.laneSpots).toBeNull();
+    for (const bad of [
+      { left: 0.55, centre: 0.05, right: -0.7 },
+      { left: -0.7, centre: 0.05 },
+      { left: '-0.7', centre: 0, right: 0.5 },
+      { left: -1e9, centre: 0, right: 0.5 },
+      'spots',
+      [],
+    ]) {
+      rec.meta.laneSpots = bad;
+      const back = decodeSession(JSON.parse(JSON.stringify(rec)));
+      expect(back.meta?.laneSpots, JSON.stringify(bad)).toBeUndefined(); // the replay decides lanes automatically
+      expect(back.meta?.seed).toBe(sample().meta?.seed); // and nothing else was lost
+    }
+  });
+
   it('rejects malformed recordings with a reason', () => {
     const good = JSON.parse(JSON.stringify(sample())) as Record<string, unknown>;
     expect(() => decodeSession(null)).toThrow(/object/);

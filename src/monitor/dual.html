@@ -11,6 +11,10 @@
   </head>
   <body>
     <iframe id="mon" src="/monitor.html" title="monitor"></iframe>
-    <iframe id="game" src="/monitor-harness.html" title="harness"></iframe>
+    <iframe id="game" title="harness"></iframe>
+    <script>
+      // Passes this page's query (e.g. ?spots) on to the harness.
+      document.getElementById('game').src = `/monitor-harness.html${location.search}`;
+    </script>
   </body>
 </html>

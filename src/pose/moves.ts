@@ -1,4 +1,5 @@
 import type { Baseline } from './calibration';
+import { spotZones, symmetricZones, type LaneSpots, type LaneZones } from './laneSpots';
 import type { Body } from './landmarks';
 import { DropDetector, JumpDetector, VerticalRef } from './signals';
 import type { Thresholds } from './thresholds';
@@ -40,16 +41,27 @@ export interface MoveContext {
   jogging: boolean;
 }
 
-/** Lane zones with hysteresis: enter a side lane at |offset| >= enter, leave it below exit. */
-export function nextLane(lane: Lane, offset: number, enter: number, exit: number): Lane {
-  if (lane === 0) return offset <= -enter ? -1 : offset >= enter ? 1 : 0;
-  if (lane === -1) return offset > -exit ? (offset >= enter ? 1 : 0) : -1;
-  return offset < exit ? (offset <= -enter ? -1 : 0) : 1;
+/**
+ * Lane zones with hysteresis: a side lane is entered at or beyond its enter point and left once the
+ * hips come back past its exit point. A move straight across (left to right) goes directly. The
+ * automatic lanes are the symmetric case (`symmetricZones(enter, exit)`); lane spots are not.
+ */
+export function nextLane(lane: Lane, offset: number, z: Readonly<LaneZones>): Lane {
+  if (lane === 0) return offset <= z.enterL ? -1 : offset >= z.enterR ? 1 : 0;
+  if (lane === -1) return offset > z.exitL ? (offset >= z.enterR ? 1 : 0) : -1;
+  return offset < z.exitR ? (offset <= z.enterL ? -1 : 0) : 1;
 }
 
 /** Full-body mode: standing position sets the lane; hips drive jump and roll. Units: torso lengths. */
 export class FullBodyMoves {
   lane: Lane = 0;
+  /**
+   * The player's own lane spots, or null for the automatic lanes. While set, they — not
+   * `laneEnter`/`laneExit` — decide the lane. Validated by the controller before it lands here.
+   */
+  spots: LaneSpots | null = null;
+  /** Reused every frame, so deciding the lane allocates nothing. */
+  private readonly zones: LaneZones = symmetricZones(0, 0);
   private jump = new JumpDetector();
   private roll = new DropDetector();
   private vref = new VerticalRef();
@@ -90,7 +102,8 @@ export class FullBodyMoves {
 
     const offset = (body.hip.x - base.hip.x) / T;
     this.mag.lane = offset;
-    const lane = nextLane(this.lane, offset, th.laneEnter / sens, th.laneExit / sens);
+    const zones = this.spots ? spotZones(this.spots, sens, this.zones) : symmetricZones(th.laneEnter / sens, th.laneExit / sens, this.zones);
+    const lane = nextLane(this.lane, offset, zones);
     if (lane !== this.lane) {
       this.lane = lane;
       events.push({ type: 'lane', lane });

@@ -4,6 +4,7 @@ import { SessionFlow, type FlowEffect, type InputMode, type ModeChoice, type Mov
 import { IntroRunner, introMode, shouldPlayIntro } from './app/intro';
 import { applyLiveSettings } from './app/liveSettings';
 import { AppLoop } from './app/loop';
+import { LaneSetupSession } from './app/laneSetupSession';
 import { MoveCheckSession } from './app/moveCheckSession';
 import { fixtureReplay, loadSession, PoseRuntime, sessionReplay, STALL_MS } from './app/poseRuntime';
 import { ProfileStore } from './app/profile';
@@ -17,11 +18,13 @@ import { Game } from './game/game';
 import { FixedStepper } from './game/loop';
 import { KeyboardInput } from './input/keyboard';
 import { listCameras } from './pose/camera';
+import { cleanLaneSpots } from './pose/laneSpots';
 import type { Thresholds } from './pose/thresholds';
 import type { PlayMode } from './pose/types';
 import type { SessionRecording } from './telemetry/messages';
 import { TelemetryPublisher } from './telemetry/publisher';
 import { Hud, menuNotice, openMonitorWindow } from './ui/hud';
+import { LaneSetupScreen } from './ui/laneSetupScreen';
 import { MissionBoard, renderMissionList, renderMissionToast } from './ui/missionCard';
 import { MoveCheckScreen, renderSummaryCard } from './ui/moveCheckScreen';
 import { PosePip, pipVisibleFromUrl } from './ui/pip';
@@ -41,6 +44,7 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?intro=always|off        force / suppress the intro cinematic (default: once per session)
 //   ?mute ?vol=0.5 ?nosamples   the mixer; ?audio forces sound on for an autopilot/replay demo
 //   ?difficulty= ?obstacles=1..5 ?amount=few|normal|lots ?seed= ?god ?tone= ?line= ?sens= ?reduced
+//   ?lanes=auto|spots        full-body lanes: automatic, or the player's recorded lane spots
 //   ?pip=0 ?perf ?saveAutopilot
 //   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
 //                            webcam mode, because the keyboard then claims to track jogging.
@@ -118,6 +122,8 @@ const forcedMode: PlayMode | null = sessionMeta
     : null;
 /** The play mode in force: a recorded session, then `?mode=`, then the saved setting. */
 const initialMode: PlayMode | null = forcedMode ?? (settings.mode === 'auto' ? null : settings.mode);
+/** A recorded session decides lanes with the spots it was played with — or automatically, without any. */
+const sessionSpots = sessionMeta ? cleanLaneSpots(sessionMeta.laneSpots) : null;
 const runtime = new PoseRuntime({
   replay,
   replayName,
@@ -125,6 +131,7 @@ const runtime = new PoseRuntime({
     forcedMode: initialMode,
     sensitivity: sessionMeta?.sensitivity ?? settings.sensitivity,
     thresholds: sessionMeta?.thresholds as Partial<Thresholds> | undefined,
+    laneSpots: sessionSpots,
   },
 });
 const initialInput: InputMode =
@@ -152,6 +159,22 @@ const moveCheck = new MoveCheckSession({
     if (event.phase === 'result' && event.result === 'done') audio.moveCheck('ok');
     else if (event.phase === 'done') audio.moveCheck('fanfare');
   },
+});
+
+// ---------------------------------------------------------------- lane spots
+
+/**
+ * The lane-spots setup. Only Save writes anything: it records the spots and switches Lanes to My
+ * spots, which `applySettings` then puts in force on the controller. Every other way out of the
+ * setup — Cancel, Home, Esc, a recalibration, a camera failure — leaves the saved spots alone.
+ */
+const lanes = new LaneSetupSession({
+  onSaved: () => {
+    audio.moveCheck('fanfare');
+    applySettings(settingsStore.set({ lanes: 'spots' }));
+    syncOverlays();
+  },
+  onDone: () => loop.dispatch({ type: 'lanesDone' }),
 });
 
 const flow = new SessionFlow({
@@ -197,6 +220,9 @@ const moveCheckRoot = document.body.appendChild(document.createElement('div'));
 const moveCheckLayer = new MoveCheckScreen(moveCheckRoot, moveCheck.handlers, {
   onHome: () => loop.dispatch({ type: 'home' }),
 });
+// The lane setup likewise owns the whole screen while it is up.
+const laneRoot = document.body.appendChild(document.createElement('div'));
+const laneLayer = new LaneSetupScreen(laneRoot, lanes.handlers);
 const pip = new PosePip(pipRoot, { visible: pipVisibleFromUrl(location.search) });
 pip.attachToggleKey(window);
 runtime.sampleLuma = (t) => pip.sampleLuma(t);
@@ -266,6 +292,13 @@ const settingsScreen = new SettingsScreen(settingsRoot, {
       loop.dispatch({ type: 'startPressed' });
     }
   },
+  setLaneSpots: () => {
+    // Like the move check, this asks to be measured and must never become a way to start a run.
+    if (flow.input !== 'webcam') return;
+    setOverlay('none');
+    // The flow walks a player without a camera or a calibration there first, then opens it.
+    loop.dispatch({ type: 'setLanes' });
+  },
   resetTuning: () => {
     moveCheck.store.clear(currentMode() ?? undefined);
     moveCheck.lastSummary = null;
@@ -320,6 +353,8 @@ function settingsView(): SettingsView {
     cameras: cameraOptions(runtime.cameras, runtime.activeCameraId ?? flow.model.cameraId),
     webcam: flow.input === 'webcam',
     hasTuning: !moveCheck.store.empty,
+    laneSpots: lanes.store.get(),
+    smallRoom: settings.mode === 'small' || currentMode() === 'small',
   };
 }
 
@@ -367,7 +402,17 @@ function applySettings(next: GameSettings): void {
   settings = next;
   applyLiveSettings(
     // A recorded session replays with the sensitivity, and the track, it was played with.
-    { controller: runtime.ctrl, game, world, pip, ownsSensitivity: sessionMeta?.sensitivity === undefined, ownsRun: !sessionMeta },
+    {
+      controller: runtime.ctrl,
+      game,
+      world,
+      pip,
+      laneSpots: lanes.store.get(),
+      ownsSensitivity: sessionMeta?.sensitivity === undefined,
+      ownsRun: !sessionMeta,
+      // A replay decides lanes the way it was recorded (see `sessionSpots`).
+      ownsLanes: !sessionMeta,
+    },
     next,
   );
 }
@@ -413,9 +458,12 @@ const inputLabel = (): string =>
   autopilotOn ? 'autopilot' : runtime.isReplay ? `replay:${runtime.replayName}` : flow.input;
 const currentMode = (): PlayMode | null => runtime.ctrl.baseline?.mode ?? runtime.ctrl.forcedMode ?? null;
 let metaKey = '';
+/** The lane spots the last meta reported; the controller hands out a new object whenever they change. */
+let metaSpots: unknown = null;
 function sendMeta(): void {
   const ctrl = runtime.ctrl;
   metaKey = `${inputLabel()}|${currentMode()}`;
+  metaSpots = ctrl.laneSpots;
   telemetry.meta({
     seed,
     difficulty,
@@ -425,6 +473,7 @@ function sendMeta(): void {
     sensitivity: ctrl.sensitivity,
     thresholds: { ...(ctrl.th as unknown as Record<string, number>) },
     moveTuning: moveCheck.tuningInForce(),
+    laneSpots: ctrl.laneSpots ? { ...ctrl.laneSpots } : null,
   });
 }
 runtime.onFrame = (f, events) => {
@@ -435,6 +484,7 @@ runtime.onFrame = (f, events) => {
   for (let i = 0; i < events.length; i++) if (events[i].type === 'start') gesture.fire();
   // The check measures the same signals the controller just computed, on the same frame.
   if (runtime.ctrl.baseline) moveCheck.frame(runtime.ctrl, events, f.t);
+  lanes.frame(runtime.ctrl, f.t);
 };
 
 /** Counts recalibrations the flow asked for, so a monitor request can tell whether the flow handled it. */
@@ -520,6 +570,12 @@ function onEffect(fx: FlowEffect): void {
       break;
     case 'endMoveCheck':
       moveCheck.end();
+      break;
+    case 'startLaneSetup':
+      lanes.begin();
+      break;
+    case 'endLaneSetup':
+      lanes.end();
       break;
     default:
       break;
@@ -707,6 +763,7 @@ Object.assign(window as unknown as Record<string, unknown>, {
   __flow: flow,
   __runtime: runtime,
   __moveCheck: moveCheck,
+  __lanes: lanes,
   __loop: loop,
   __telemetry: telemetry,
   __overlay: (name: Overlay) => setOverlay(name),
@@ -909,13 +966,16 @@ function frame(now: number): void {
     wantsMoveCheck = false; // they went somewhere else; the request is stale
   }
   moveCheckLayer.update(checking ? moveCheck.model : null);
+  const settingLanes = m.screen === 'laneSetup';
+  laneLayer.update(settingLanes ? lanes.model : null);
   hud.setControls(game.state === 'paused' ? controlsCard() : null);
   // The check's scrim owns the screen: the PiP drops to its corner form (the player is copying the
   // figure, not watching themselves) and goes back to the big stage view afterwards.
   const setup = m.screen === 'calibrating' || m.screen === 'ready';
   // The cinematic owns the screen — the HUD clears every card for it, and the camera card is no
   // more exempt than they are. The flow reads `playing` throughout the intro, hence the guard.
-  const pipOn = webcam && flow.cameraReady && !intro.playing && (setup || checking || m.screen === 'playing');
+  // The lane setup keeps the corner preview: seeing yourself helps you find your spot.
+  const pipOn = webcam && flow.cameraReady && !intro.playing && (setup || checking || settingLanes || m.screen === 'playing');
   pip.setActive(pipOn);
   pip.setLayout(setup ? 'stage' : 'corner');
   syncPipVideo(pipOn);
@@ -928,7 +988,7 @@ function frame(now: number): void {
       menuNotice({ input: m.input, cameraReady: flow.cameraReady, replay: runtime.replayName, autopilot: autopilotOn, fallback }),
     );
   }
-  if (`${inputLabel()}|${currentMode()}` !== metaKey) sendMeta();
+  if (`${inputLabel()}|${currentMode()}` !== metaKey || runtime.ctrl.laneSpots !== metaSpots) sendMeta();
 
   updateProgressionUi(now, dt);
   hud.setSound({ muted: audio.muted, ready: audio.audible });

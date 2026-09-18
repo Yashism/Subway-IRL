@@ -15,7 +15,8 @@ const fixture = params.get('fixture') ?? 'synth-full';
 const out = document.getElementById('out')!;
 
 const pub = new TelemetryPublisher();
-const ctrl = new PoseController();
+// ?spots: play with a set of lane spots in force, so the monitor's lanes readout has something to show.
+const ctrl = new PoseController({ laneSpots: params.has('spots') ? { left: -0.62, centre: 0.04, right: 0.58 } : null });
 const seed = 1234;
 const game = new Game({ seed, difficulty: 'cardio', god: true });
 const bot = new Autopilot(game);
@@ -30,6 +31,7 @@ const sendMeta = () =>
     mode: ctrl.forcedMode,
     sensitivity: ctrl.sensitivity,
     thresholds: { ...ctrl.th },
+    laneSpots: ctrl.laneSpots ? { ...ctrl.laneSpots } : null,
   });
 sendMeta();
 

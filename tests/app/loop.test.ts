@@ -680,3 +680,66 @@ describe('AppLoop: a hold outlives nothing', () => {
     expect(r.game.state).toBe('countdown');
   });
 });
+
+describe('AppLoop: the lane setup', () => {
+  /** A calibrated full-body player on the ready screen, who asks for the setup. */
+  function inSetup() {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.pose.st.mode = 'full';
+    r.frame();
+    expect(r.flow.screen).toBe('ready');
+    r.loop.dispatch({ type: 'setLanes' });
+    expect(r.flow.screen).toBe('laneSetup');
+    expect(r.effects.at(-1)).toEqual({ type: 'startLaneSetup' });
+    return r;
+  }
+
+  it('Esc leaves the setup for the menu, tearing it down on the way', () => {
+    const r = inSetup();
+    r.key('Escape');
+    r.frame();
+    expect(r.flow.screen).toBe('menu');
+    expect(r.effects.at(-1)).toEqual({ type: 'endLaneSetup' });
+  });
+
+  it('a raised hand never starts a run from under the setup', () => {
+    const r = inSetup();
+    r.pose.commands.queue.push({ type: 'start' });
+    r.frame();
+    expect(r.flow.screen).toBe('laneSetup');
+    expect(r.game.state).toBe('menu');
+  });
+
+  it('nor does Enter', () => {
+    const r = inSetup();
+    r.key('Enter');
+    r.frame(3);
+    expect(r.flow.screen).toBe('laneSetup');
+    expect(r.game.state).toBe('menu');
+  });
+
+  it('opened over a live run, pauses it first and leaves it paused behind the setup', () => {
+    const r = setup({ input: 'webcam' });
+    r.openCamera();
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.pose.st.mode = 'full';
+    r.frame();
+    r.key('Enter');
+    r.frame(240);
+    expect(r.game.state).toBe('playing');
+    r.loop.dispatch({ type: 'setLanes' });
+    expect(r.game.state).toBe('paused');
+    expect(r.flow.screen).toBe('laneSetup');
+    r.frame(60);
+    expect(r.game.state).toBe('paused');
+    r.loop.dispatch({ type: 'lanesDone' });
+    expect(r.flow.screen).toBe('playing');
+    expect(r.effects.at(-1)).toEqual({ type: 'endLaneSetup' });
+    // Still paused: the player resumes when they are ready, as from any pause.
+    expect(r.game.state).toBe('paused');
+  });
+});

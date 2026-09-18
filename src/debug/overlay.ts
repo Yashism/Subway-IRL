@@ -1,4 +1,5 @@
 import type { Baseline } from '../pose/calibration';
+import type { LaneSpots } from '../pose/laneSpots';
 import { TRACKED_INDICES } from '../pose/landmarks';
 import type { Thresholds } from '../pose/thresholds';
 import type { PoseStatus } from '../pose/types';
@@ -15,8 +16,19 @@ export interface View {
   aspect: number;
 }
 
-/** Draws the skeleton and detection guides, letterboxed like `object-fit: contain`. */
-export function drawOverlay(ctx: CanvasRenderingContext2D, view: View, st: PoseStatus, base: Baseline | null, th: Thresholds): void {
+/**
+ * Draws the skeleton and detection guides, letterboxed like `object-fit: contain`. With full-body
+ * lane `spots` in force, the lane lines are the recorded midpoints (before sensitivity, like the
+ * automatic ±laneEnter lines) and each spot gets a solid tick of its own.
+ */
+export function drawOverlay(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  st: PoseStatus,
+  base: Baseline | null,
+  th: Thresholds,
+  spots: Readonly<LaneSpots> | null = null,
+): void {
   const { width, height, aspect } = view;
   ctx.clearRect(0, 0, width, height);
   const imgW = Math.min(width, height * aspect);
@@ -33,7 +45,17 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, view: View, st: PoseS
     if (base.mode === 'full') {
       const T = base.torso;
       ctx.strokeStyle = 'rgba(255,176,32,0.8)';
-      for (const dx of [-th.laneEnter, th.laneEnter]) line(ctx, px(base.hip.x + dx * T), oy, px(base.hip.x + dx * T), oy + imgH);
+      const bounds = spots ? [(spots.left + spots.centre) / 2, (spots.right + spots.centre) / 2] : [-th.laneEnter, th.laneEnter];
+      for (const dx of bounds) line(ctx, px(base.hip.x + dx * T), oy, px(base.hip.x + dx * T), oy + imgH);
+      if (spots) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(41,199,224,0.95)';
+        ctx.lineWidth = 4;
+        const y = base.hip.y;
+        for (const dx of [spots.left, spots.centre, spots.right]) line(ctx, px(base.hip.x + dx * T), py(y - 0.25 * T), px(base.hip.x + dx * T), py(y + 0.25 * T));
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+      }
       ctx.strokeStyle = 'rgba(62,207,142,0.8)';
       line(ctx, ox, py(base.hip.y - th.jumpRise * T), ox + imgW, py(base.hip.y - th.jumpRise * T));
       ctx.strokeStyle = 'rgba(255,93,93,0.8)';

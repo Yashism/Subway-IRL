@@ -32,7 +32,7 @@ describe('cleaning', () => {
 
   it('keeps a good record verbatim', () => {
     const good = {
-      sensitivity: 1.1, mode: 'small', mirror: false, line: 'harbour', difficulty: 'beast',
+      sensitivity: 1.1, mode: 'small', lanes: 'spots', mirror: false, line: 'harbour', difficulty: 'beast',
       obstacleLevel: 5, obstacleAmount: 'lots', reducedMotion: true, reducedEffects: true, weightKg: 82,
     };
     expect(cleanSettings(good)).toEqual(good);
@@ -199,6 +199,29 @@ describe('the store', () => {
   });
 });
 
+describe('lanes', () => {
+  it('defaults to Automatic, the game as it was', () => {
+    expect(DEFAULT_SETTINGS.lanes).toBe('auto');
+    expect(cleanSettings({}).lanes).toBe('auto');
+  });
+
+  it('keeps a real choice and drops anything else to Automatic, on its own', () => {
+    expect(cleanSettings({ lanes: 'spots' }).lanes).toBe('spots');
+    for (const bad of ['SPOTS', 'manual', 1, null, {}, ['spots']]) {
+      const s = cleanSettings({ lanes: bad, line: 'harbour' });
+      expect(s.lanes).toBe('auto');
+      expect(s.line).toBe('harbour');
+    }
+  });
+
+  it('persists through the store', () => {
+    const storage = new Map<string, string>();
+    const backing = { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => void storage.set(k, v), removeItem: (k: string) => void storage.delete(k) };
+    new SettingsStore(backing).set({ lanes: 'spots' });
+    expect(new SettingsStore(backing).get().lanes).toBe('spots');
+  });
+});
+
 describe('url flags', () => {
   it('applies the ones it recognises', () => {
     const s = applyUrlFlags(DEFAULT_SETTINGS, '?line=harbour&difficulty=beast&sens=1.2&reduced');
@@ -224,6 +247,12 @@ describe('url flags', () => {
     const bad = applyUrlFlags(DEFAULT_SETTINGS, '?obstacles=&amount=tons');
     expect(bad.obstacleLevel).toBe(DEFAULT_SETTINGS.obstacleLevel);
     expect(bad.obstacleAmount).toBe(DEFAULT_SETTINGS.obstacleAmount);
+  });
+
+  it('sets how lanes are decided for the session, ignoring anything else', () => {
+    expect(applyUrlFlags(DEFAULT_SETTINGS, '?lanes=spots').lanes).toBe('spots');
+    expect(applyUrlFlags({ ...DEFAULT_SETTINGS, lanes: 'spots' }, '?lanes=auto').lanes).toBe('auto');
+    expect(applyUrlFlags({ ...DEFAULT_SETTINGS, lanes: 'spots' }, '?lanes=wherever').lanes).toBe('spots');
   });
 
   it('can be turned off explicitly', () => {

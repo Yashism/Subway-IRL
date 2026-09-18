@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   connection,
+  lanesLabel,
   describeEntry,
   formatRel,
   idleBar,
@@ -85,6 +86,16 @@ describe('monitor reducer', () => {
     expect(c.label).toContain('webcam');
     expect(s1.meta).toEqual(META);
     expect(s0.meta).toBeNull();
+  });
+
+  it('says whether lane spots are in force, and which', () => {
+    const auto = run([{ kind: 'meta', t: 500, meta: { ...META, laneSpots: null }, fullRate: false }], 100);
+    expect(connection(auto, 1000).label).toContain('lanes auto');
+    const old = run([{ kind: 'meta', t: 500, meta: META, fullRate: false }], 100);
+    expect(connection(old, 1000).label).toContain('lanes auto');
+    const spots = run([{ kind: 'meta', t: 500, meta: { ...META, laneSpots: { left: -0.7, centre: 0.05, right: 0.55 } }, fullRate: false }], 100);
+    expect(connection(spots, 1000).label).toContain('lanes spots L \u22120.70 C +0.05 R +0.55');
+    expect(lanesLabel(null)).toBe('lanes auto');
   });
 
   it('goes back to waiting 3 s after the last message, or at once on bye', () => {

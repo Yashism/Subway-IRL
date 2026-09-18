@@ -17,6 +17,8 @@ export type FlowScreen =
   | 'cameraError'
   | 'calibrating'
   | 'moveCheck'
+  /** The guided lane-spots setup (docs/superpowers/specs/2026-09-18-lane-spots.md). */
+  | 'laneSetup'
   | 'ready'
   | 'playing';
 export type InputMode = 'webcam' | 'keyboard';
@@ -52,6 +54,13 @@ export type FlowInput =
   | { type: 'recalibrate' }
   /** "Check my moves" from the ready screen: run the check without recalibrating. */
   | { type: 'checkMoves' }
+  /**
+   * "Set my lane spots" (Settings, the ready screen, or picking My spots with none recorded). Needs
+   * a calibrated full-body player: without a camera or a calibration it gets one first.
+   */
+  | { type: 'setLanes' }
+  /** The lane setup is finished with — saved or cancelled; either way, back to where it came from. */
+  | { type: 'lanesDone' }
   /** Back to the main menu from anywhere, abandoning whatever is on screen. */
   | { type: 'home' }
   | { type: 'cameraOk' }
@@ -75,6 +84,10 @@ export type FlowEffect =
   | { type: 'startMoveCheck' }
   /** The move-check screen is gone: stop feeding it (whatever it measured is kept). */
   | { type: 'endMoveCheck' }
+  /** The lane-setup screen is up: build a LaneSetup and start feeding it pose frames. */
+  | { type: 'startLaneSetup' }
+  /** The lane-setup screen is gone: drop it. Nothing is saved on the way out — only Save saves. */
+  | { type: 'endLaneSetup' }
   /** Call Game.toMenu(): abandon the run on screen without scoring it. */
   | { type: 'homeGame' };
 
@@ -101,6 +114,8 @@ export interface ScreenModel {
   showRecalibrate: boolean;
   /** The ready screen offers the move check in one click ("Check my moves"). */
   showMoveCheck: boolean;
+  /** The ready screen offers the lane-spots setup: a calibrated full-body player. */
+  showLaneSetup: boolean;
   gameState: GameState;
 }
 
@@ -123,6 +138,8 @@ const NONE: readonly FlowEffect[] = Object.freeze([]);
 const START_CHECK: FlowEffect = Object.freeze({ type: 'startMoveCheck' });
 const HOME_GAME: FlowEffect = Object.freeze({ type: 'homeGame' });
 const END_CHECK: FlowEffect = Object.freeze({ type: 'endMoveCheck' });
+const START_LANES: FlowEffect = Object.freeze({ type: 'startLaneSetup' });
+const END_LANES: FlowEffect = Object.freeze({ type: 'endLaneSetup' });
 const initialPose = (): PoseSnapshot => ({
   tracking: false,
   calibrated: false,
@@ -154,6 +171,11 @@ export class SessionFlow {
   private seenCheck: boolean;
   /** The calibration now under way should be followed by the move check. */
   private pendingCheck = false;
+  /**
+   * The player asked for the lane setup before there was a calibrated full-body player to run it
+   * with: it opens the moment there is one. Wins over a pending move check — it was asked for.
+   */
+  private pendingLanes = false;
 
   constructor(opts: FlowOptions = {}) {
     this.input = opts.input ?? 'webcam';
@@ -178,11 +200,13 @@ export class SessionFlow {
 
   /** Applies one input; returns the effects to run, in order. The returned array must not be mutated. */
   dispatch(i: FlowInput): FlowEffect[] {
-    const wasCheck = this.screen === 'moveCheck';
+    const was = this.screen;
     const fx = this.route(i);
-    // Every way off the move-check screen tears the check down, so no caller has to remember to.
-    if (!wasCheck || this.screen === 'moveCheck') return fx;
-    return [END_CHECK, ...fx];
+    // Every way off the move-check or lane-setup screen tears it down, so no caller has to remember to.
+    if (was === this.screen) return fx;
+    if (was === 'moveCheck') return [END_CHECK, ...fx];
+    if (was === 'laneSetup') return [END_LANES, ...fx];
+    return fx;
   }
 
   private route(i: FlowInput): FlowEffect[] {
@@ -215,6 +239,8 @@ export class SessionFlow {
         return this.recalibrate(NONE as FlowEffect[]);
       case 'checkMoves':
         return this.checkMoves();
+      case 'setLanes':
+        return this.setLanes();
       case 'chooseMode':
         return this.chooseMode(i.mode);
       case 'back':
@@ -222,6 +248,7 @@ export class SessionFlow {
         // on screen — paused behind a recalibration, say — "where you were" is the run, not the
         // menu: leaving the pause card sitting over the menu's own screen is neither.
         if (this.screen !== 'playing') this.screen = this.gameState === 'menu' ? 'menu' : 'playing';
+        this.pendingLanes = false;
         return NONE as FlowEffect[];
       default:
         break;
@@ -271,6 +298,12 @@ export class SessionFlow {
         // one hand away from it, and a check must never be dropped by the move it is asking for.
         if (i.type === 'startPressed') return this.endCheck();
         return NONE as FlowEffect[];
+      case 'laneSetup':
+        if (i.type === 'chooseCamera') return this.switchCamera(i.id);
+        if (i.type === 'lanesDone') return this.lanesDone();
+        // Neither Enter nor a raised hand leaves the setup: the player is standing on spots, arms
+        // anywhere, and Save / Cancel are the only answers to what it asks. Esc and Home still work.
+        return NONE as FlowEffect[];
       case 'playing':
         if (i.type === 'chooseCamera') return this.switchCamera(i.id);
         if (i.type === 'startGesture') {
@@ -291,20 +324,27 @@ export class SessionFlow {
     if (this.screen === 'calibrating' && p.calibrated) {
       this.recheck = false;
       this.cached = null;
-      if (this.pendingCheck) {
+      if (this.pendingLanes) {
+        // Asked for by the player, so it goes first; the check stays one click away on the ready screen.
+        this.pendingCheck = false;
+        this.screen = 'ready';
+      } else if (this.pendingCheck) {
         this.pendingCheck = false;
         this.screen = 'moveCheck';
         return [START_CHECK];
       }
       this.screen = 'ready';
-    } else if ((this.screen === 'ready' || this.screen === 'moveCheck') && !p.calibrated) {
+    } else if ((this.screen === 'ready' || this.screen === 'moveCheck' || this.screen === 'laneSetup') && !p.calibrated) {
       // The calibration went away under the check (a recalibration from the monitor, say):
-      // there is nothing to measure against, so go back and offer it again afterwards.
-      this.pendingCheck = this.screen === 'moveCheck' || this.wantsCheck(false);
+      // there is nothing to measure against, so go back and offer it again afterwards. The lane
+      // setup likewise starts again from the centre spot — spots are relative to the calibration.
+      if (this.screen === 'laneSetup') this.pendingLanes = true;
+      this.pendingCheck = this.screen === 'moveCheck' || (!this.pendingLanes && this.wantsCheck(false));
       this.screen = 'calibrating';
       this.recheck = false;
       this.cached = null;
     }
+    if (this.screen === 'ready' && this.pendingLanes && p.calibrated) return this.enterLanes();
     return NONE as FlowEffect[];
   }
 
@@ -331,6 +371,56 @@ export class SessionFlow {
   }
 
   /**
+   * "Set my lane spots". A calibrated full-body player goes straight in; one without a calibration
+   * (or without a camera, from the menu) is walked there first and the setup opens when they arrive.
+   * A run on screen is pinned down before the setup covers it.
+   */
+  private setLanes(): FlowEffect[] {
+    const s = this.screen;
+    if (s === 'laneSetup') return NONE as FlowEffect[];
+    if (!this.cameraReady) {
+      if (s !== 'menu') return NONE as FlowEffect[];
+      this.pendingLanes = true;
+      this.cached = null;
+      return this.go('cameraPrompt');
+    }
+    if (s !== 'menu' && s !== 'ready' && s !== 'calibrating' && s !== 'playing') return NONE as FlowEffect[];
+    // Small-room mode leans rather than standing somewhere: spots do not apply there.
+    if (this.pose.calibrated && this.pose.mode !== 'full') return NONE as FlowEffect[];
+    const fx: FlowEffect[] = this.mustPause() ? [{ type: 'pauseGame' }] : [];
+    this.cached = null;
+    if (this.pose.calibrated) {
+      fx.push(...this.enterLanes());
+      return fx;
+    }
+    this.pendingLanes = true;
+    this.recheck = false;
+    this.screen = 'calibrating';
+    return fx;
+  }
+
+  /** Opens the setup for a calibrated player, if they are in full-body mode. */
+  private enterLanes(): FlowEffect[] {
+    this.pendingLanes = false;
+    if (!this.pose.calibrated || this.pose.mode !== 'full') return NONE as FlowEffect[];
+    this.screen = 'laneSetup';
+    this.recheck = false;
+    this.cached = null;
+    return [START_LANES];
+  }
+
+  /**
+   * Save or Cancel: back to where the setup was opened from. A run on screen (paused behind it)
+   * is where they were; otherwise the ready screen, one raised hand from playing with the new lanes.
+   */
+  private lanesDone(): FlowEffect[] {
+    this.cached = null;
+    this.recheck = false;
+    this.screen = this.gameState === 'menu' ? 'ready' : 'playing';
+    return NONE as FlowEffect[];
+  }
+
+  /**
    * "START PLAYING" on the summary card: done with the check, straight into the run — the card
    * itself lists the start gesture, so there is nothing left for the ready screen to teach.
    * Without a calibration there is nothing to play with, so that falls back to the ready screen,
@@ -354,6 +444,7 @@ export class SessionFlow {
     this.screen = 'menu';
     this.recheck = false;
     this.lossPaused = false;
+    this.pendingLanes = false;
     this.cached = null;
     return running ? [HOME_GAME] : (NONE as FlowEffect[]);
   }
@@ -400,6 +491,7 @@ export class SessionFlow {
   private cameraFailed(message: string): FlowEffect[] {
     this.cameraReady = false;
     this.error = message;
+    this.pendingLanes = false;
     if (this.screen === 'menu') return NONE as FlowEffect[];
     const fx: FlowEffect[] = this.mustPause() ? [{ type: 'pauseGame' }] : [];
     this.screen = 'cameraError';
@@ -412,6 +504,7 @@ export class SessionFlow {
     this.cameraReady = false;
     this.input = 'keyboard';
     this.recheck = false;
+    this.pendingLanes = false;
     if (this.screen === 'menu' || this.screen === 'playing') return fx;
     fx.push(...this.play());
     return fx;
@@ -423,6 +516,9 @@ export class SessionFlow {
     if (this.mustPause()) fx.push({ type: 'pauseGame' });
     fx.push(...before, { type: 'recalibrate' });
     this.recheck = false;
+    // A recalibration (or a mode change) from inside the lane setup comes back to it afterwards,
+    // from the centre spot: the old spots were taken against the calibration just thrown away.
+    this.pendingLanes = this.screen === 'laneSetup';
     this.screen = 'calibrating';
     // Spec "Where it runs": the check always follows a recalibration.
     this.pendingCheck = this.wantsCheck(true);
@@ -455,7 +551,10 @@ export class SessionFlow {
    */
   private canCalibrate(): boolean {
     const s = this.screen;
-    return this.cameraReady && (s === 'menu' || s === 'calibrating' || s === 'ready' || s === 'moveCheck' || s === 'playing');
+    return (
+      this.cameraReady &&
+      (s === 'menu' || s === 'calibrating' || s === 'ready' || s === 'moveCheck' || s === 'laneSetup' || s === 'playing')
+    );
   }
 
   private build(): ScreenModel {
@@ -494,6 +593,7 @@ export class SessionFlow {
       playAgain: webcam && s === 'playing' && this.gameState === 'summary' ? MSG_PLAY_AGAIN : '',
       showRecalibrate: webcam && s === 'playing' && this.cameraReady,
       showMoveCheck: webcam && s === 'ready' && p.calibrated && this.policy !== 'skip',
+      showLaneSetup: webcam && s === 'ready' && p.calibrated && p.mode === 'full',
       gameState: this.gameState,
     };
   }

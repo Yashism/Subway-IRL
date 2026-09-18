@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toBody } from '../../src/pose/landmarks';
+import { symmetricZones } from '../../src/pose/laneSpots';
 import { FullBodyMoves, nextLane, SmallRoomMoves, type MoveContext } from '../../src/pose/moves';
 import { DEFAULT_THRESHOLDS } from '../../src/pose/thresholds';
 import type { Baseline } from '../../src/pose/calibration';
@@ -35,7 +36,7 @@ describe('nextLane', () => {
     [-1, 0.1, 0],
     [-1, 0.7, 1],
   ] as const)('lane %i at offset %f → %i', (lane, offset, expected) => {
-    expect(nextLane(lane, offset, 0.5, 0.35)).toBe(expected);
+    expect(nextLane(lane, offset, symmetricZones(0.5, 0.35))).toBe(expected);
   });
 });
 

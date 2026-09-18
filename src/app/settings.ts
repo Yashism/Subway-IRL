@@ -28,11 +28,21 @@ export const LINES: readonly LineId[] = ['western', 'central', 'harbour'];
 export const DIFFICULTIES: readonly Difficulty[] = ['chill', 'cardio', 'beast'];
 export const MODE_CHOICES: readonly ModeChoice[] = ['auto', 'full', 'small'];
 
+/** How full-body lanes are decided: the automatic step size, or the player's own recorded spots. */
+export type LaneChoice = 'auto' | 'spots';
+export const LANE_CHOICES: readonly LaneChoice[] = ['auto', 'spots'];
+
 export interface GameSettings {
   /** How easily a move triggers. Higher is easier. */
   sensitivity: number;
   /** Which body the detectors expect; 'auto' lets calibration decide. */
   mode: ModeChoice;
+  /**
+   * Full-body lanes: 'auto' is the automatic step size, 'spots' the player's recorded lane spots
+   * (kept in their own store, `subway-irl.laneSpots.v1`). With no spots recorded, 'spots' falls
+   * back to the automatic lanes. Small-room mode leans instead, so it never reads this.
+   */
+  lanes: LaneChoice;
   /** Mirror the camera preview. Display only — detection never sees this. */
   mirror: boolean;
   line: LineId;
@@ -56,6 +66,7 @@ export interface GameSettings {
 export const DEFAULT_SETTINGS: GameSettings = Object.freeze({
   sensitivity: 1,
   mode: 'auto',
+  lanes: 'auto',
   mirror: true,
   line: 'western',
   difficulty: 'cardio',
@@ -110,6 +121,11 @@ export const MODE_BLURBS: Record<ModeChoice, string> = {
   full: 'Room to jog — knees and arms',
   small: 'Desk, sofa, small flat — lean and bob',
 };
+export const LANE_NAMES: Record<LaneChoice, string> = { auto: 'Automatic', spots: 'My spots' };
+export const LANE_BLURBS: Record<LaneChoice, string> = {
+  auto: 'One step either side of where you calibrated',
+  spots: 'Stand on the three spots you chose',
+};
 
 /** Sensitivity in words, because "1.15" tells a player standing 2 m away nothing at all. */
 export function sensitivityWords(value: number): string {
@@ -149,6 +165,7 @@ export function cleanSettings(raw: unknown): GameSettings {
   return {
     sensitivity: cleanSensitivity(o.sensitivity),
     mode: pick(o.mode, MODE_CHOICES, DEFAULT_SETTINGS.mode),
+    lanes: pick(o.lanes, LANE_CHOICES, DEFAULT_SETTINGS.lanes),
     mirror: bool(o.mirror, DEFAULT_SETTINGS.mirror),
     line: pick(o.line, LINES, DEFAULT_SETTINGS.line),
     difficulty: pick(o.difficulty, DIFFICULTIES, DEFAULT_SETTINGS.difficulty),
@@ -162,7 +179,7 @@ export function cleanSettings(raw: unknown): GameSettings {
 
 /**
  * URL overrides, for a demo machine or a screenshot run: `?line=`, `?difficulty=`, `?sens=`,
- * `?obstacles=1..5`, `?amount=few|normal|lots`, `?reduced`. They apply for the session and are never written back — a shared link must not
+ * `?obstacles=1..5`, `?amount=few|normal|lots`, `?lanes=auto|spots`, `?reduced`. They apply for the session and are never written back — a shared link must not
  * quietly change someone's saved settings.
  */
 export function applyUrlFlags(settings: GameSettings, search: string): GameSettings {
@@ -181,6 +198,8 @@ export function applyUrlFlags(settings: GameSettings, search: string): GameSetti
   if (lvl !== null && lvl !== '') out.obstacleLevel = cleanObstacleLevel(Number(lvl));
   const amount = params.get('amount');
   if (amount !== null) out.obstacleAmount = pick(amount, OBSTACLE_AMOUNTS, out.obstacleAmount);
+  const lanes = params.get('lanes');
+  if (lanes !== null) out.lanes = pick(lanes, LANE_CHOICES, out.lanes);
   const sens = params.get('sens');
   if (sens !== null && sens !== '') {
     const n = Number(sens);

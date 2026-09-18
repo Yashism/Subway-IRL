@@ -13,6 +13,9 @@ import {
   DIFFICULTIES,
   DIFFICULTY_BLURBS,
   DIFFICULTY_NAMES,
+  LANE_BLURBS,
+  LANE_CHOICES,
+  LANE_NAMES,
   LINES,
   LINE_BLURBS,
   LINE_NAMES,
@@ -28,8 +31,10 @@ import {
   SENSITIVITY_STEP,
   sensitivityWords,
   type GameSettings,
+  type LaneChoice,
 } from '../app/settings';
 import { OBSTACLE_AMOUNTS, obstacleLevel } from '../game/config';
+import type { LaneSpots } from '../pose/laneSpots';
 import type { CameraOption } from './poseScreens';
 
 // ---------------------------------------------------------------- DOM helpers (shared with workout.ts)
@@ -69,6 +74,21 @@ export const onOff = (on: boolean): string => (on ? 'ON' : 'OFF');
 /** The weight the calorie estimate will use, as a label: their own, or the assumed one. */
 export const weightLabel = (kg: number | null): string => (kg === null ? 'Not set' : `${kg} kg`);
 
+/**
+ * The line under the Lanes chips: what is actually deciding lanes, in words. Small-room mode leans
+ * rather than standing anywhere, so it says spots do not apply rather than hiding the option.
+ */
+export function lanesNote(lanes: LaneChoice, spots: Readonly<LaneSpots> | null, smallRoom: boolean): string {
+  if (smallRoom) return 'You are in Small room mode, where leaning changes lane — spots only apply in Full body mode.';
+  const tail = 'Full body mode only.';
+  if (!spots) {
+    return lanes === 'spots' ? `No spots set yet, so the lanes are Automatic for now. ${tail}` : `No spots set yet. ${tail}`;
+  }
+  const d = (v: number) => Math.abs(v).toFixed(2);
+  const yours = `Your spots: ${d(spots.centre - spots.left)} left and ${d(spots.right - spots.centre)} right of centre, in torso lengths.`;
+  return `${yours} ${lanes === 'spots' ? 'In use.' : 'Not in use while Lanes is Automatic.'} ${tail}`;
+}
+
 /** The rungs the weight picker offers, inside the model's own 30–200 kg band. */
 export const WEIGHT_CHOICES: readonly number[] = [40, 50, 60, 70, 80, 90, 100, 110, 125];
 
@@ -85,6 +105,10 @@ export interface SettingsView {
   webcam: boolean;
   /** True when this machine has a saved move tuning, so "reset my tuning" has something to do. */
   hasTuning: boolean;
+  /** The recorded lane spots, or null when none are recorded. */
+  laneSpots: Readonly<LaneSpots> | null;
+  /** The player is in small-room mode (chosen, or detected): lane spots do not apply there. */
+  smallRoom: boolean;
 }
 
 /** What the screen can ask of the app. Every one of these is a player action, never a frame update. */
@@ -98,6 +122,8 @@ export interface SettingsHandlers {
   redoMoveCheck(): void;
   /** Forget the saved tuning for the current play mode. Already confirmed by the screen. */
   resetTuning(): void;
+  /** Run the lane-spots setup. Also what picking "My spots" with none recorded offers. */
+  setLaneSpots(): void;
   /** Hand the player their data as a JSON file. */
   exportData(): void;
   /** Erase every run, the day streak and the lifetime totals — not the wallet. Already confirmed. */
@@ -113,6 +139,8 @@ interface Confirm {
   body: string;
   yes: string;
   danger: boolean;
+  /** A "yes" that starts something rather than losing something: green, like every other go. */
+  go?: boolean;
   onYes(): void;
 }
 
@@ -133,6 +161,11 @@ export class SettingsScreen {
   private sensValue!: HTMLElement;
   private sensWords!: HTMLElement;
   private modeChips!: Map<string, HTMLButtonElement>;
+  private laneChips!: Map<string, HTMLButtonElement>;
+  private laneNote!: HTMLElement;
+  private laneBtn!: HTMLButtonElement;
+  /** The last view rendered, so a chip can ask what it needs to know (are there spots at all?). */
+  private view: SettingsView | null = null;
   private lineChips!: Map<string, HTMLButtonElement>;
   private diffChips!: Map<string, HTMLButtonElement>;
   private obstacles!: HTMLInputElement;
@@ -195,8 +228,13 @@ export class SettingsScreen {
       this.handlers.change({ mode: v as GameSettings['mode'] }),
     );
 
+    // Lanes: full body only, and said so rather than hidden (spec: lane spots, "Small-room mode").
+    this.laneChips = this.chips(moveBody, 'Lanes', LANE_CHOICES, LANE_NAMES, LANE_BLURBS, (v) => this.pickLanes(v as LaneChoice));
+    this.laneNote = el('div', 'sw-note sw-lanes-note', moveBody);
+
     const moveActions = el('div', 'sw-actions', moveBody);
     this.checkBtn = button(moveActions, 'sw-btn sw-btn-go', 'Redo the move check', () => this.handlers.redoMoveCheck());
+    this.laneBtn = button(moveActions, 'sw-btn', 'Set my lane spots', () => this.handlers.setLaneSpots());
     this.tuningBtn = button(moveActions, 'sw-btn sw-btn-warn', 'Reset my tuning', () =>
       this.ask({
         title: 'Reset your tuning?',
@@ -314,6 +352,7 @@ export class SettingsScreen {
       this.setConfirm(null);
       return;
     }
+    this.view = v;
     const s = v.settings;
 
     // A slider the player is dragging must never be written to underneath them.
@@ -322,6 +361,8 @@ export class SettingsScreen {
     this.text(this.sensWords, sensitivityWords(s.sensitivity));
 
     this.select(this.modeChips, s.mode);
+    this.select(this.laneChips, s.lanes);
+    this.text(this.laneNote, lanesNote(s.lanes, v.laneSpots, v.smallRoom));
     this.select(this.lineChips, s.line);
     this.select(this.diffChips, s.difficulty);
     const level = obstacleLevel(s.obstacleLevel);
@@ -359,6 +400,8 @@ export class SettingsScreen {
     this.attr(this.moveGroup, 'data-off', v.webcam ? 'off' : 'on');
     this.camSelect.disabled = !v.webcam || v.cameras.length === 0;
     this.checkBtn.disabled = !v.webcam;
+    this.laneBtn.disabled = !v.webcam || v.smallRoom;
+    this.text(this.laneBtn, v.laneSpots ? 'Redo my lane spots' : 'Set my lane spots');
     this.tuningBtn.disabled = !v.hasTuning;
   }
 
@@ -379,6 +422,27 @@ export class SettingsScreen {
   }
 
   // ---------------------------------------------------------------- internals
+
+  /**
+   * "My spots" with none recorded would quietly do nothing, so it offers the setup instead: the
+   * choice lands when the player saves their spots (Save switches Lanes to My spots). Anything else
+   * is an ordinary settings change.
+   */
+  private pickLanes(v: LaneChoice): void {
+    const view = this.view;
+    if (v === 'spots' && view && !view.laneSpots && view.webcam && !view.smallRoom) {
+      this.ask({
+        title: 'Set your lane spots?',
+        body: 'My spots uses three places you choose to stand: your left, centre and right lanes. You have not set them yet, so the lanes stay Automatic until you do. It takes about ten seconds.',
+        yes: 'Set them now',
+        danger: false,
+        go: true,
+        onYes: () => this.handlers.setLaneSpots(),
+      });
+      return;
+    }
+    this.handlers.change({ lanes: v });
+  }
 
   /** A group card. `offNote` is the strip shown in its place of a reason when the group is inert. */
   private group(parent: Element, icon: string, title: string, blurb: string, offNote?: string): HTMLElement {
@@ -496,7 +560,7 @@ export class SettingsScreen {
     this.text(this.dlgTitle, c.title);
     this.text(this.dlgBody, c.body);
     this.text(this.dlgYes, c.yes);
-    this.dlgYes.className = c.danger ? 'sw-btn sw-btn-danger' : 'sw-btn sw-btn-warn';
+    this.dlgYes.className = c.go ? 'sw-btn sw-btn-go' : c.danger ? 'sw-btn sw-btn-danger' : 'sw-btn sw-btn-warn';
   }
 
   private text(e: Element, value: string): void {

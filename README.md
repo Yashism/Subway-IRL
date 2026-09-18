@@ -58,10 +58,16 @@ of what you actually managed, so a move is comfortably reachable but still above
 If a move will not register, "Use my best attempt" accepts what you managed. Tuning is saved per
 mode. The summary doubles as a controls cheat sheet, and is on the pause screen as **Controls**.
 
+**Lane spots** (full-body mode). If one step either side of where you calibrated does not suit your
+room, set **Lanes: My spots** and stand on your own left, centre and right spots, holding each for
+a second. Lanes then change halfway between your spots. Reached from Settings › Movement ("Set my
+lane spots") and from the ready screen. Small-room mode leans to change lane, so spots do not apply
+there.
+
 ## Screens
 
 - **Menu** — missions, the daily challenge, your level, the shop.
-- **Settings** (⚙, from the menu or pause) — sensitivity, play mode, camera, audio, line
+- **Settings** (⚙, from the menu or pause) — sensitivity, play mode, lanes (Automatic / My spots), camera, audio, line
   (Western / Central / Harbour), pace (Chill / Cardio / Beast), obstacle difficulty (1 Gentle – 5
   Brutal) and obstacle amount (Few / Normal / Lots), reduced motion and effects, export or clear
   your data. Obstacle settings only ever choose among patterns the passability solver has checked,
@@ -76,7 +82,7 @@ mode. The summary doubles as a controls cheat sheet, and is on the pause screen 
 ## URL options
 
 `?input=keyboard` · `?mode=full|small` · `?line=western|central|harbour` · `?difficulty=` ·
-`?obstacles=1..5` · `?amount=few|normal|lots` ·
+`?obstacles=1..5` · `?amount=few|normal|lots` · `?lanes=auto|spots` ·
 `?sens=` · `?intro=always|off` · `?movecheck=skip|force` · `?mute` · `?vol=0.5` · `?audio=0` ·
 `?posereplay=<fixture>` · `?session=<recording>` · `?autopilot` · `?perf` · `?god`
 
@@ -89,7 +95,7 @@ npm run build        # typecheck + vite build
 ```
 
 Harness pages, all camera-free: `debug.html` (pose), `gallery.html` (3D models),
-`moveCheck-harness.html`, `settings-harness.html`, `missions-harness.html`, `intro-harness.html`,
+`moveCheck-harness.html`, `laneSetup-harness.html`, `settings-harness.html`, `missions-harness.html`, `intro-harness.html`,
 `audio-lab.html` (renders every sound cue offline and draws its waveform), `monitor-harness.html`.
 
 Screenshots for visual checks use `shoot <url> <out.png> [readyExpr] [settleMs]`. Playwright is not

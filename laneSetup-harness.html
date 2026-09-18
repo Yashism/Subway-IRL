@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lane Spots Harness</title>
+    <style>
+      #backdrop {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        display: block;
+      }
+      .harness-nav {
+        position: fixed;
+        left: 50%;
+        bottom: 4px;
+        transform: translateX(-50%);
+        z-index: 50;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        font: 12px system-ui, sans-serif;
+        opacity: 0.25;
+      }
+      .harness-nav:hover {
+        opacity: 1;
+      }
+      .harness-nav a {
+        color: #fff;
+        background: #000a;
+        padding: 2px 6px;
+        border-radius: 4px;
+        text-decoration: none;
+      }
+      body.shot .harness-nav {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="backdrop"></canvas>
+    <div id="lane-setup"></div>
+    <nav class="harness-nav" id="nav"></nav>
+    <script type="module" src="/src/ui/laneSetup.harness.ts"></script>
+  </body>
+</html>

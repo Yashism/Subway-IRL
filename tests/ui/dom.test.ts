@@ -26,6 +26,7 @@ const model = (over: Partial<ScreenModel> = {}): ScreenModel => ({
   playAgain: '',
   showRecalibrate: false,
   showMoveCheck: false,
+  showLaneSetup: false,
   gameState: 'menu',
   ...over,
 });

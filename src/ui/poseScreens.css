@@ -629,11 +629,13 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   gap: 8px;
 }
 .ps-recal-ready,
-.ps-movecheck-ready {
+.ps-movecheck-ready,
+.ps-lanes-ready {
   display: none;
 }
 .pose-ui[data-screen='ready'] .ps-recal-ready,
-.pose-ui[data-screen='ready'] .ps-movecheck-ready:not([hidden]) {
+.pose-ui[data-screen='ready'] .ps-movecheck-ready:not([hidden]),
+.pose-ui[data-screen='ready'] .ps-lanes-ready:not([hidden]) {
   display: block;
 }
 

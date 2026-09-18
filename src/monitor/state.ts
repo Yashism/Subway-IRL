@@ -236,8 +236,19 @@ export function connection(s: MonitorState, now: number): Connection {
   }
   const m = s.meta;
   const parts = ['connected'];
-  if (m) parts.push(`seed ${m.seed}`, m.difficulty, `input ${m.input}`, `mode ${m.mode ?? 'auto'}`);
+  if (m) parts.push(`seed ${m.seed}`, m.difficulty, `input ${m.input}`, `mode ${m.mode ?? 'auto'}`, lanesLabel(m));
   return { state: 'connected', label: parts.join(' · ') };
+}
+
+const signed = (v: number): string => `${v >= 0 ? '+' : '\u2212'}${Math.abs(v).toFixed(2)}`;
+
+/**
+ * How full-body lanes are being decided, for the header: "lanes auto", or the spots in force in
+ * torso lengths from the calibrated centre. A recording from before lane spots reads as auto.
+ */
+export function lanesLabel(meta: Pick<SessionMeta, 'laneSpots'> | null): string {
+  const s = meta?.laneSpots;
+  return s ? `lanes spots L ${signed(s.left)} C ${signed(s.centre)} R ${signed(s.right)}` : 'lanes auto';
 }
 
 /** How long before the status was sent the last pose frame arrived. */

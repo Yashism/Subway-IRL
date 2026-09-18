@@ -23,6 +23,7 @@ import {
   idleBar,
   initialState,
   isVisible,
+  lanesLabel,
   lastAtOrBefore,
   poseStatusOf,
   recordingTimeline,
@@ -284,7 +285,7 @@ function renderSkeleton(frame: LiveFrame | null, st: PoseStatus, base: Baseline 
     const scale = Math.min(1, Math.max(0.45, w / 1100));
     ctx.save();
     ctx.scale(scale, scale);
-    drawOverlay(ctx, { width: w / scale, height: h / scale, aspect }, st, base, thresholdsOf(meta));
+    drawOverlay(ctx, { width: w / scale, height: h / scale, aspect }, st, base, thresholdsOf(meta), meta?.laneSpots ?? null);
     ctx.restore();
   }
   stageEmpty.hidden = frame !== null;
@@ -586,7 +587,7 @@ function openRecording(name: string, rec: SessionRecording): void {
   $('offName').title = name;
   const m = rec.meta;
   const bits = [
-    m ? `seed ${m.seed} · ${m.difficulty} · input ${m.input} · mode ${m.mode ?? 'auto'} · sens ${m.sensitivity}` : 'no meta',
+    m ? `seed ${m.seed} · ${m.difficulty} · input ${m.input} · mode ${m.mode ?? 'auto'} · sens ${m.sensitivity} · ${lanesLabel(m)}` : 'no meta',
     rec.backend ? `backend ${rec.backend}` : '',
     rec.createdAt,
   ].filter(Boolean);

@@ -31,6 +31,8 @@ const view = (over: Partial<SettingsView> = {}): SettingsView => ({
   cameras: CAMS,
   webcam: true,
   hasTuning: true,
+  laneSpots: null,
+  smallRoom: false,
   ...over,
 });
 
@@ -50,6 +52,7 @@ function screen() {
     chooseCamera: (id) => void calls.camera.push(id),
     redoMoveCheck: note('redo'),
     resetTuning: note('resetTuning'),
+    setLaneSpots: note('setLaneSpots'),
     exportData: note('export'),
     clearHistory: note('clear'),
     openWorkout: note('workout'),
@@ -107,7 +110,7 @@ describe('mounting', () => {
     ui.update(view());
     ui.update(view({ settings: { ...DEFAULT_SETTINGS, line: 'harbour' } }));
     expect(root.querySelectorAll('.sw-group')).toHaveLength(5);
-    expect(root.querySelectorAll('.sw-chip')).toHaveLength(12); // mode 3 + line 3 + pace 3 + obstacle amount 3
+    expect(root.querySelectorAll('.sw-chip')).toHaveLength(14); // mode 3 + lanes 2 + line 3 + pace 3 + obstacle amount 3
   });
 
   it('takes everything back down on destroy', () => {
@@ -130,7 +133,7 @@ describe('the controls', () => {
     expect(chip(root, 'Western').dataset.on).toBe('off');
     expect(chip(root, 'Beast').dataset.on).toBe('on');
     expect(chip(root, 'Small room').dataset.on).toBe('on');
-    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(4); // one per group: mode, line, pace, amount
+    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(5); // one per group: mode, lanes, line, pace, amount
   });
 
   it('asks for the change it was clicked for, and changes nothing itself', () => {
@@ -334,6 +337,8 @@ describe('the mixer sliders drive the real audio settings', () => {
         cameras: CAMS,
         webcam: true,
         hasTuning: true,
+        laneSpots: null,
+        smallRoom: false,
       });
     const ui = new SettingsScreen(root, {
       change: () => render(),
@@ -344,6 +349,7 @@ describe('the mixer sliders drive the real audio settings', () => {
       chooseCamera: () => render(),
       redoMoveCheck: () => {},
       resetTuning: () => {},
+      setLaneSpots: () => {},
       exportData: () => {},
       clearHistory: () => {},
       openWorkout: () => {},
@@ -433,5 +439,91 @@ describe('SettingsScreen: obstacles', () => {
     ui.update(view({ settings: { ...DEFAULT_SETTINGS, obstacleAmount: 'few' } }));
     expect(chip(root, 'Few').getAttribute('aria-pressed')).toBe('true');
     expect(chip(root, 'Normal').getAttribute('aria-pressed')).toBe('false');
+  });
+});
+
+describe('SettingsScreen: lanes', () => {
+  const SPOTS = { left: -0.62, centre: 0.04, right: 0.58 };
+  const laneBtn = (root: Element) =>
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.sw-btn')).find((b) => /lane spots/.test(b.textContent ?? ''))!;
+  const note = (root: Element) => root.querySelector('.sw-lanes-note')!.textContent ?? '';
+
+  it('shows the Lanes choice, Automatic by default', () => {
+    const { root, ui } = screen();
+    ui.update(view());
+    expect(chip(root, 'Automatic').dataset.on).toBe('on');
+    expect(chip(root, 'My spots').dataset.on).toBe('off');
+  });
+
+  it('says plainly that spots are for full-body mode', () => {
+    const { root, ui } = screen();
+    ui.update(view());
+    expect(note(root)).toMatch(/Full body mode only/);
+    ui.update(view({ smallRoom: true, laneSpots: SPOTS }));
+    expect(note(root)).toMatch(/Small room mode/);
+    expect(note(root)).toMatch(/only apply in Full body mode/);
+  });
+
+  it('describes the spots in force, and whether they are in use', () => {
+    const { root, ui } = screen();
+    ui.update(view({ laneSpots: SPOTS, settings: { ...DEFAULT_SETTINGS, lanes: 'spots' } }));
+    expect(note(root)).toContain('0.66 left and 0.54 right of centre');
+    expect(note(root)).toContain('In use.');
+    ui.update(view({ laneSpots: SPOTS }));
+    expect(note(root)).toContain('Not in use while Lanes is Automatic.');
+  });
+
+  it('owns up when My spots is chosen but none are recorded', () => {
+    const { root, ui } = screen();
+    ui.update(view({ settings: { ...DEFAULT_SETTINGS, lanes: 'spots' } }));
+    expect(note(root)).toMatch(/Automatic for now/);
+  });
+
+  it('with spots recorded, the chips are an ordinary change', () => {
+    const { root, ui, calls } = screen();
+    ui.update(view({ laneSpots: SPOTS }));
+    chip(root, 'My spots').click();
+    chip(root, 'Automatic').click();
+    expect(calls.change).toEqual([{ lanes: 'spots' }, { lanes: 'auto' }]);
+    expect(ui.confirm).toBeNull();
+  });
+
+  it('picking My spots with none recorded offers the setup instead of changing anything', () => {
+    const { root, ui, calls } = screen();
+    ui.update(view());
+    chip(root, 'My spots').click();
+    expect(calls.change).toEqual([]);
+    expect(ui.confirm?.title).toBe('Set your lane spots?');
+    const yes = root.querySelector<HTMLButtonElement>('.sw-dialog-actions .sw-btn:last-child')!;
+    expect(yes.textContent).toBe('Set them now');
+    expect(yes.className).toContain('sw-btn-go');
+    yes.click();
+    expect(calls.fired).toEqual(['setLaneSpots']);
+    expect(calls.change).toEqual([]);
+    expect(ui.confirm).toBeNull();
+  });
+
+  it('cancelling the offer leaves Lanes on Automatic', () => {
+    const { root, ui, calls } = screen();
+    ui.update(view());
+    chip(root, 'My spots').click();
+    root.querySelector<HTMLButtonElement>('.sw-dialog-actions .sw-btn-cancel')!.click();
+    expect(calls.fired).toEqual([]);
+    expect(calls.change).toEqual([]);
+    expect(chip(root, 'Automatic').dataset.on).toBe('on');
+  });
+
+  it('the button runs the setup, and is off in keyboard or small-room mode', () => {
+    const { root, ui, calls } = screen();
+    ui.update(view());
+    expect(laneBtn(root).textContent).toBe('Set my lane spots');
+    laneBtn(root).click();
+    expect(calls.fired).toEqual(['setLaneSpots']);
+    ui.update(view({ laneSpots: SPOTS }));
+    expect(laneBtn(root).textContent).toBe('Redo my lane spots');
+    ui.update(view({ webcam: false }));
+    expect(laneBtn(root).disabled).toBe(true);
+    ui.update(view({ smallRoom: true }));
+    expect(laneBtn(root).disabled).toBe(true);
   });
 });

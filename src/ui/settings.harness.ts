@@ -1,6 +1,6 @@
 /**
  * Visual harness for the settings and workout screens (not part of the build).
- * settings-harness.html?screen=settings|settings-keyboard|confirm|workout|workout-empty|workout-oneday
+ * settings-harness.html?screen=settings|settings-keyboard|confirm|lanes|lanes-offer|lanes-small|workout|workout-empty|workout-oneday
  *
  * Everything is fixture data held in memory: no camera, no audio device, no game, no localStorage.
  * The stores are real, pointed at a fake storage, so a control that does not actually persist shows
@@ -14,7 +14,17 @@ import { cameraOptions } from './poseScreens';
 import { SettingsScreen, type SettingsView } from './settings';
 import { WorkoutScreen, type WorkoutView } from './workout';
 
-const SCREENS = ['settings', 'settings-keyboard', 'confirm', 'workout', 'workout-empty', 'workout-oneday'] as const;
+const SCREENS = [
+  'settings',
+  'settings-keyboard',
+  'confirm',
+  'lanes',
+  'lanes-offer',
+  'lanes-small',
+  'workout',
+  'workout-empty',
+  'workout-oneday',
+] as const;
 type Screen = (typeof SCREENS)[number];
 
 const params = new URLSearchParams(location.search);
@@ -127,6 +137,10 @@ function oneDayProfile(): Profile {
 // ---------------------------------------------------------------- main
 
 const settingsStore = new SettingsStore(memoryStorage());
+// `lanes`: spots recorded and in use. `lanes-offer`: none recorded, and My spots just picked.
+if (screen === 'lanes') settingsStore.set({ lanes: 'spots' });
+if (screen === 'lanes-small') settingsStore.set({ mode: 'small' });
+const laneSpots = screen === 'lanes' || screen === 'lanes-small' ? { left: -0.62, centre: 0.04, right: 0.58 } : null;
 let audio: AudioSettings = { ...DEFAULT_AUDIO };
 let cameraId = 'usb';
 const profile = screen === 'workout-empty' ? new ProfileStore(memoryStorage()).profile : screen === 'workout-oneday' ? oneDayProfile() : populatedProfile();
@@ -151,6 +165,7 @@ const settings = new SettingsScreen(document.getElementById('settings')!, {
   },
   redoMoveCheck: () => log('redo move check'),
   resetTuning: () => log('reset tuning'),
+  setLaneSpots: () => log('set lane spots'),
   exportData: () => log('export data'),
   clearHistory: () => log('clear history'),
   openWorkout: () => log('open workout'),
@@ -164,7 +179,7 @@ const workout = new WorkoutScreen(document.getElementById('workout')!, {
 });
 
 function render(): void {
-  const showSettings = screen === 'settings' || screen === 'settings-keyboard' || screen === 'confirm';
+  const showSettings = !screen.startsWith('workout');
   const view: SettingsView = {
     open: showSettings,
     settings: settingsStore.get(),
@@ -172,6 +187,8 @@ function render(): void {
     cameras: cameraOptions(CAMS, cameraId),
     webcam: screen !== 'settings-keyboard',
     hasTuning: screen !== 'settings-keyboard',
+    laneSpots,
+    smallRoom: settingsStore.get().mode === 'small',
   };
   settings.update(view);
   const wView: WorkoutView = { open: !showSettings, profile, weightKg: settingsStore.get().weightKg };
@@ -185,6 +202,12 @@ if (screen === 'confirm') {
   const clear = Array.from(document.querySelectorAll<HTMLButtonElement>('.sw-btn')).find((b) => b.textContent === 'Clear my history');
   clear?.click();
 }
+if (screen === 'lanes-offer') {
+  const chip = Array.from(document.querySelectorAll<HTMLButtonElement>('.sw-chip')).find((b) => b.textContent?.startsWith('My spots'));
+  chip?.click();
+}
+// The Lanes controls sit low in the Movement card: bring them into the shot.
+if (screen.startsWith('lanes')) document.querySelector('.sw-lanes-note')?.scrollIntoView({ block: 'center' });
 
 void document.fonts.ready.then(() => {
   (window as unknown as { __ready: boolean }).__ready = true;

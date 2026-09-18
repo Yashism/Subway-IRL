@@ -2,6 +2,7 @@ import type { GameCommand } from '../input/commands';
 import type { CaughtReason, GameEvent, GameState } from '../game/game';
 import type { IdleLevel } from '../game/rules';
 import type { Baseline } from '../pose/calibration';
+import { cleanLaneSpots, type LaneSpots } from '../pose/laneSpots';
 import type { PoseFixture } from '../pose/fixtures';
 import type { MoveId, MoveTuning } from '../pose/moveCheckTypes';
 import type { Lane, PlayMode, Pose, PoseEvent, PoseFrame, PoseStatus } from '../pose/types';
@@ -33,6 +34,11 @@ export interface SessionMeta {
   thresholds: Record<string, number>;
   /** The move-check record behind those thresholds, when there is one. */
   moveTuning?: MoveTuning | null;
+  /**
+   * The full-body lane spots in force, null for the automatic lanes. A replay decides lanes with
+   * these. Absent in recordings made before lane spots, which replay with the automatic lanes.
+   */
+  laneSpots?: LaneSpots | null;
 }
 
 export interface GameSnapshot {
@@ -410,6 +416,13 @@ function checkMeta(x: unknown): void {
   // Optional and newer than most recordings: a malformed one is dropped, not fatal — the replay
   // then lays the track at the designed settings.
   if (m.obstacles !== undefined && !(isObj(m.obstacles) && isNum(m.obstacles.level) && isStr(m.obstacles.amount))) delete m.obstacles;
+  // Same rule for the lane spots: anything the controller would refuse is dropped, and the replay
+  // decides lanes automatically — a bad field must not cost the whole recording.
+  if (m.laneSpots !== undefined && m.laneSpots !== null) {
+    const spots = cleanLaneSpots(m.laneSpots);
+    if (spots) m.laneSpots = spots;
+    else delete m.laneSpots;
+  }
   if (m.thresholds === undefined) m.thresholds = {};
   else if (!isObj(m.thresholds)) fail('meta.thresholds must be an object');
 }

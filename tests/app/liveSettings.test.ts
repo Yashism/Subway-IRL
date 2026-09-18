@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyLiveSettings, type LiveTargets } from '../../src/app/liveSettings';
 import { SettingsStore, DEFAULT_SETTINGS, SETTINGS_KEY, applyUrlFlags } from '../../src/app/settings';
+import type { LaneSpots } from '../../src/pose/laneSpots';
 import type { LineId } from '../../src/world/stations';
 
 class FakeStorage {
@@ -24,7 +25,7 @@ function targets() {
     lines,
     reduced,
     mirrors,
-    controller: { sensitivity: 1 },
+    controller: { sensitivity: 1, laneSpots: null as LaneSpots | null },
     game: { options: { difficulty: 'cardio' } },
     world: {
       setLine: (l) => lines.push(l),
@@ -69,6 +70,42 @@ describe('applyLiveSettings', () => {
     expect(t.game.options.obstacles).toEqual({ level: 5, amount: 'lots' });
     // What does not decide the track still follows the settings.
     expect(t.lines.length).toBe(1);
+  });
+
+  describe('lanes', () => {
+    const SPOTS: LaneSpots = { left: -0.7, centre: 0, right: 0.55 };
+
+    it('puts the recorded spots in force when Lanes is My spots', () => {
+      const t = { ...targets(), laneSpots: SPOTS };
+      applyLiveSettings(t, { ...DEFAULT_SETTINGS, lanes: 'spots' });
+      expect(t.controller.laneSpots).toEqual(SPOTS);
+    });
+
+    it('Automatic takes them off again, live', () => {
+      const t = { ...targets(), laneSpots: SPOTS };
+      applyLiveSettings(t, { ...DEFAULT_SETTINGS, lanes: 'spots' });
+      applyLiveSettings(t, { ...DEFAULT_SETTINGS, lanes: 'auto' });
+      expect(t.controller.laneSpots).toBeNull();
+    });
+
+    it('My spots with none recorded is the automatic lanes', () => {
+      const t = { ...targets(), laneSpots: null };
+      applyLiveSettings(t, { ...DEFAULT_SETTINGS, lanes: 'spots' });
+      expect(t.controller.laneSpots).toBeNull();
+      const u = targets();
+      applyLiveSettings(u, { ...DEFAULT_SETTINGS, lanes: 'spots' });
+      expect(u.controller.laneSpots).toBeNull();
+    });
+
+    it('never reaches into a replay, which decides lanes the way it was recorded', () => {
+      const t = { ...targets(), laneSpots: SPOTS, ownsLanes: false };
+      const recorded: LaneSpots = { left: -0.4, centre: 0.1, right: 0.9 };
+      t.controller.laneSpots = recorded;
+      applyLiveSettings(t, { ...DEFAULT_SETTINGS, lanes: 'auto' });
+      expect(t.controller.laneSpots).toBe(recorded);
+      applyLiveSettings(t, { ...DEFAULT_SETTINGS, lanes: 'spots' });
+      expect(t.controller.laneSpots).toBe(recorded);
+    });
   });
 
   it('leaves the sensitivity alone while a recorded session is replaying', () => {

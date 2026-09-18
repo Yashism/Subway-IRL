@@ -50,7 +50,7 @@ const TOAST_STALLED_IDLE: Toast = { level: 'stalled', text: 'Camera stalled — 
 export const warningToast = (slow: boolean, stalled: boolean, running = true): Toast | null =>
   stalled ? (running ? TOAST_STALLED : TOAST_STALLED_IDLE) : slow ? TOAST_SLOW : null;
 
-type CopyScreen = Exclude<FlowScreen, 'menu' | 'moveCheck' | 'playing'>;
+type CopyScreen = Exclude<FlowScreen, 'menu' | 'moveCheck' | 'laneSetup' | 'playing'>;
 const COPY: Record<CopyScreen, { tab: string; title: string; body: string }> = {
   cameraPrompt: {
     tab: 'CAMERA TIME',
@@ -183,6 +183,7 @@ export class PoseScreens {
   private readonly checks: Record<'body' | 'distance' | 'light', CheckRow>;
   private readonly modeChip: HTMLButtonElement;
   private readonly moveCheckBtn: HTMLButtonElement;
+  private readonly laneBtn: HTMLButtonElement;
   private readonly modeLabel: HTMLElement;
   private readonly calRing: ReturnType<typeof ring>;
   private readonly startRing: ReturnType<typeof ring>;
@@ -289,6 +290,8 @@ export class PoseScreens {
     this.moveCheckBtn = this.button(toolRow, 'ps-btn ps-btn-small ps-movecheck-ready', 'Check my moves', () =>
       this.emit({ type: 'checkMoves' }),
     );
+    // Full body only: small-room mode leans to change lane, so it has no spots to stand on.
+    this.laneBtn = this.button(toolRow, 'ps-btn ps-btn-small ps-lanes-ready', 'Set my lane spots', () => this.emit({ type: 'setLanes' }));
     this.button(toolRow, 'ps-btn ps-btn-small ps-recal-ready', 'Recalibrate', () => this.emit({ type: 'recalibrate' }));
     this.button(toolRow, 'ps-btn ps-btn-small ps-btn-ghost', 'Use keyboard', () => this.emit({ type: 'useKeyboard' }));
     // Never stuck in the camera flow: the same way out Esc gives, spelled out.
@@ -362,6 +365,7 @@ export class PoseScreens {
     }
 
     this.moveCheckBtn.hidden = !m.showMoveCheck;
+    this.laneBtn.hidden = !m.showLaneSetup;
     this.text(this.playAgain, m.playAgain);
     this.attr(this.root, 'data-recal', m.showRecalibrate ? 'on' : 'off');
   }

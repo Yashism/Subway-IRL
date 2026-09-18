@@ -1,5 +1,6 @@
 import { Calibrator, driftBaseline, driftBaselineX, rebaseBaselineX, type Baseline } from './calibration';
 import { GestureDetector } from './gestures';
+import { cleanLaneSpots, type LaneSpots } from './laneSpots';
 import { JogDetector } from './jog';
 import { dist, toBody, VISIBLE, type Body } from './landmarks';
 import { clearMagnitudes, emptyMagnitudes, FullBodyMoves, SmallRoomMoves } from './moves';
@@ -12,6 +13,8 @@ export interface PoseControllerOptions {
   thresholds?: Partial<Thresholds>;
   sensitivity?: number;
   forcedMode?: PlayMode | null;
+  /** Full-body lane spots in force from the first frame; null or absent means the automatic lanes. */
+  laneSpots?: LaneSpots | null;
 }
 
 const SLOW_POSE_FPS = 15;
@@ -67,6 +70,20 @@ export class PoseController {
     // Both modes write into the same readout; only the calibrated one ever runs.
     this.full = new FullBodyMoves(this.th, this.mag);
     this.small = new SmallRoomMoves(this.th, this.mag);
+    this.laneSpots = opts.laneSpots ?? null;
+  }
+
+  /**
+   * The player's own lane spots, in force for full-body lanes; null means the automatic lanes
+   * (`laneEnter` / `laneExit`). Small-room mode never reads them. Validated on the way in, so
+   * spots that `cleanLaneSpots` refuses leave the automatic lanes in force rather than a broken zone.
+   */
+  get laneSpots(): Readonly<LaneSpots> | null {
+    return this.full.spots;
+  }
+
+  set laneSpots(v: Readonly<LaneSpots> | null) {
+    this.full.spots = v ? cleanLaneSpots(v) : null;
   }
 
   /**
