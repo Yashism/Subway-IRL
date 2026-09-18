@@ -159,16 +159,15 @@ function route(v: VoiceCtx, node: AudioNode, send = 0): void {
 }
 
 /**
- * Shaping for a recording that is a texture rather than an event — the train, which was recorded
- * mid-pass and has no approach of its own.
+ * Shaping for a recording whose edges are not its own — the train, which is seven seconds taken
+ * out of a continuous level-crossing recording and would otherwise switch on and off in the middle
+ * of the road traffic underneath it.
  */
 export interface BufferShape {
   /** Seconds of fade-in. Turns a flat stretch of rail noise into something arriving. */
   attack?: number;
   /** Seconds of fade-out at the end. */
   decay?: number;
-  /** Playback-rate spread across the sound, rate·(1+d) falling to rate·(1−d): a real Doppler. */
-  doppler?: number;
 }
 
 /**
@@ -191,13 +190,6 @@ export function playBuffer(
   s.buffer = buffer;
   s.playbackRate.value = r;
   const dur = buffer.duration / r;
-  const d = shape?.doppler ?? 0;
-  if (d > 0) {
-    // Falling pitch across the pass. This is the Doppler the recording does not have: it was made
-    // standing beside a train that was already going past, so the shift has to be put back.
-    s.playbackRate.setValueAtTime(r * (1 + d), t);
-    s.playbackRate.linearRampToValueAtTime(Math.max(0.25, r * (1 - d)), t + dur);
-  }
   const g = gain(v.ctx, shape?.attack || shape?.decay ? 0 : peak);
   s.connect(g);
   route(v, g, send);
@@ -211,8 +203,8 @@ export function playBuffer(
     g.gain.linearRampToValueAtTime(0, t + dur);
   }
   s.start(t);
-  // A hard stop at the end so a long tail cannot outlive the node; slack for a Doppler'd rate.
-  s.stop(t + dur * (1 + d) + 0.05);
+  // A hard stop at the end so a long tail cannot outlive the node.
+  s.stop(t + dur + 0.05);
 }
 
 /** A looping bed from a sample — the station ambience, once its file has landed. */

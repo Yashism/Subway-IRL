@@ -246,26 +246,30 @@ describe('sample or synth', () => {
     expect(measure(withSample, SR).tonality).toBeGreaterThan(measure(synthOnly, SR).tonality);
   });
 
-  it('shapes the flat train recording into a pass-by, since it was recorded mid-pass', async () => {
+  it('fades the train in and out, so a cut from a longer recording arrives and leaves', async () => {
     // The stand-in has to be as long as the real recording, or the envelope has nothing to shape.
-    const bank = await loadedBank(['train-pass'], 200, 5.5);
-    const buf = renderEngine(3.5, (e) => e.cue('trainPass', 1, 1), bank);
-    const m = measure(buf, SR);
-    expect(m.peak).toBeGreaterThan(0.01);
-    // The manifest's attack/decay must put the loudest moment in the middle and make it grow,
-    // exactly as the synth patch does — a flat texture played raw would fail both of these.
-    expect(m.peakAt).toBeGreaterThan(0.15);
-    expect(m.peakAt).toBeLessThan(0.85);
-    expect(m.frontLoad).toBeLessThan(1);
+    const bank = await loadedBank(['train-pass'], 200, 7);
+    const buf = renderEngine(8, (e) => e.cue('trainPass', 1, 1), bank);
+    expect(measure(buf, SR).peak).toBeGreaterThan(0.01);
+    // The fades must make it arrive and leave: the middle of the pass is louder than either end.
+    // Played raw, the cut would switch on and off in the middle of the traffic under it.
+    const at = (from: number, to: number) =>
+      measure(buf.subarray(Math.round(SR * from), Math.round(SR * to)), SR).rms;
+    const [head, middle, tail] = [at(0, 0.5), at(3, 3.5), at(6.6, 7.1)];
+    expect(middle).toBeGreaterThan(head * 2);
+    expect(middle).toBeGreaterThan(tail * 2);
   });
 
-  it('puts a Doppler on the train that the recording does not have', async () => {
-    const bank = await loadedBank(['train-pass'], 300, 5.5);
-    const buf = renderEngine(3.5, (e) => e.cue('trainPass', 1, 1), bank);
-    // Early in the pass it is pitched up, late in it pitched down.
-    const early = measure(buf.subarray(Math.round(SR * 0.6), Math.round(SR * 1.4)), SR);
-    const late = measure(buf.subarray(Math.round(SR * 3.0), Math.round(SR * 3.4)), SR);
-    expect(early.crossingsPerSec).toBeGreaterThan(late.crossingsPerSec * 1.02);
+  it('does not pitch-bend the train, because the recording already Dopplers', async () => {
+    const bank = await loadedBank(['train-pass'], 300, 7);
+    const buf = renderEngine(5, (e) => e.cue('trainPass', 1, 1), bank);
+    // A synthetic bend stacked on top of the recorded one would be audible as a double shift.
+    const early = measure(buf.subarray(Math.round(SR * 1.2), Math.round(SR * 2.0)), SR);
+    const late = measure(buf.subarray(Math.round(SR * 3.2), Math.round(SR * 4.0)), SR);
+    expect(early.crossingsPerSec).toBeGreaterThan(0);
+    expect(Math.abs(early.crossingsPerSec - late.crossingsPerSec)).toBeLessThan(
+      early.crossingsPerSec * 0.05,
+    );
   });
 
   it('walks round the footstep recordings instead of repeating one', async () => {

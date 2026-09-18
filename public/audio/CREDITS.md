@@ -52,7 +52,7 @@ it is given here because it should be.
 
 | File(s) | Source | Author | License |
 |---|---|---|---|
-| `train-pass.*` | "Via Gioacchino Rossini, 43, 22063 Cantù Asnago CO, Italy — Train station with train announcement", https://archive.org/details/aporee_51225_58462 (seconds 5.5–11.0 only: the train, not the announcement) | mq.wc7fe.o | Public Domain Mark 1.0 |
+| `train-pass.*` | "Level crossing bells and train, Údolní 2, 147 00 Praha 4, Czechia", https://archive.org/details/aporee_56617_64769 (seconds 132–139 only: the pass itself) | Peter Cusack | Public Domain Mark 1.0 |
 
 **A note on that one, so a reviewer can make their own call.** Public Domain Mark is an *assertion*
 by the uploader that a work carries no known copyright, not a licence grant like CC0. Creative
@@ -86,6 +86,12 @@ Kept here so nobody repeats the search.
 | "Electronic Indian tabla tune" (OpenGameArt, CC0) | Genuinely CC0, but it is a finished mix. The music bed sequences individual strokes so it can add layers with the run speed; a fixed tune would throw that away. |
 | Tabla recitals (archive.org: NCAA, Sahapedia, ICCR) | CC BY-NC 4.0 or unmarked, and they are named artists' performances — sampling a recital into a game groove is exactly the lift this project does not do. |
 | Kassel Hauptbahnhof hall (archive.org, Public Domain Mark) | A good station bed, and a real alternative to the one shipped — not used only to avoid putting the single largest file in the build on a Public Domain Mark rather than a Commons-reviewed licence. |
+| Cantù Asnago train (archive.org, Public Domain Mark) | Used first, then replaced. It is real rail with real wheel clacks, but it starts mid-pass, so the swell and the pitch drop had to be synthesised on top of it. The Praha recording has both in the recording. |
+| The level-crossing bell in that same Praha recording | Considered for the station chime, since it is a real railway bell rather than speech. Rejected on looking at it: the bell is far off under constant road traffic, and a distant noisy ding is worse than the clean synthesised chime. |
+| House crow, *Corvus splendens* (Commons) | The right bird for Mumbai, and there are seven recordings of it — every one CC BY-SA. The CC0 crow that ships is a different corvid; the species is the price of the licence. |
+| "Black Crow (*Corvus capensis*)" (Commons, British Library) | CC BY 4.0, so usable with attribution — but it is a Cape crow, no closer to a house crow than the CC0 one already shipping, so there was no reason to trade CC0 away for it. |
+| Mridangam demonstration (archive.org, CC Public Domain Dedication) | The best-licensed Indian percussion found anywhere: a real dedication by the player, V. Raghuraman. Still rejected — it is thirty seconds of continuous solo with no isolated strokes in it, and the groove needs single hits. Carving a loop out of someone's performance is the lift this project does not do. |
+| Commons Category:Tabla, Category:Dholak | Between them: one German pronunciation clip (CC BY-SA) and one 70 MB video of a sarangi recital. No instrument demos. |
 | "Taiwan Railway Station Arrival Sound" (Commons, CC0) | Genuinely CC0, but it is platform noise: the spectrogram is flat broadband hiss with no chime in it. The station tannoy is synthesised. |
 | "Train passing by in the Wirikuta Desert" (Commons, CC0) | Genuinely CC0, but every slice renders as featureless noise at a constant level — no approach, no recede, no wheel clacks. Superseded by the Cantù recording, which has real wheel clacks. |
 | Station PA announcements (Kassel, Baltimore Penn, Cantù, El Palomar) | All public-domain-marked and all usable, but every one of them is SPEECH, in German, English, Italian or Spanish. A German platform announcement in a Mumbai station is worse than the synthesised chime. |

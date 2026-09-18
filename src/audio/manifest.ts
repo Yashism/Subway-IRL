@@ -99,11 +99,12 @@ export const CUE_SAMPLES: Partial<Record<CueName, CueSample>> = {
   unfurl: { layers: [{ file: 'unfurl' }], gain: 0.5, send: 0.35 },
   introWhistle: { layers: [{ file: 'whistle' }], gain: 0.5, send: 0.8 },
   crow: { layers: [{ file: 'crow' }], gain: 0.45, send: 0.6 },
-  // The recording is five seconds of real rail texture with real wheel clacks, taken from the
-  // middle of a pass — so the arrival, the departure and the pitch drop are put back here.
+  // Seven seconds across a level crossing, with the approach, the pass and the recede all in the
+  // recording — the Doppler is real, so nothing is added on top of it. The fades only stop the cue
+  // switching on and off in the middle of the road traffic underneath it.
   trainPass: {
-    layers: [{ file: 'train-pass', shape: { attack: 2.2, decay: 2.4, doppler: 0.055 } }],
-    gain: 0.55,
+    layers: [{ file: 'train-pass', shape: { attack: 1.0, decay: 1.6 } }],
+    gain: 0.5,
     send: 0.4,
   },
 };
