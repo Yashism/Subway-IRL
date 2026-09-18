@@ -608,7 +608,7 @@ async function renderCues(): Promise<void> {
  */
 async function renderFallbacks(): Promise<void> {
   const host = $('fallbacks');
-  for (const cue of ['whistle', 'coin', 'land', 'caught', 'go', 'stumble'] as CueName[]) {
+  for (const cue of ['whistle', 'bark', 'coin', 'land', 'caught', 'go', 'stumble'] as CueName[]) {
     const seconds = cue === 'caught' ? 3 : 2;
     await card(host, `${cue} — recorded`, 'file present', seconds,
       () => renderOffline(seconds, (e) => e.cue(cue, 1, 1)), undefined, true);

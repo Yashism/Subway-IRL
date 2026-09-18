@@ -3,7 +3,7 @@
  * whole point of the split.
  */
 import { describe, expect, it } from 'vitest';
-import { Director, PULSE, type DirectorFrame } from '../../src/audio/director';
+import { ALARM, Director, PULSE, type DirectorFrame } from '../../src/audio/director';
 import type { AudioSink, CueName, MixChannel } from '../../src/audio/types';
 import { TUNING } from '../../src/game/config';
 import type { GameEvent, GameState } from '../../src/game/game';
@@ -215,7 +215,8 @@ describe('a hoverboard rest', () => {
     expect(sink.level('pulse')).toBeLessThan(running.pulse / 2);
     expect(sink.level('tabla')).toBeLessThan(running.tabla);
     expect(sink.level('heartbeat')).toBe(0);
-    expect(sink.named('idleWarn')).toHaveLength(0);
+    // Resting is allowed, so it is never a danger: no alarm.
+    expect(sink.named('bark')).toHaveLength(0);
   });
 
   it('brings the tick back at its strongest as the rest runs out', () => {
@@ -263,22 +264,73 @@ describe('the idle warning', () => {
     expect(sink.level('drone')).toBeGreaterThan(0);
   });
 
-  it('fires the warning sting once per crossing, not once per frame', () => {
+  /** Runs `seconds` of frames and returns every whistle/bark with the time it fired. */
+  const alarmCues = (d: Director, sink: FakeSink, f: DirectorFrame, seconds: number, events: GameEvent[] = []) => {
+    const out: { cue: CueName; t: number }[] = [];
+    const n = Math.round(seconds / f.dt);
+    for (let i = 0; i < n; i++) {
+      const before = sink.cues.length;
+      d.update(f, i === 0 ? events : []);
+      for (const c of sink.cues.slice(before)) if (c.cue === 'whistle' || c.cue === 'bark') out.push({ cue: c.cue, t: i * f.dt });
+    }
+    return out;
+  };
+
+  it('sounds the alarm when the idle warning starts: a whistle, then three barks, once', () => {
     const { sink, d } = setup();
     const f = idleFrame(0);
     run(d, f, 0.5);
     f.idleLevel = 'warn';
     f.idleMs = TUNING.idleWarnMs;
-    run(d, f, 0.5);
-    expect(sink.named('idleWarn')).toHaveLength(1);
+    // Stay in the warning well past the whole sequence: it must play exactly once, not loop.
+    const heard = alarmCues(d, sink, f, 3);
+    expect(heard.map((h) => h.cue)).toEqual(['whistle', 'bark', 'bark', 'bark']);
+    heard.forEach((h, i) => expect(Math.abs(h.t - ALARM[i].at)).toBeLessThanOrEqual(1 / 60 + 1e-9));
+    // The three barks are not one sample fired identically three times.
+    expect(new Set(sink.named('bark').map((b) => b.rate)).size).toBe(3);
+  });
 
+  it('sounds it again for a new danger, once the last alarm has finished', () => {
+    const { sink, d } = setup();
+    const f = idleFrame(0);
+    run(d, f, 0.5);
+    f.idleLevel = 'warn';
+    f.idleMs = TUNING.idleWarnMs;
+    run(d, f, 2);
     f.idleLevel = 'ok';
     f.idleMs = 0;
     run(d, f, 0.5);
     f.idleLevel = 'warn';
     f.idleMs = TUNING.idleWarnMs;
-    d.update(f, []);
-    expect(sink.named('idleWarn')).toHaveLength(2);
+    run(d, f, 2);
+    expect(sink.named('whistle')).toHaveLength(2);
+    expect(sink.named('bark')).toHaveLength(6);
+  });
+
+  it('sounds the alarm on a stumble too — but one danger is one alarm, never two on top of each other', () => {
+    const { sink, d } = setup();
+    const f = idleFrame(0);
+    run(d, f, 0.2);
+    // A stumble on its own sounds it: the whistle comes at once, with no idle warning involved…
+    const heard = alarmCues(d, sink, f, 0.3, [{ type: 'stumble' }]);
+    expect(heard.map((h) => h.cue)).toEqual(['whistle']);
+    // …and the idle warning arriving while that alarm still plays does not start a second one.
+    f.idleLevel = 'warn';
+    f.idleMs = TUNING.idleWarnMs;
+    heard.push(...alarmCues(d, sink, f, 2));
+    expect(heard.map((h) => h.cue)).toEqual(['whistle', 'bark', 'bark', 'bark']);
+  });
+
+  it("holds the TT's own whistle off while the alarm plays, so the two never collide", () => {
+    const { sink, d } = setup();
+    // The TT right behind: his periodic whistle would be due often.
+    const f = frame({ chaserGap: TUNING.chaserNearGap, speedFraction: 1 });
+    run(d, f, 3);
+    sink.cues.length = 0;
+    f.idleLevel = 'warn';
+    f.idleMs = TUNING.idleWarnMs;
+    const heard = alarmCues(d, sink, f, ALARM[ALARM.length - 1].at + 0.2);
+    expect(heard.filter((h) => h.cue === 'whistle')).toHaveLength(1);
   });
 });
 

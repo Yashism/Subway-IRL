@@ -74,6 +74,9 @@ export const CUE_SAMPLES: Partial<Record<CueName, CueSample>> = {
   uiConfirm: { layers: [{ file: 'ui-confirm' }], gain: 0.5, send: 0.2, tier: 'core' },
   // The TT's whistle is the cue the whole chase hangs on, so it is never left to the fallback.
   whistle: { layers: [{ file: 'whistle' }], gain: 0.5, send: 0.35, tier: 'core' },
+  // The dog in the "about to be caught" alarm: loaded up front, since the moment it is for can
+  // come in the first seconds of a run.
+  bark: { layers: [{ file: 'bark' }], gain: 0.6, send: 0.3, tier: 'core' },
 
   // --- everything else ------------------------------------------------------------
   coinJosh: { layers: [{ file: 'coin', gain: 1 }, { file: 'coin', gain: 0.45, delay: 0.012 }], gain: 0.7, send: 0.4 },

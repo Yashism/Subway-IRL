@@ -670,6 +670,24 @@ export function playCue(v: VoiceCtx, cue: CueName, t: number, g: number, rate: n
       hit(v, t + 0.07, 'triangle', 240, 95, 0.3 * a, 0.001, 0.09);
       hit(v, t + 0.13, 'sine', 150, 62, 0.35 * a, 0.002, 0.24, 0.2);
       break;
+    case 'bark': {
+      // The fallback for the recorded bark: a voiced burst whose pitch drops as it goes, shaped by a
+      // mouth-like formant band, with a breath of noise on the attack — the same outline the real
+      // bark has on a spectrogram (a hard onset, then decaying harmonic bands).
+      const o = osc(v.ctx, 'sawtooth', 520 * r);
+      o.frequency.setValueAtTime(520 * r, t);
+      o.frequency.exponentialRampToValueAtTime(300 * r, t + 0.14);
+      const mouth = filter(v.ctx, 'bandpass', 950 * r, 2.2);
+      const g = gain(v.ctx);
+      o.connect(mouth);
+      mouth.connect(g);
+      route(v, g, 0.3);
+      const end = env(g.gain, t, 0.9 * a, 0.006, 0.03, 0.14);
+      o.start(t);
+      o.stop(end);
+      swish(v, t, 2400, 900, 1.3, 0.3 * a, 0.002, 0.07, 0.25);
+      break;
+    }
     case 'hoverboard':
       // Air first, motor second: the riser has to be the thing you hear, or it reads as a bass note.
       swish(v, t, 300, 3800, 1.1, 0.66 * a, 0.14, 0.34, 0.3);
@@ -705,10 +723,6 @@ export function playCue(v: VoiceCtx, cue: CueName, t: number, g: number, rate: n
       swish(v, t, 2600, 3400, 2.5, 0.05 * a, 0.02, dur, send);
       break;
     }
-    case 'idleWarn':
-      hit(v, t, 'sine', 62, 44, 0.5 * a, 0.08, 0.6, 0.3);
-      playHeartbeat(v, t + 0.1, 0.6 * a);
-      break;
     case 'caught': {
       // The sting: a cluster sliding down a tritone, over a hit and a long reversed-sounding tail.
       for (const [mult, level] of [[1, 0.095], [semi(3), 0.075], [semi(6), 0.06], [0.5, 0.11]] as const) {

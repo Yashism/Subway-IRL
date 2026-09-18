@@ -29,7 +29,8 @@ export const CUES = [
   'hoverboardSave',
   // pressure
   'whistle',
-  'idleWarn',
+  /** The street dog at the TT's heels: one bark; the alarm sequence fires it three times. */
+  'bark',
   'caught',
   'trainPass',
   // ambience punctuation

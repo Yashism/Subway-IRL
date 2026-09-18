@@ -166,6 +166,18 @@ const DUCK: Partial<Record<CueName, number>> = {
 
 /** Seconds for a full duck to release. */
 const DUCK_RELEASE = 0.55;
+/**
+ * The "about to be caught" alarm: the whistle, then three barks a quick 0.3 s apart, the last
+ * pitched a touch lower so the three do not sound like one sample looped. Times in seconds.
+ */
+export const ALARM: readonly { at: number; cue: CueName; gain: number; rate: number }[] = [
+  { at: 0, cue: 'whistle', gain: 0.85, rate: 1 },
+  { at: 0.45, cue: 'bark', gain: 0.9, rate: 1 },
+  { at: 0.75, cue: 'bark', gain: 0.85, rate: 1.04 },
+  { at: 1.05, cue: 'bark', gain: 0.9, rate: 0.96 },
+];
+const ALARM_LENGTH = ALARM[ALARM.length - 1].at;
+
 /** The jog tick while the player rests on a hoverboard: there, but no longer asking anything. */
 const RESTING_PULSE = 0.12;
 /** …and in the last seconds of the rest: the strongest it gets, to pull them back to their feet. */
@@ -209,6 +221,10 @@ export class Director {
   private wasAirborne = false;
   private wasJosh = false;
   private idleWas: IdleLevel = 'ok';
+  /** Seconds into the alarm sequence, or -1 when it is not playing. */
+  private alarmT = -1;
+  /** Index of the next ALARM step to fire. */
+  private alarmNext = 0;
 
   constructor(private readonly sink: AudioSink, options: DirectorOptions = {}) {
     this.random = options.random ?? Math.random;
@@ -239,6 +255,7 @@ export class Director {
     for (let i = 0; i < events.length; i++) this.onEvent(events[i], frame);
     if (this.state !== frame.state) this.onState(frame);
     this.edges(frame);
+    this.advanceAlarm(dt);
 
     // The landing is the falling edge of being in the air — the game has no event for it.
     if (this.wasAirborne && !frame.airborne && frame.state === 'playing') {
@@ -490,6 +507,8 @@ export class Director {
         break;
       case 'stumble':
         this.emit('stumble', 0.8, 1);
+        // One more stumble soon and the TT has them: the chaser closes in, so sound the alarm.
+        this.alarm();
         break;
       case 'rocketLanding':
         this.emit('rocketLanding', 0.7, 1);
@@ -504,12 +523,36 @@ export class Director {
 
   /** The idle warning and the Josh meter, both edge-triggered off the frame. */
   private edges(frame: DirectorFrame): void {
-    if (frame.idleLevel === 'warn' && this.idleWas === 'ok') this.emit('idleWarn', 0.7, 1);
+    if (frame.idleLevel === 'warn' && this.idleWas === 'ok') this.alarm();
     this.idleWas = frame.idleLevel;
     if (frame.joshActive !== this.wasJosh) {
       this.emit(frame.joshActive ? 'joshStart' : 'joshEnd', frame.joshActive ? 0.8 : 0.45, 1);
       this.wasJosh = frame.joshActive;
     }
+  }
+
+  /**
+   * "About to be caught": the TT's whistle, then his dog barking three times (the user asked for
+   * exactly this — "security whistle > 3 bark sounds", played once). Started by the idle warning
+   * and by a stumble, the two moments the chaser closes in. Never restarted while it is playing,
+   * so one danger is one alarm, and the TT's own periodic whistle is held off until it is done.
+   */
+  private alarm(): void {
+    if (this.alarmT >= 0) return;
+    this.alarmT = 0;
+    this.alarmNext = 0;
+    this.whistleIn = Math.max(this.whistleIn, ALARM_LENGTH + 1);
+    this.advanceAlarm(0);
+  }
+
+  private advanceAlarm(dt: number): void {
+    if (this.alarmT < 0) return;
+    this.alarmT += dt;
+    while (this.alarmNext < ALARM.length && ALARM[this.alarmNext].at <= this.alarmT + 1e-9) {
+      const step = ALARM[this.alarmNext++];
+      this.emit(step.cue, step.gain, step.rate);
+    }
+    if (this.alarmNext >= ALARM.length) this.alarmT = -1;
   }
 
   private emit(cue: CueName, gain: number, rate: number): void {

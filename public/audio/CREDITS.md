@@ -48,6 +48,7 @@ it is given here because it should be.
 | File(s) | Source | Author | License |
 |---|---|---|---|
 | `crow.*` | "Crow caw", https://opengameart.org/content/crow-caw (recorded near the pyramids, Cairo, per the submission) | zeroisnotnull | CC0 1.0 |
+| `bark.*` | "Dog barking mono", https://opengameart.org/content/dog-barking-mono — the second of its four barks (0.505–0.755 s), faded out over its last 35 ms | Brandon Morris (submitted by HaelDB) | CC0 1.0 (dual-licensed CC0 / OGA-BY 3.0; used under CC0) |
 
 ## archive.org / radio aporee
 
