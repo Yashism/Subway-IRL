@@ -441,7 +441,7 @@ export class SettingsScreen {
   private renderCameras(cams: readonly CameraOption[]): void {
     const list = cams.length ? cams : [NO_CAMERAS];
     // Rebuilding the options resets the select, so only do it when the list has really changed.
-    const key = list.map((c) => `${c.id} ${c.label}`).join('');
+    const key = list.map((c) => `${c.id}\u0000${c.label}`).join('\u0001');
     if (key !== this.camKey) {
       this.camKey = key;
       this.camSelect.replaceChildren();
