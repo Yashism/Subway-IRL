@@ -69,15 +69,26 @@ describe('characters', () => {
     let count = 0;
     rig.root.traverse(() => count++);
     const state = { action: 'run' as CharacterAction, speed: 20, lean: 0.5, airborneT: 0 };
+    const batch = () => {
+      for (let i = 0; i < 1000; i++) {
+        state.action = ACTIONS[Math.floor(i / 50) % ACTIONS.length];
+        state.airborneT = (i % 36) / 36;
+        rig.update(1 / 60, state);
+      }
+    };
+    // Heap growth is a noisy measure: without `--expose-gc` nothing can be collected first, and a
+    // cold rig pays for JIT compilation on its first calls, while the heap also carries whatever the
+    // rest of the suite left in this worker. So warm up, then take the best of three batches. Real
+    // per-call allocation shows up in every batch; noise does not, so the minimum is what counts.
     const g = globalThis as { gc?: () => void };
-    g.gc?.();
-    const before = process.memoryUsage().heapUsed;
-    for (let i = 0; i < 1000; i++) {
-      state.action = ACTIONS[Math.floor(i / 50) % ACTIONS.length];
-      state.airborneT = (i % 36) / 36;
-      rig.update(1 / 60, state);
+    batch();
+    let grown = Infinity;
+    for (let trial = 0; trial < 3; trial++) {
+      g.gc?.();
+      const before = process.memoryUsage().heapUsed;
+      batch();
+      grown = Math.min(grown, process.memoryUsage().heapUsed - before);
     }
-    const grown = process.memoryUsage().heapUsed - before;
     let after = 0;
     rig.root.traverse(() => after++);
     expect(after).toBe(count);
