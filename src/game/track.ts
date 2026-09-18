@@ -1,7 +1,7 @@
 import type { Lane } from '../pose/types';
 import { CHUNK_LENGTH, CHUNKS, type ChunkDef, type CoinRun } from './chunks';
 import { TUNING, type Difficulty } from './config';
-import { lengthOf, meetPointOf, movingFrontAt, OBSTACLES, type Obstacle } from './obstacles';
+import { blockLengthOf, closingRate, lengthOf, meetOf, movingFrontAt, OBSTACLES, type Obstacle } from './obstacles';
 import type { Rng } from './rng';
 import { NORMAL_JUMP } from './runner';
 import { POWERUP_KINDS, type PowerupKind } from './powerups';
@@ -38,17 +38,18 @@ function removeWhere<T>(items: T[], drop: (item: T) => boolean): void {
 }
 
 /**
- * Stretch of track on which the obstacle can touch a runner at runnerS moving at speed.
- * An oncoming train is taken where it will meet the runner, not where its front is now.
+ * Stretch of track on which the obstacle can touch a runner now at runnerS. An oncoming train is
+ * taken where it will meet the runner, not where its front is now — from the closing rate it was
+ * placed with, which holds however the runner's speed changes (see Obstacle.closing).
  */
-function reachOf(o: Obstacle, runnerS: number, speed: number): [number, number] {
+function reachOf(o: Obstacle, runnerS: number): [number, number] {
   if (!OBSTACLES[o.kind].moving) return [o.front, o.front + o.length];
-  const meet = meetPointOf(o.front, runnerS, speed);
-  return [meet, meet + o.length / (1 + TUNING.oncomingTrainSpeed / speed)];
+  const meet = meetOf(o, runnerS);
+  return [meet, meet + blockLengthOf(o)];
 }
 
-function meetsWithin(o: Obstacle, fromS: number, toS: number, runnerS: number, speed: number): boolean {
-  const [s0, s1] = reachOf(o, runnerS, speed);
+function meetsWithin(o: Obstacle, fromS: number, toS: number, runnerS: number): boolean {
+  const [s0, s1] = reachOf(o, runnerS);
   return s0 < toS && s1 > fromS;
 }
 
@@ -59,6 +60,8 @@ export class Track {
   /** Recently placed chunks, oldest first. */
   readonly placed: { id: string; s: number }[] = [];
   private nextS = FIRST_CHUNK_S;
+  /** Where the runner was at the last update: trains close by the distance run since. */
+  private lastRunnerS = 0;
   private nextId = 1;
   private lastChunk = '';
   private lastTier: Tier = 0;
@@ -69,8 +72,21 @@ export class Track {
     private readonly chunks: readonly ChunkDef[] = CHUNKS,
   ) {}
 
-  update(runnerS: number, speed: number, tSec: number, dt: number): void {
-    for (const o of this.obstacles) if (OBSTACLES[o.kind].moving) o.front -= TUNING.oncomingTrainSpeed * dt;
+  /**
+   * Advances to a runner now at runnerS. Oncoming trains close by their closing rate times the
+   * distance the runner covered since the last call, so each still meets the runner exactly where
+   * it was placed to (see Obstacle.closing) — at a steady speed that is the same as moving at
+   * `oncomingTrainSpeed`.
+   */
+  update(runnerS: number, speed: number, tSec: number): void {
+    const ran = Math.max(0, runnerS - this.lastRunnerS);
+    this.lastRunnerS = runnerS;
+    for (const o of this.obstacles) {
+      if (!OBSTACLES[o.kind].moving) continue;
+      // A train added by hand rather than placed from a chunk takes the rate of the speed it met.
+      o.closing ??= closingRate(speed);
+      o.front -= o.closing * ran;
+    }
     while (this.nextS < runnerS + TRACK_AHEAD) this.placeChunk(runnerS, speed, tSec);
     const cutoff = runnerS - TRACK_BEHIND;
     removeWhere(this.obstacles, (o) => o.front + o.length < cutoff);
@@ -79,16 +95,16 @@ export class Track {
   }
 
   /**
-   * Removes every obstacle the runner (at runnerS, moving at speed) would meet in [fromS, toS].
+   * Removes every obstacle a runner now at runnerS would meet in [fromS, toS].
    * Used for a safe rocket landing.
    */
-  clearObstacles(fromS: number, toS: number, runnerS: number, speed: number): void {
-    removeWhere(this.obstacles, (o) => meetsWithin(o, fromS, toS, runnerS, speed));
+  clearObstacles(fromS: number, toS: number, runnerS: number): void {
+    removeWhere(this.obstacles, (o) => meetsWithin(o, fromS, toS, runnerS));
   }
 
   /** Like clearObstacles, for one lane only (used after a hoverboard absorbs a crash). */
-  clearLane(lane: Lane, fromS: number, toS: number, runnerS: number, speed: number): void {
-    removeWhere(this.obstacles, (o) => o.lane === lane && meetsWithin(o, fromS, toS, runnerS, speed));
+  clearLane(lane: Lane, fromS: number, toS: number, runnerS: number): void {
+    removeWhere(this.obstacles, (o) => o.lane === lane && meetsWithin(o, fromS, toS, runnerS));
   }
 
   removeObstacle(id: number): void {
@@ -122,6 +138,7 @@ export class Track {
         lane: spec.lane,
         length: lengthOf(spec),
         front: OBSTACLES[spec.kind].moving ? movingFrontAt(s, runnerS, speed) : s,
+        ...(OBSTACLES[spec.kind].moving ? { closing: closingRate(speed) } : {}),
       });
     }
     for (const run of chunk.coins) this.addCoinRun(run, base);

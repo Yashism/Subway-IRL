@@ -1,7 +1,7 @@
 import type { ActivityStatus, CommandSource, GameCommand } from '../input/commands';
 import { TUNING } from './config';
 import type { Game } from './game';
-import { meetPointOf, OBSTACLES, type Obstacle, type ObstacleSpec } from './obstacles';
+import { blockLengthOf, closingRate, meetOf, OBSTACLES, type Obstacle, type ObstacleSpec } from './obstacles';
 import { CHAPPAL_JUMP } from './runner';
 import { plan, toBlocks, type PlanAction, type PlanOptions } from './solver';
 
@@ -21,14 +21,17 @@ const SPEEDUP_DRIFT = 0.3;
 /** Frames of slack for float rounding in power-up timers. */
 const TIMER_SLACK_FRAMES = 2;
 
-/** Current obstacles as specs the solver understands (oncoming trains back to meeting points). */
+/**
+ * Current obstacles as specs the solver understands (oncoming trains back to meeting points).
+ * A train's meeting point and blocked stretch come from the closing rate it was placed with; the
+ * solver derives the stretch from `length` and the speed it is given, so the length is scaled to
+ * make that come out true even while the runner's speed differs from the train's placement speed.
+ */
 export function liveSpecs(obstacles: readonly Obstacle[], runnerS: number, speed: number): ObstacleSpec[] {
-  return obstacles.map((o) => ({
-    kind: o.kind,
-    lane: o.lane,
-    length: o.length,
-    s: OBSTACLES[o.kind].moving ? meetPointOf(o.front, runnerS, speed) : o.front,
-  }));
+  return obstacles.map((o) => {
+    if (!OBSTACLES[o.kind].moving) return { kind: o.kind, lane: o.lane, length: o.length, s: o.front };
+    return { kind: o.kind, lane: o.lane, length: blockLengthOf(o, speed) * (1 + closingRate(speed)), s: meetOf(o, runnerS, speed) };
+  });
 }
 
 /** A bot player for demos and integration tests: plans with the solver and always "jogs". */

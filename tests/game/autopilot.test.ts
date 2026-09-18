@@ -3,7 +3,7 @@ import type { ChunkDef } from '../../src/game/chunks';
 import { TUNING, type Difficulty } from '../../src/game/config';
 import { Autopilot, liveSpecs } from '../../src/game/autopilot';
 import { Game } from '../../src/game/game';
-import { lengthOf, movingFrontAt, type ObstacleSpec } from '../../src/game/obstacles';
+import { closingRate, lengthOf, movingFrontAt, type ObstacleSpec } from '../../src/game/obstacles';
 
 function drive(seed: number, difficulty: Difficulty, seconds: number): Game {
   const g = new Game({ seed, difficulty });
@@ -65,7 +65,7 @@ function chappalProbe(chappal: { left: number } | { pickupAhead: number }, barri
 describe('Autopilot', () => {
   it('converts oncoming trains back to meeting points', () => {
     const front = movingFrontAt(120, 20, 25);
-    const [spec] = liveSpecs([{ id: 1, kind: 'trainMoving', lane: 0, length: 30, front }], 20, 25);
+    const [spec] = liveSpecs([{ id: 1, kind: 'trainMoving', lane: 0, length: 30, front, closing: closingRate(25) }], 20, 25);
     expect(spec.s).toBeCloseTo(120, 9);
     expect(spec.length).toBe(30);
   });

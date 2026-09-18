@@ -70,18 +70,50 @@ export interface Obstacle {
   length: number;
   /** Current near end along the track. */
   front: number;
+  /**
+   * An oncoming train's closing rate: metres it comes towards the runner per metre the runner runs,
+   * fixed when it is placed (`TUNING.oncomingTrainSpeed` / the runner's speed then). Moving the train
+   * by the runner's own distance, rather than by time, keeps the meeting point exactly where the
+   * passability solver checked it, whatever the runner's speed does in between — so slowing the
+   * runner (after a hoverboard burst) can never walk a train into a spot that was meant to be clear.
+   * Absent on anything that does not move.
+   */
+  closing?: number;
 }
 
 export const lengthOf = (spec: ObstacleSpec): number => spec.length ?? OBSTACLES[spec.kind].length;
 
+/** An oncoming train's closing rate for a runner at `runnerSpeed` (see Obstacle.closing). */
+export const closingRate = (runnerSpeed: number): number => TUNING.oncomingTrainSpeed / runnerSpeed;
+
 /** Front of an oncoming train, with the runner at runnerS, that will meet the runner at meetS. */
 export function movingFrontAt(meetS: number, runnerS: number, runnerSpeed: number): number {
-  const k = TUNING.oncomingTrainSpeed / runnerSpeed;
-  return meetS + (meetS - runnerS) * k;
+  return meetS + (meetS - runnerS) * closingRate(runnerSpeed);
 }
 
 /** Inverse of movingFrontAt. */
 export function meetPointOf(front: number, runnerS: number, runnerSpeed: number): number {
-  const k = TUNING.oncomingTrainSpeed / runnerSpeed;
+  const k = closingRate(runnerSpeed);
   return (front + k * runnerS) / (1 + k);
+}
+
+/**
+ * A train's closing rate. Every train a Track places has one, and a train added by hand gets one on
+ * the Track's next update; until then `speed` (the runner's current speed) stands in, which is the
+ * rate that update would give it.
+ */
+const closingOf = (o: Obstacle, speed?: number): number => o.closing ?? (speed ? closingRate(speed) : 0);
+
+/**
+ * Where a placed oncoming train will meet a runner now at runnerS, from the closing rate it was
+ * given — not the runner's current speed, which may have changed since.
+ */
+export function meetOf(o: Obstacle, runnerS: number, speed?: number): number {
+  const k = closingOf(o, speed);
+  return (o.front + k * runnerS) / (1 + k);
+}
+
+/** How far along the track an oncoming train blocks a runner, once they meet. */
+export function blockLengthOf(o: Obstacle, speed?: number): number {
+  return o.length / (1 + closingOf(o, speed));
 }

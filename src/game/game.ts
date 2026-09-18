@@ -245,12 +245,12 @@ export class Game {
     this.time += dt;
     this.speed = speedAt(this.time, this.options.difficulty);
     this.s += this.speed * dt;
-    this.track.update(this.s, this.speed, this.time, dt);
+    this.track.update(this.s, this.speed, this.time);
 
     const p = this.powerups;
     if (p.update(dt).rocketEnded) {
       const clear = TUNING.rocketLandingClearSeconds + TUNING.rocketFallSeconds;
-      this.track.clearObstacles(this.s, this.s + this.speed * clear, this.s, this.speed);
+      this.track.clearObstacles(this.s, this.s + this.speed * clear, this.s);
       p.grace = Math.max(p.grace, clear);
       events.push({ type: 'rocketLanding' });
     }
@@ -377,7 +377,7 @@ export class Game {
       this.track.removeObstacle(hit.obstacle.id);
       // Whatever follows in this lane would be hit the moment the grace runs out.
       const reach = TUNING.crashClearMargin;
-      this.track.clearLane(r.lane, this.s - reach, this.s + this.speed * TUNING.crashGraceSeconds + reach, this.s, this.speed);
+      this.track.clearLane(r.lane, this.s - reach, this.s + this.speed * TUNING.crashGraceSeconds + reach, this.s);
       events.push({ type: 'hoverboardSaved' });
       return;
     }
