@@ -1,5 +1,5 @@
 import type { Game, GameEvent } from '../game/game';
-import type { CommandSource, GameCommand } from '../input/commands';
+import type { ActivityStatus, CommandSource, GameCommand } from '../input/commands';
 import { InputHub } from '../input/hub';
 import type { Baseline } from '../pose/calibration';
 import type { PoseStatus } from '../pose/types';
@@ -38,6 +38,12 @@ export interface AppLoopOptions {
   onEffect?: (fx: FlowEffect) => void;
   /** Every game event, after the flow has seen it. */
   onGameEvent?: (e: GameEvent) => void;
+  /**
+   * After every fixed game step: the step's own dt, the activity that drove it and exactly the
+   * events it returned. This is where the audio frame goes — it runs before the events are routed
+   * anywhere, so it sees the state the step produced and not one a flow effect has since changed.
+   */
+  onStep?: (stepSec: number, activity: ActivityStatus, events: readonly GameEvent[]) => void;
   /**
    * Offers the flow's `startGame` to a cinematic (the intro) before the run is queued. Returning
    * true holds the run back: from then until `queueStart()`, every `start` from every source is
@@ -83,6 +89,7 @@ export class AppLoop {
   private readonly telemetry: LoopTelemetry | null;
   private readonly onEffect: (fx: FlowEffect) => void;
   private readonly onGameEvent: ((e: GameEvent) => void) | null;
+  private readonly onStep: ((stepSec: number, activity: ActivityStatus, events: readonly GameEvent[]) => void) | null;
   private readonly holdStart: (() => boolean) | null;
   private readonly onSkip: (() => void) | null;
   private readonly stallMs: number;
@@ -104,6 +111,7 @@ export class AppLoop {
     this.telemetry = o.telemetry ?? null;
     this.onEffect = o.onEffect ?? (() => {});
     this.onGameEvent = o.onGameEvent ?? null;
+    this.onStep = o.onStep ?? null;
     this.holdStart = o.holdStart ?? null;
     this.onSkip = o.onSkip ?? null;
     this.stallMs = o.stallMs ?? 1000;
@@ -207,6 +215,7 @@ export class AppLoop {
 
     const activity = (this.poseActive ? this.hubOn : this.hubOff).activity(nowMs);
     const events = game.step(stepSec, merged, activity);
+    this.onStep?.(stepSec, activity, events);
     if (events.length) this.gameEvents(events, nowMs);
   }
 

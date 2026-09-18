@@ -255,6 +255,8 @@ export interface HudHandlers {
   onSettings?(): void;
   /** "Your runs": the workout screen, from the menu and from the summary card. */
   onWorkout?(): void;
+  /** The speaker button (and the N key): mute and unmute. */
+  onToggleSound?(): void;
 }
 
 /** "Live monitor (M)": opens monitor.html in its own popup window. */
@@ -338,6 +340,7 @@ export class Hud {
   readonly summaryPanel: HTMLElement;
   private readonly toastHost: HTMLElement;
   private readonly introHint: HTMLElement;
+  private readonly soundBtn: HTMLButtonElement;
 
   private readonly lastText = new Map<HTMLElement, string>();
   private readonly lastStyle = new Map<string, string>();
@@ -490,6 +493,29 @@ export class Hud {
     // Live mission toasts, and the intro's skip line. Both sit above every card.
     this.toastHost = el('div', 'hud-toasts', root);
     this.introHint = el('div', 'hud-intro-hint', root, 'Any key to skip');
+
+    // Mute, reachable at all times: not inside any card, so it survives the menu, the run, the
+    // pause, the summary and the intro. M belongs to the live monitor, so this one is N.
+    this.soundBtn = hudButton(root, 'hud-sound', '\u{1F50A}', () => this.handlers.onToggleSound?.());
+    this.soundBtn.title = 'Mute / unmute (N)';
+    this.soundBtn.setAttribute('aria-label', 'Mute');
+  }
+
+  /**
+   * The speaker button. `ready` is false until the first gesture has built the audio graph, which
+   * the button says plainly rather than pretending the game is already making a sound.
+   */
+  setSound(s: { muted: boolean; ready: boolean }): void {
+    const icon = s.muted ? '\u{1F507}' : s.ready ? '\u{1F50A}' : '\u{1F509}';
+    this.text(this.soundBtn, icon);
+    this.flag(this.soundBtn, 'muted', s.muted);
+    this.flag(this.soundBtn, 'idle', !s.ready && !s.muted);
+    const label = s.muted ? 'Unmute (N)' : s.ready ? 'Mute (N)' : 'Sound starts on your first key or click';
+    if (this.soundBtn.title !== label) {
+      this.soundBtn.title = label;
+      this.soundBtn.setAttribute('aria-label', label);
+      this.soundBtn.setAttribute('aria-pressed', String(s.muted));
+    }
   }
 
   /**

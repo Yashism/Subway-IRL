@@ -1,5 +1,5 @@
 import './ui/hud.css';
-import { AudioPrefs } from './app/audioPrefs';
+import { GameAudio } from './audio';
 import { SessionFlow, type FlowEffect, type InputMode, type ModeChoice, type MoveCheckPolicy } from './app/flow';
 import { IntroRunner, introMode, shouldPlayIntro } from './app/intro';
 import { applyLiveSettings } from './app/liveSettings';
@@ -9,6 +9,7 @@ import { fixtureReplay, loadSession, PoseRuntime, sessionReplay } from './app/po
 import { ProfileStore } from './app/profile';
 import { ProgressionStore, dailyView, fmtCoins, levelProgress, shopItem, shopModel } from './app/progression';
 import { RunSession } from './app/session';
+import { GestureUnlock, soundAllowed } from './app/sound';
 import { SettingsStore, applyUrlFlags, type GameSettings } from './app/settings';
 import { Autopilot } from './game/autopilot';
 import type { Difficulty } from './game/config';
@@ -38,6 +39,7 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?mode=full|small         force the play mode; ?monitor opens the live monitor
 //   ?movecheck=skip|force    never / always run the guided move check after calibration
 //   ?intro=always|off        force / suppress the intro cinematic (default: once per session)
+//   ?mute ?vol=0.5 ?nosamples   the mixer; ?audio forces sound on for an autopilot/replay demo
 //   ?difficulty= ?seed= ?god ?tone= ?line= ?sens= ?reduced ?pip=0 ?perf ?saveAutopilot
 //   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
 //                            webcam mode, because the keyboard then claims to track jogging.
@@ -71,7 +73,12 @@ const sessionMeta = session?.meta ?? null;
 
 const settingsStore = new SettingsStore();
 let settings: GameSettings = settingsStore.override(applyUrlFlags(settingsStore.get(), location.search));
-const audioPrefs = new AudioPrefs();
+/**
+ * The mixer, built at boot and silent until `unlock()` runs inside a real gesture. It owns
+ * `subway-irl.audio.v1` (and `?mute` / `?vol=`), so the settings screen's sliders read and write
+ * through it rather than keeping a second copy of the same four numbers.
+ */
+const audio = new GameAudio();
 
 const DIFFICULTIES: Difficulty[] = ['chill', 'cardio', 'beast'];
 const requested = (sessionMeta?.difficulty ?? null) as Difficulty | null;
@@ -129,7 +136,12 @@ const moveCheck = new MoveCheckSession({
     flow.setMoveCheckSeen(moveCheck.seen);
     sendMeta();
   },
-  onTelemetry: (mode, event, t) => telemetry.moveCheck(mode, event, t),
+  onTelemetry: (mode, event, t) => {
+    telemetry.moveCheck(mode, event, t);
+    // A move that landed gets a confirmation; the whole check gets its small fanfare.
+    if (event.phase === 'result' && event.result === 'done') audio.moveCheck('ok');
+    else if (event.phase === 'done') audio.moveCheck('fanfare');
+  },
 });
 
 const flow = new SessionFlow({
@@ -149,11 +161,17 @@ const world = new WorldView(canvas, {
   seed,
   tone: toneParam && TONES.includes(toneParam) ? toneParam : undefined,
   line: settings.line,
+  // The sim has no train-pass event: only the view knows a moving local just drew level.
+  onTrainPass: (closeness) => audio.trainPass(closeness),
 });
 const hud = new Hud(document.getElementById('hud')!, {
-  onHome: () => loop.dispatch({ type: 'home' }),
+  onHome: () => {
+    audio.ui('back');
+    loop.dispatch({ type: 'home' });
+  },
   onSettings: () => setOverlay('settings'),
   onWorkout: () => setOverlay('workout'),
+  onToggleSound: () => toggleSound(),
 });
 const stepper = new FixedStepper();
 
@@ -203,6 +221,7 @@ const shopRoot = document.body.appendChild(document.createElement('div'));
 
 const settingsScreen = new SettingsScreen(settingsRoot, {
   change: (patch) => {
+    audio.ui('click');
     // The mode is the one setting the flow owns: it re-calibrates and re-applies that mode's
     // tuning, so it goes through the flow rather than straight onto the controller.
     if (patch.mode !== undefined && patch.mode !== settings.mode) loop.dispatch({ type: 'chooseMode', mode: patch.mode });
@@ -210,7 +229,7 @@ const settingsScreen = new SettingsScreen(settingsRoot, {
     syncOverlays();
   },
   audioChange: (patch) => {
-    audioPrefs.set(patch);
+    audio.setVolumes(patch);
     syncOverlays();
   },
   chooseCamera: (id) => {
@@ -255,11 +274,13 @@ const workoutScreen = new WorkoutScreen(workoutRoot, {
 const shopScreen = new ShopScreen(shopRoot, {
   buy: (id) => {
     const bought = progression.buy(id);
+    audio.ui(bought.ok ? 'confirm' : 'back');
     if (bought.ok && (bought.item.kind === 'character' || bought.item.kind === 'board')) progression.equip(id);
     applySkins();
     syncOverlays();
   },
   equip: (id) => {
+    audio.ui('confirm');
     progression.equip(id);
     applySkins();
     syncOverlays();
@@ -272,7 +293,7 @@ function settingsView(): SettingsView {
   return {
     open: true,
     settings: settingsStore.get(),
-    audio: audioPrefs.get(),
+    audio: audio.volumes,
     cameras: cameraOptions(runtime.cameras, runtime.activeCameraId ?? flow.model.cameraId),
     webcam: flow.input === 'webcam',
     hasTuning: !moveCheck.store.empty,
@@ -293,6 +314,7 @@ function setOverlay(next: Overlay): void {
   // restart it behind the settings screen.
   const live = game.state === 'playing' || game.state === 'countdown' || (game.state === 'paused' && game.pausedByLoss);
   if (next !== 'none' && live) loop.pauseGame();
+  audio.ui(next === 'none' ? 'back' : 'click');
   overlay = next;
   if (next === 'none') detachKeyboard ??= keyboard.attach(window);
   else {
@@ -384,6 +406,9 @@ function sendMeta(): void {
 runtime.onFrame = (f, events) => {
   telemetry.frame(f);
   telemetry.poseEvents(events, f.t);
+  // The spec counts the raised-hand start as a gesture. A browser may disagree and refuse to
+  // resume; `unlock()` swallows that, and the next key or click gets there anyway.
+  for (let i = 0; i < events.length; i++) if (events[i].type === 'start') gesture.fire();
   // The check measures the same signals the controller just computed, on the same frame.
   if (runtime.ctrl.baseline) moveCheck.frame(runtime.ctrl, events, f.t);
 };
@@ -416,6 +441,8 @@ telemetry.onControl((msg) => {
 window.addEventListener('pagehide', () => {
   telemetry.close();
   runtime.stop();
+  gesture.detach();
+  audio.dispose();
 });
 
 // ---------------------------------------------------------------- session flow effects
@@ -498,6 +525,7 @@ function recordRun(): void {
 const intro = new IntroRunner({
   stage: world,
   seed,
+  onCue: (cue, gain) => audio.intro(cue, gain),
   onEnd: () => {
     hud.setIntro(false);
     // Released here, so the countdown's first frame is the one right after the handover: the
@@ -526,6 +554,8 @@ const loop: AppLoop = new AppLoop({
   pose: runtime,
   telemetry,
   onEffect,
+  // The audio frame is one per fixed step, with exactly the events that step emitted.
+  onStep: (stepSec, activity, events) => audio.update(stepSec, game, activity, events),
   holdStart: () => {
     if (!wantsIntro()) return false;
     hud.setIntro(true);
@@ -556,6 +586,34 @@ function startDaily(): void {
   loop.dispatch({ type: 'startPressed' });
 }
 
+// ---------------------------------------------------------------- sound
+//
+// Nothing may be heard before a real user gesture: the browser insists, and a game that blares on
+// load is obnoxious. A demo path (autopilot, a pose replay) never unlocks at all, so an automated
+// check runs silent; `?audio` forces it on for a demo someone is actually watching.
+
+const gesture = new GestureUnlock({
+  target: window,
+  enabled: soundAllowed({ autopilot: autopilotOn, replay: runtime.isReplay, search: location.search }),
+  onUnlock: () => audio.unlock(),
+});
+
+function toggleSound(): void {
+  // Pressing mute is itself a gesture: a player who reaches for the speaker before touching
+  // anything else should end up with sound, not with a muted graph that was never built.
+  gesture.fire();
+  audio.toggleMute();
+  hud.setSound({ muted: audio.muted, ready: audio.ready });
+}
+
+// N, because M opens the live monitor.
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'KeyN' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  toggleSound();
+});
+
 // Any key and any click skip the cinematic, from frame one. (A raised hand goes through the
 // loop's own `onSkip`, because a pose start never reaches the DOM.)
 const skipIntro = (): void => intro.skip();
@@ -576,7 +634,7 @@ Object.assign(window as unknown as Record<string, unknown>, {
   __progression: progression,
   __runs: runs,
   __settings: settingsStore,
-  __audio: audioPrefs,
+  __audio: audio,
   __intro: intro,
   __flow: flow,
   __runtime: runtime,
@@ -776,6 +834,7 @@ function frame(now: number): void {
   if (`${inputLabel()}|${currentMode()}` !== metaKey) sendMeta();
 
   updateProgressionUi(now, dt);
+  hud.setSound({ muted: audio.muted, ready: audio.ready });
 
   if (!contextLost) {
     // Asked *after* the step, not before it: the step is where a held `startGame` begins the

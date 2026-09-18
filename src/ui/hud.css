@@ -1284,3 +1284,51 @@ html[data-overlay='shop'] .hud-menu-rail {
   .hud-summary .hud-again-hint { margin-top: 6px; }
   .hud-summary .hud-card-foot { margin-top: 8px; }
 }
+
+/*
+ * The mute button. It is outside every card on purpose — the spec's "reachable at all times"
+ * means the menu, the run, the pause card, the summary and the cinematic, so it cannot live in
+ * any of them. Bottom right, which is the one corner the PiP, the perf readout and the key
+ * legend all leave alone.
+ */
+.hud-sound {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  appearance: none;
+  cursor: pointer;
+  pointer-events: auto;
+  font-size: 22px;
+  line-height: 1;
+  border-radius: 16px;
+  color: #fff;
+  background: rgba(20, 12, 45, 0.86);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  /* It sits over whatever the track happens to be: a hard shadow keeps it readable on bright ballast. */
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.hud-sound:hover,
+.hud-sound:focus-visible {
+  background: rgba(60, 40, 120, 0.9);
+  border-color: var(--gold);
+}
+/* Muted is a state worth seeing across the room, not a slightly different glyph. */
+.hud-sound.muted {
+  background: rgba(232, 67, 58, 0.85);
+  border-color: #fff;
+}
+/*
+ * Before the first gesture there is no graph yet. The button says so with a quieter speaker glyph
+ * rather than by fading out — a control the player cannot quite see is worse than one that is
+ * simply honest about not having started yet.
+ */
+.hud-sound.idle {
+  opacity: 0.88;
+  border-color: rgba(255, 255, 255, 0.28);
+}

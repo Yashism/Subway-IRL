@@ -74,6 +74,12 @@ const CAM_KEYS: CamKey[] = [
 ];
 
 /** Rig sub-step, so a seek reproduces the animation state. */
+/**
+ * When the brush hits the wall: the moments paste is thrown off it, and the moments the sequence
+ * makes a noise. Exported so the app layer can put a sound on each stroke without guessing.
+ */
+export const INTRO_BRUSH_STROKES: readonly number[] = Object.freeze([0.16, 0.42, 0.66, 0.9, 1.1]);
+
 const RIG_STEP = 1 / 60;
 const MAX_RIG_STEPS = 12;
 const SPLATS = 26;
@@ -360,7 +366,7 @@ export function createIntro(o: IntroOptions): IntroSequence {
   (tt.root.getObjectByName('handR') ?? tt.root).add(torch);
 
   // ---- paste flecks
-  const splats = makeSplats(rand, [0.16, 0.42, 0.66, 0.9, 1.1]);
+  const splats = makeSplats(rand, INTRO_BRUSH_STROKES);
   const splatGeo = new THREE.IcosahedronGeometry(1, 0);
   const splatMat = toonMaterial({ color: 0xece2c6 });
   own.push(splatGeo, splatMat);

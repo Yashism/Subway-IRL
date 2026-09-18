@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { IntroRunner, introMode, shouldPlayIntro, type IntroStage } from '../../src/app/intro';
+import { INTRO_CUES, IntroRunner, introMode, shouldPlayIntro, type IntroCue, type IntroStage } from '../../src/app/intro';
+import { INTRO_BEATS, INTRO_BRUSH_STROKES, INTRO_DURATION } from '../../src/world/intro';
 
 const ctx = (over: Partial<Parameters<typeof shouldPlayIntro>[0]> = {}) => ({
   mode: 'auto' as const,
@@ -58,6 +59,9 @@ function stage(duration = 4.2) {
     get introBeat() {
       return t >= duration ? 4 : Math.min(4, Math.floor(t / (duration / 4)) + 1);
     },
+    get introTime() {
+      return t;
+    },
     startIntro(o) {
       log.push(`start:${o?.seed ?? ''}`);
       t = 0;
@@ -72,6 +76,8 @@ function stage(duration = 4.2) {
     },
     skipIntro() {
       log.push('skip');
+      // A skip is a jump to the end, exactly as the real sequence does it.
+      t = duration;
       ended = true;
     },
     endIntro(game) {
@@ -141,5 +147,66 @@ describe('IntroRunner', () => {
     expect(intro.advance(0.5, { name: 'game' })).toBe(false);
     expect(st.log.length).toBe(after);
     expect(intro.beat).toBe(0);
+  });
+});
+
+describe('the cinematic\u2019s own sounds', () => {
+  const run = (over: { skipAt?: number } = {}) => {
+    const st = stage();
+    const cues: { cue: IntroCue; at: number }[] = [];
+    const intro = new IntroRunner({ stage: st, onCue: (cue) => cues.push({ cue, at: st.introTime }) });
+    intro.begin();
+    let t = 0;
+    while (intro.playing && t < 10) {
+      if (over.skipAt !== undefined && t >= over.skipAt) intro.skip();
+      intro.advance(1 / 60, { name: 'game' });
+      t += 1 / 60;
+    }
+    return cues;
+  };
+
+  it('the brush strokes are the instants the paste flies, not a second guess at them', () => {
+    expect(INTRO_CUES.filter((c) => c.cue === 'brush').map((c) => c.t)).toEqual([...INTRO_BRUSH_STROKES]);
+  });
+
+  it('every cue lands inside the sequence, in order, in the beat the spec puts it in', () => {
+    const times = INTRO_CUES.map((c) => c.t);
+    expect([...times].sort((a, b) => a - b)).toEqual(times);
+    expect(times.at(-1)!).toBeLessThan(INTRO_DURATION);
+    const at = (cue: IntroCue) => INTRO_CUES.filter((c) => c.cue === cue).map((c) => c.t);
+    // Beat 1 is the pasting, beat 2 opens with the poster dropping, beat 3 is the torch.
+    for (const t of at('brush')) expect(t).toBeLessThan(INTRO_BEATS[2]);
+    expect(at('unfurl')).toEqual([INTRO_BEATS[1]]);
+    for (const t of at('whistle')) {
+      expect(t).toBeGreaterThanOrEqual(INTRO_BEATS[2]);
+      expect(t).toBeLessThan(INTRO_BEATS[3]);
+    }
+  });
+
+  it('plays each one once, in order, as the clock reaches it', () => {
+    const cues = run();
+    expect(cues.map((c) => c.cue)).toEqual(INTRO_CUES.map((c) => c.cue));
+    for (const c of cues) {
+      const due = INTRO_CUES.find((x) => x.cue === c.cue)!.t;
+      expect(c.at).toBeGreaterThanOrEqual(due);
+    }
+  });
+
+  it('a skip drops the cues it jumped over instead of firing them all at once', () => {
+    const cues = run({ skipAt: 0.5 });
+    // Two brush strokes had landed by 0.5 s; the rest of the sequence is gone.
+    expect(cues.filter((c) => c.cue === 'brush').length).toBe(2);
+    expect(cues.filter((c) => c.cue === 'unfurl').length).toBe(0);
+    // …except the whistle, which is the sound the player is handed to the run by.
+    expect(cues.filter((c) => c.cue === 'whistle').length).toBe(1);
+  });
+
+  it('says nothing at all when the page wired no sound', () => {
+    const st = stage();
+    const intro = new IntroRunner({ stage: st });
+    intro.begin();
+    expect(() => {
+      while (intro.playing) intro.advance(1 / 60, { name: 'game' });
+    }).not.toThrow();
   });
 });

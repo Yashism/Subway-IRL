@@ -296,3 +296,58 @@ describe('Hud: settings, the workout screen and the mission slots', () => {
     expect(h.root.dataset.intro).toBeUndefined();
   });
 });
+
+describe('Hud: the mute button', () => {
+  function hud() {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const log: string[] = [];
+    const h = new Hud(root, { onToggleSound: () => log.push('sound') });
+    return { root, h, log, btn: root.querySelector<HTMLButtonElement>('.hud-sound')! };
+  }
+
+  it('sits outside every card, so it is reachable on the menu, in a run and under the intro', () => {
+    const h = hud();
+    expect(h.btn).not.toBeNull();
+    expect(h.btn.closest('.hud-screen')).toBeNull();
+    expect(h.btn.closest('.hud-play')).toBeNull();
+    // The intro hides the cards and the play HUD; the speaker is neither.
+    h.h.setIntro(true);
+    expect(h.btn.closest('[data-intro]')).toBe(h.root);
+  });
+
+  it('reports the press and lets go of focus', () => {
+    const h = hud();
+    h.btn.focus();
+    h.btn.click();
+    expect(h.log).toEqual(['sound']);
+    expect(document.activeElement).not.toBe(h.btn);
+  });
+
+  it('says which of the three states it is in, and says it to a screen reader too', () => {
+    const h = hud();
+    h.h.setSound({ muted: false, ready: false });
+    expect(h.btn.classList.contains('idle')).toBe(true);
+    expect(h.btn.getAttribute('aria-label')).toMatch(/first key or click/i);
+
+    h.h.setSound({ muted: false, ready: true });
+    expect(h.btn.classList.contains('idle')).toBe(false);
+    expect(h.btn.classList.contains('muted')).toBe(false);
+    expect(h.btn.getAttribute('aria-label')).toBe('Mute (N)');
+    expect(h.btn.getAttribute('aria-pressed')).toBe('false');
+
+    h.h.setSound({ muted: true, ready: true });
+    expect(h.btn.classList.contains('muted')).toBe(true);
+    expect(h.btn.textContent).toBe('\u{1F507}');
+    expect(h.btn.getAttribute('aria-label')).toBe('Unmute (N)');
+    expect(h.btn.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('is inert rather than broken when the page wired no handler', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const h = new Hud(root);
+    expect(() => root.querySelector<HTMLButtonElement>('.hud-sound')!.click()).not.toThrow();
+    expect(() => h.setSound({ muted: true, ready: true })).not.toThrow();
+  });
+});

@@ -2,7 +2,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type GameSettings } from '../../src/app/settings';
 import { DEFAULT_SETTINGS as DEFAULT_AUDIO, type AudioSettings } from '../../src/audio/types';
+import { AudioSettingsStore, GameAudio } from '../../src/audio';
 import { SettingsScreen, onOff, volumePercent, weightLabel, type SettingsHandlers, type SettingsView } from '../../src/ui/settings';
+
+/** The mixer's persistence, without a real localStorage. */
+class FakeAudioStorage {
+  readonly map = new Map<string, string>();
+  getItem(k: string): string | null {
+    return this.map.get(k) ?? null;
+  }
+  setItem(k: string, v: string): void {
+    this.map.set(k, v);
+  }
+  removeItem(k: string): void {
+    this.map.delete(k);
+  }
+}
 
 const CAMS = [
   { id: 'cam-a', label: 'Integrated Camera', selected: true },
@@ -301,5 +316,65 @@ describe('the rest of the buttons', () => {
     expect(calls.fired).toEqual(['redo', 'export', 'close', 'workout']);
     expect(blur).toHaveBeenCalledTimes(4);
     blur.mockRestore();
+  });
+});
+
+describe('the mixer sliders drive the real audio settings', () => {
+  /** The screen wired the way main.ts wires it: its handlers write through to GameAudio. */
+  function wired() {
+    const storage = new FakeAudioStorage();
+    const audio = new GameAudio({ settings: new AudioSettingsStore(storage), search: '' });
+    const root = document.createElement('div');
+    document.body.append(root);
+    const render = () =>
+      ui.update({
+        open: true,
+        settings: { ...DEFAULT_SETTINGS },
+        audio: audio.volumes,
+        cameras: CAMS,
+        webcam: true,
+        hasTuning: true,
+      });
+    const ui = new SettingsScreen(root, {
+      change: () => render(),
+      audioChange: (p) => {
+        audio.setVolumes(p);
+        render();
+      },
+      chooseCamera: () => render(),
+      redoMoveCheck: () => {},
+      resetTuning: () => {},
+      exportData: () => {},
+      clearHistory: () => {},
+      openWorkout: () => {},
+      close: () => {},
+    });
+    render();
+    return { root, ui, audio, storage };
+  }
+
+  it('a volume slider is in force at once, shown back, and saved', () => {
+    const w = wired();
+    const music = byText(w.root, '.sw-row-label', 'Music')?.closest('.sw-row')?.querySelector('input') as HTMLInputElement;
+    expect(music).toBeTruthy();
+    music.value = '0.3';
+    music.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(w.audio.volumes.music).toBeCloseTo(0.3, 5);
+    // The screen renders what is actually in force, not what it asked for.
+    expect(music.value).toBe('0.3');
+    expect(JSON.parse(w.storage.getItem('subway-irl.audio.v1')!).music).toBeCloseTo(0.3, 5);
+  });
+
+  it('the mute toggle round-trips through the store and comes back on the next render', () => {
+    const w = wired();
+    const mute = toggle(w.root, 'Mute everything');
+    expect(mute.dataset.on).toBe('off');
+    mute.click();
+    expect(w.audio.muted).toBe(true);
+    expect(mute.dataset.on).toBe('on');
+    mute.click();
+    expect(w.audio.muted).toBe(false);
+    expect(JSON.parse(w.storage.getItem('subway-irl.audio.v1')!).muted).toBe(false);
   });
 });

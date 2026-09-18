@@ -31,6 +31,9 @@ function fakeStage(duration = 4.2) {
     get introBeat() {
       return Math.min(4, Math.floor(t / (duration / 4)) + 1);
     },
+    get introTime() {
+      return t;
+    },
     startIntro() {
       stage.starts++;
       t = 0;
@@ -42,6 +45,7 @@ function fakeStage(duration = 4.2) {
     },
     renderIntro() {},
     skipIntro() {
+      t = duration;
       cut = true;
     },
     endIntro() {

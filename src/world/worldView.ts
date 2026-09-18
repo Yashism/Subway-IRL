@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNKS } from '../game/chunks';
-import { laneX } from '../game/config';
+import { LANE_WIDTH, laneX } from '../game/config';
 import type { Game, GameEvent, GameState } from '../game/game';
 import { OBSTACLES, type ObstacleKind } from '../game/obstacles';
 import type { Track, PowerupKind } from '../game/track';
@@ -98,6 +98,11 @@ export const CAMERA = {
 };
 
 const SUN_OFFSET = new THREE.Vector3(-7, 15, 9);
+
+/** Two lanes away is the far side of the corridor; the same lane is right past your ear. */
+const TRAIN_PASS_RANGE = 2 * LANE_WIDTH;
+const trainCloseness = (trainX: number, runnerX: number): number =>
+  Math.max(0.15, 1 - Math.min(1, Math.abs(trainX - runnerX) / TRAIN_PASS_RANGE));
 
 const NO_EVENTS: readonly GameEvent[] = [];
 
@@ -227,6 +232,12 @@ class ActiveSet {
 export interface WorldViewOptions {
   /** Seeds the side-scenery layout. */
   seed?: number;
+  /**
+   * A moving local has just swept past the runner, `closeness` 0..1 by how near it went. There is
+   * no game event for this — the sim only knows the train is an obstacle — so the view, which is
+   * the thing that actually draws it going by, is what reports it.
+   */
+  onTrainPass?: (closeness: number) => void;
   /** Tone mapping (default 'neutral'). */
   tone?: ToneChoice;
   /** Mumbai suburban line whose real station names the platforms show (default: from the seed). */
@@ -258,6 +269,10 @@ export class WorldView {
   private readonly rocket: THREE.Group;
   private readonly tt: CharacterRig;
   private readonly dog: CharacterRig;
+
+  private readonly onTrainPass: ((closeness: number) => void) | null;
+  /** Moving trains already reported as passed, so each one sounds exactly once. */
+  private readonly passed = new Set<number>();
 
   /** The equipped shop skins, so a re-equip of the same id is a no-op. */
   private characterSkin = '';
@@ -291,6 +306,7 @@ export class WorldView {
   private readonly look = { state: 'menu' as GameState, flying: false, airborne: false, rolling: false, hoverboard: false, stumbling: false };
 
   constructor(canvas: HTMLCanvasElement, options: WorldViewOptions = {}) {
+    this.onTrainPass = options.onTrainPass ?? null;
     applyAgxLook();
     const r = (this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }));
     const tone = TONE[options.tone ?? 'neutral'] ?? TONE.neutral;
@@ -430,6 +446,11 @@ export class WorldView {
     return this.intro?.beat ?? 0;
   }
 
+  /** Seconds into the cinematic, 0 when none is running. */
+  get introTime(): number {
+    return this.intro?.time ?? 0;
+  }
+
   /**
    * Starts the intro cinematic. The game's own characters are hidden for its duration — the
    * cinematic brings its own kid and TT — and the camera track ends exactly at this view's
@@ -529,6 +550,7 @@ export class WorldView {
 
     if (g.track !== this.track) {
       this.track = g.track;
+      this.passed.clear();
       this.obstacles.sweep(-1, (a) => this.releaseObstacle(a));
       this.pickups.sweep(-1, (a) => this.releasePickup(a));
     }
@@ -759,6 +781,11 @@ export class WorldView {
       a.stamp = stamp;
       a.item.root.position.set(laneX(o.lane), 0, z);
       setNear(a.item, z > -LOD_FAR);
+      // A moving local draws level with the runner: report it once, as loud as it went near.
+      if (this.onTrainPass && o.kind === 'trainMoving' && z >= 0 && !this.passed.has(o.id)) {
+        this.passed.add(o.id);
+        this.onTrainPass(trainCloseness(laneX(o.lane), g.runner.x));
+      }
     }
     this.obstacles.sweep(stamp, (a) => this.releaseObstacle(a));
   }

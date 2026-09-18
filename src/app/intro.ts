@@ -10,8 +10,25 @@
  * the run is held back while it plays, the last frame of the cinematic and the first frame of the
  * countdown are the same camera pose, and the teardown happens *after* the real runner is in place.
  */
+import { INTRO_BEATS, INTRO_BRUSH_STROKES } from '../world/intro';
+
 
 export type IntroMode = 'auto' | 'always' | 'off';
+
+/** The three sounds the cinematic makes (`GameAudio.intro`). */
+export type IntroCue = 'brush' | 'unfurl' | 'whistle';
+
+/**
+ * When each one lands, in seconds of the sequence's own clock. The brush strokes are
+ * `INTRO_BRUSH_STROKES` — the same instants the paste is thrown off the brush in `world/intro.ts`,
+ * so the sound and the flecks can never drift apart. The other two are read off the same file:
+ * the poster starts dropping at the beat-2 boundary, and the TT's torch finds the wall at 2.42.
+ */
+export const INTRO_CUES: readonly { t: number; cue: IntroCue; gain: number }[] = Object.freeze([
+  ...INTRO_BRUSH_STROKES.map((t, i) => ({ t, cue: 'brush' as const, gain: i === 0 ? 0.9 : 0.72 })),
+  { t: INTRO_BEATS[1], cue: 'unfurl', gain: 0.85 },
+  { t: 2.44, cue: 'whistle', gain: 0.9 },
+]);
 
 /** `?intro=always` / `?intro=off` (`?intro` alone means always); anything else is `auto`. */
 export function introMode(search: string): IntroMode {
@@ -54,6 +71,8 @@ export function shouldPlayIntro(c: IntroContext): boolean {
 /** The part of WorldView the runner drives. Structural, so the tests need no WebGL at all. */
 export interface IntroStage<G> {
   startIntro(o?: { seed?: number; variant?: number }): void;
+  /** Seconds into the sequence, so the cues can be placed against its own clock. */
+  readonly introTime: number;
   advanceIntro(dt: number): boolean;
   renderIntro(): void;
   skipIntro(): void;
@@ -67,6 +86,11 @@ export interface IntroRunnerOptions<G> {
   seed?: number;
   /** Runs when the cinematic has handed over, after the world has been put back to the game. */
   onEnd?: () => void;
+  /**
+   * A sound the cinematic makes. Fired once each, in order, as its clock passes them — including
+   * on a skip, where every cue still pending is dropped rather than played in a burst.
+   */
+  onCue?: (cue: IntroCue, gain: number) => void;
 }
 
 /**
@@ -77,6 +101,8 @@ export interface IntroRunnerOptions<G> {
 export class IntroRunner<G> {
   private readonly o: IntroRunnerOptions<G>;
   private active = false;
+  /** Index of the next cue in INTRO_CUES; everything before it has already been fired or dropped. */
+  private nextCue = 0;
   /** The cinematic has played once in this session (the spec's "first run of a session"). */
   played = false;
 
@@ -97,6 +123,7 @@ export class IntroRunner<G> {
     if (this.active) return;
     this.active = true;
     this.played = true;
+    this.nextCue = 0;
     this.o.stage.startIntro({ seed: this.o.seed });
   }
 
@@ -112,7 +139,9 @@ export class IntroRunner<G> {
    */
   advance(dt: number, game: G): boolean {
     if (!this.active) return false;
-    if (this.o.stage.advanceIntro(dt)) return true;
+    const playing = this.o.stage.advanceIntro(dt);
+    this.fireCues(playing);
+    if (playing) return true;
     this.active = false;
     this.o.stage.endIntro(game);
     this.o.onEnd?.();
@@ -121,5 +150,19 @@ export class IntroRunner<G> {
 
   draw(): void {
     if (this.active) this.o.stage.renderIntro();
+  }
+
+  /**
+   * Every cue the clock has passed, once each. A skip jumps the clock to the end, which would
+   * otherwise fire the whole sequence at once — so once the cinematic is over the pending cues are
+   * dropped rather than played. The one exception is the whistle, which is the sound the player is
+   * being handed to the run by; a skipped intro still gets it.
+   */
+  private fireCues(stillPlaying: boolean): void {
+    const at = this.o.stage.introTime;
+    while (this.nextCue < INTRO_CUES.length && INTRO_CUES[this.nextCue].t <= at) {
+      const c = INTRO_CUES[this.nextCue++];
+      if (stillPlaying || c.cue === 'whistle') this.o.onCue?.(c.cue, c.gain);
+    }
   }
 }

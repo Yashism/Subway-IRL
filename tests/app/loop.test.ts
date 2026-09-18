@@ -63,6 +63,13 @@ interface SetupExtras {
   hold?: () => boolean;
 }
 
+/** One `onStep` call, kept verbatim so a test can compare it with what the Game emitted. */
+interface StepRecord {
+  dt: number;
+  activity: ActivityStatus;
+  events: readonly GameEvent[];
+}
+
 function setup(flowOpts: FlowOptions, withPose = true, autopilot = false, extra: SetupExtras = {}) {
   const game = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY_TRACK });
   // Returning player by default: the move check between calibration and ready has its own tests.
@@ -81,8 +88,10 @@ function setup(flowOpts: FlowOptions, withPose = true, autopilot = false, extra:
     onEffect: (fx) => effects.push(fx),
     holdStart: extra.hold,
     onSkip: () => skips.push(loop.holdingStart),
+    onStep: (dt, activity, events) => steps.push({ dt, activity, events }),
   });
   const skips: boolean[] = [];
+  const steps: StepRecord[] = [];
   let now = 0;
   const frame = (n = 1) => {
     for (let i = 0; i < n; i++) {
@@ -102,7 +111,7 @@ function setup(flowOpts: FlowOptions, withPose = true, autopilot = false, extra:
     expect(effects.at(-1)).toEqual({ type: 'openCamera', cameraId: null });
     loop.dispatch({ type: 'cameraOk' });
   };
-  return { game, flow, keyboard, pose: pose!, tel, effects, loop, frame, key, openCamera, skips, now: () => now };
+  return { game, flow, keyboard, pose: pose!, tel, effects, loop, frame, key, openCamera, skips, steps, now: () => now };
 }
 
 describe('AppLoop: keyboard mode', () => {
@@ -588,5 +597,51 @@ describe('AppLoop: a cinematic holding the run back (the intro)', () => {
     r.frame();
     expect(r.game.state).toBe('countdown');
     expect(r.loop.holdingStart).toBe(false);
+  });
+});
+
+describe('AppLoop: the per-step hook (the audio frame)', () => {
+  it('runs once per fixed step, with that step\u2019s own dt', () => {
+    const r = setup({ input: 'keyboard' }, false);
+    r.frame(3);
+    expect(r.steps.length).toBe(3);
+    for (const s of r.steps) expect(s.dt).toBe(DT);
+  });
+
+  it('is handed exactly the events that step emitted, and nothing else', () => {
+    const r = setup({ input: 'keyboard' }, false);
+    r.key('Enter');
+    r.frame();
+    // The step that started the run emitted the countdown; the ones before it emitted nothing.
+    const withEvents = r.steps.filter((s) => s.events.length > 0);
+    expect(withEvents.length).toBe(1);
+    expect(withEvents[0].events.map((e) => (e.type === 'state' ? e.state : e.type))).toEqual(['countdown']);
+    // And it is the same array the loop passed on to everything else, not a copy of a later frame.
+    const before = r.steps.length;
+    r.frame(2);
+    expect(r.steps.slice(before).every((s) => s.events.length === 0)).toBe(true);
+  });
+
+  it('is handed the activity that actually drove the step', () => {
+    const r = setup({ input: 'webcam' });
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.openCamera();
+    r.pose.commands.act = { ...r.pose.commands.act, cadenceSpm: 171, steps: 9 };
+    const before = r.steps.length;
+    r.frame();
+    const s = r.steps.at(-1)!;
+    expect(r.steps.length).toBeGreaterThan(before);
+    expect(s.activity.tracksJogging).toBe(true);
+    expect(s.activity.cadenceSpm).toBe(171);
+  });
+
+  it('keeps running while a cinematic holds the run back, so the menu bed never stalls', () => {
+    const r = setup({ input: 'keyboard' }, false, false, { hold: () => true });
+    r.key('Enter');
+    r.frame(4);
+    expect(r.loop.holdingStart).toBe(true);
+    expect(r.game.state).toBe('menu');
+    expect(r.steps.length).toBe(4);
   });
 });
