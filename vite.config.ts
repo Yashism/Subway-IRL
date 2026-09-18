@@ -9,6 +9,7 @@ export default defineConfig({
         debug: resolve(import.meta.dirname, 'debug.html'),
         gallery: resolve(import.meta.dirname, 'gallery.html'),
         monitor: resolve(import.meta.dirname, 'monitor.html'),
+        audioLab: resolve(import.meta.dirname, 'audio-lab.html'),
       },
     },
   },

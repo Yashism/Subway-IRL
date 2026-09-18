@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Subway IRL — Audio lab</title>
+    <style>
+      :root {
+        --bg: #0d0f13;
+        --panel: #161a21;
+        --line: #262c36;
+        --ink: #dfe6f0;
+        --dim: #8b97a8;
+        --hot: #ffb545;
+        --cool: #4fd0c0;
+        --warn: #ff6b5e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 13px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        padding: 10px 16px;
+        background: #0d0f13ee;
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(6px);
+      }
+      h1 { font-size: 14px; margin: 0 12px 0 0; letter-spacing: 0.06em; text-transform: uppercase; }
+      h2 {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        margin: 0 0 10px;
+      }
+      main { padding: 16px; display: grid; gap: 16px; }
+      section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+      button {
+        font: inherit;
+        color: var(--ink);
+        background: #222834;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      button:hover { background: #2c3441; }
+      button.primary { background: var(--hot); color: #16130b; border-color: var(--hot); font-weight: 700; }
+      button.on { background: var(--cool); color: #06201c; border-color: var(--cool); }
+      label { color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
+      input[type='range'] { width: 130px; accent-color: var(--hot); }
+      .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+      .card { background: #11151b; border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+      .card .name { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+      .card .name b { font-weight: 600; }
+      .card .stats { color: var(--dim); font-size: 11px; margin-top: 4px; }
+      canvas { display: block; width: 100%; background: #0a0c10; border-radius: 4px; }
+      .beds { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+      .meterRow { display: grid; grid-template-columns: 110px 1fr 46px; gap: 8px; align-items: center; margin: 3px 0; }
+      .bar { height: 9px; background: #0a0c10; border-radius: 3px; overflow: hidden; }
+      .bar i { display: block; height: 100%; width: 0; background: var(--cool); }
+      .bar.music i { background: var(--hot); }
+      .val { color: var(--dim); text-align: right; font-size: 11px; }
+      .hint { color: var(--dim); }
+      .two { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.3fr); gap: 16px; }
+      @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Audio lab</h1>
+      <button id="enable" class="primary">▶ Enable audio</button>
+      <span id="ctxState" class="hint">no context yet</span>
+      <label>master <input id="vMaster" type="range" min="0" max="1" step="0.01" /></label>
+      <label>music <input id="vMusic" type="range" min="0" max="1" step="0.01" /></label>
+      <label>sfx <input id="vSfx" type="range" min="0" max="1" step="0.01" /></label>
+      <button id="mute">mute</button>
+    </header>
+
+    <main>
+      <div class="two">
+        <section>
+          <h2>The run</h2>
+          <div class="row" id="stateRow"></div>
+          <div class="row" style="margin-top: 10px">
+            <label>speed <input id="speed" type="range" min="0" max="1" step="0.01" value="0.4" /></label>
+            <span id="speedVal" class="val"></span>
+            <label>idle ms <input id="idle" type="range" min="0" max="2000" step="20" value="0" /></label>
+            <span id="idleVal" class="val"></span>
+          </div>
+          <div class="row">
+            <label>chaser gap <input id="gap" type="range" min="1" max="14" step="0.1" value="12" /></label>
+            <span id="gapVal" class="val"></span>
+            <label>cadence <input id="cadence" type="range" min="0" max="200" step="1" value="150" /></label>
+            <span id="cadenceVal" class="val"></span>
+          </div>
+          <div class="row" id="toggles"></div>
+          <div class="row" style="margin-top: 10px" id="fireRow"></div>
+          <h2 style="margin-top: 14px">What is coming out</h2>
+          <canvas id="scope" width="640" height="130"></canvas>
+          <div class="meterRow" style="margin-top: 8px">
+            <span>output</span><span class="bar music"><i id="outBar"></i></span><span class="val" id="outVal">—</span>
+          </div>
+          <div id="pulseInfo" class="hint" style="margin-top: 8px"></div>
+        </section>
+
+        <section>
+          <h2>Mix channels (live)</h2>
+          <div id="meters"></div>
+          <h2 style="margin-top: 14px">Solo a layer</h2>
+          <div class="row" id="soloRow"></div>
+        </section>
+      </div>
+
+      <section>
+        <h2>The bed, by how fast the run is going — rendered offline</h2>
+        <p class="hint" style="margin-top: -4px">
+          Four seconds of the real music bed through the real director, rendered with
+          OfflineAudioContext. Layers arrive as the run speeds up; the last two show what the idle
+          warning and a pause do to it.
+        </p>
+        <div class="beds" id="beds"></div>
+      </section>
+
+      <section>
+        <h2>Each layer alone — rendered offline</h2>
+        <div class="beds" id="layers"></div>
+      </section>
+
+      <section>
+        <h2>Every cue — rendered offline, click to hear</h2>
+        <p class="hint" style="margin-top: -4px">
+          Each waveform is the cue through the real bus and reverb. peak/rms are what it costs the
+          mix; “tonal” is how periodic it is (a whistle is near 1, a whoosh near 0).
+        </p>
+        <div class="grid" id="cues"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/audio/lab.ts"></script>
+  </body>
+</html>
