@@ -94,9 +94,17 @@ export function tunedValue(key: ThresholdKey, peak: number): number {
   return clamp(TUNE_FRACTION * peak, min, max);
 }
 
-/** Writes `key`, and every companion that moves with it, into `out`. */
-export function tuneKey(out: Partial<Thresholds>, key: ThresholdKey, peak: number): void {
-  const value = tunedValue(key, peak);
+/**
+ * Writes `key`, and every companion that moves with it, into `out`.
+ *
+ * `ceiling` is the value the result must not exceed: what a step the player never actually managed
+ * is capped at. Their peak can be large precisely because some *other* gate was blocking them — a
+ * jumper who gets plenty high but not fast enough — and tuning up from it would answer "make this
+ * easier" by making every gate on the move harder than never running the check at all.
+ */
+export function tuneKey(out: Partial<Thresholds>, key: ThresholdKey, peak: number, ceiling = Infinity): void {
+  const { min, max } = tuningRange(key);
+  const value = clamp(Math.min(tunedValue(key, peak), ceiling), min, max);
   out[key] = value;
   deriveCompanions(out, key, value);
 }

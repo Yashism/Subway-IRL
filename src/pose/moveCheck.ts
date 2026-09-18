@@ -16,7 +16,7 @@ import {
   type MoveTuning,
 } from './moveCheckTypes';
 import { DEFAULT_THRESHOLDS, type Thresholds } from './thresholds';
-import { tuneKey, tunedValue, type ThresholdKey } from './tuning';
+import { tuneKey, type ThresholdKey } from './tuning';
 import type { MoveMagnitudes, PlayMode, PoseEvent } from './types';
 
 /** What the check needs from the pose pipeline each frame. `PoseController` satisfies it. */
@@ -58,8 +58,12 @@ const sig = (key: ThresholdKey, read: (m: Readonly<MoveMagnitudes>) => number, f
   floor,
 });
 
-/** The jump also has to clear the jogger's own bounce (`moves.ts`), or every step would be a jump. */
-const bobFloor = (m: Readonly<MoveMagnitudes>, th: Thresholds): number => th.bobJumpFactor * m.bobAmp;
+/**
+ * The jump also has to clear the jogger's own bounce (`moves.ts`), or every step would be a jump.
+ * Reads the gated bounce, the one the detector subtracts — `bobAmp` is the raw excursion of the last
+ * second, which the jump's own rise inflates, so using it here would make the bar unreachable.
+ */
+const bobFloor = (m: Readonly<MoveMagnitudes>, th: Thresholds): number => th.bobJumpFactor * m.bobGated;
 
 // Read functions are module constants, so a frame allocates nothing.
 const jogPrimary = (m: Readonly<MoveMagnitudes>) => m.jogPrimary;
@@ -154,6 +158,8 @@ class Step {
   readonly peaks: number[];
   /** What each signal had to reach, as of the last frame — the line "was this measured at all?" uses. */
   readonly needs: number[];
+  /** The plain live threshold behind each signal: the ceiling for a move the player never made. */
+  readonly lives: number[];
   /** Packed inputs of the current hint, so an unchanged hint is not rebuilt 30 times a second. */
   hintSig = -1;
   startT = Number.NaN;
@@ -169,6 +175,7 @@ class Step {
   constructor(readonly id: MoveId, mode: PlayMode, readonly signals: readonly Signal[]) {
     this.peaks = signals.map(() => 0);
     this.needs = signals.map(() => 0);
+    this.lives = signals.map((sg) => DEFAULT_THRESHOLDS[sg.key]);
     this.model = {
       id,
       status: 'todo',
@@ -186,6 +193,7 @@ class Step {
   reset(): void {
     this.peaks.fill(0);
     this.needs.fill(0);
+    this.signals.forEach((sg, i) => (this.lives[i] = DEFAULT_THRESHOLDS[sg.key]));
     this.hintSig = -1;
     this.startT = Number.NaN;
     this.doneT = Number.NaN;
@@ -207,6 +215,14 @@ class Step {
   get tunable(): boolean {
     return this.model.status === 'done' || this.accepted;
   }
+}
+
+/** What one threshold key was measured at, by side, and the ceiling any accepted step imposes. */
+interface Contribution {
+  left: number | null;
+  right: number | null;
+  rest: number[];
+  ceiling: number;
 }
 
 const snapshot = (m: MoveStepModel): MoveStepModel => ({ ...m, steps: m.steps ? { ...m.steps } : null });
@@ -337,10 +353,12 @@ export class MoveCheck {
     const peaks: Partial<Record<MoveId, number>> = {};
     for (const s of this.steps) if (s.tunable && s.signals.length) peaks[s.id] = s.peaks[0];
     const keyPeaks = this.keyPeaks();
+    const summary = this.view.summary;
     const thresholds: Partial<Thresholds> = {};
-    // Measured keys only. Re-arm and velocity companions are derived from these on apply, so a
-    // record can never carry a companion that disagrees with the key it belongs to.
-    for (const [key, peak] of Object.entries(keyPeaks)) thresholds[key as ThresholdKey] = tunedValue(key as ThresholdKey, peak);
+    // Measured keys only, taken straight from the summary so the record and the card can never
+    // disagree. Re-arm and velocity companions are derived from these on apply, so a record can
+    // never carry a companion that contradicts the key it belongs to.
+    for (const key of Object.keys(keyPeaks) as ThresholdKey[]) thresholds[key] = summary.tuned[key];
     const record: MoveTuning = { mode: this.mode, at, thresholds, peaks };
     if (Object.keys(keyPeaks).length) record.keyPeaks = keyPeaks;
     return record;
@@ -355,6 +373,8 @@ export class MoveCheck {
       const need = this.need(s, src);
       const value = s.read(m);
       step.needs[i] = need;
+      const live = src.th[s.key];
+      step.lives[i] = Number.isFinite(live) ? live : DEFAULT_THRESHOLDS[s.key];
       if (value > step.peaks[i]) step.peaks[i] = value;
       if (need > 0) {
         best = Math.max(best, step.peaks[i] / need);
@@ -362,7 +382,8 @@ export class MoveCheck {
       }
     }
     if (step.signals.length) {
-      step.model.peak = step.peaks[0];
+      // Null until the player has actually moved, so the card can say nothing rather than "best 0.00".
+      step.model.peak = step.peaks[0] > 0 ? step.peaks[0] : null;
       step.model.progress = Math.min(1, best);
     }
     if (step.model.status !== 'active') return;
@@ -390,6 +411,11 @@ export class MoveCheck {
 
   private describe(step: Step, tMs: number): void {
     const m = step.model;
+    // The jog is counted in steps, not measured, so past a full bar the player is already lifting
+    // plenty and needs another step — not a higher knee. Telling them to go further would have them
+    // exaggerate, and the check would then tune kneeLift from a lift they cannot sustain while
+    // actually running.
+    const more = step.id === 'jog' && m.progress >= 1 && m.steps ? m.steps.needed - m.steps.seen : 0;
     const near = m.progress >= NEAR_MISS_FRACTION;
     // A full bar on a move that still has not fired means the other gate is the one in the way: for
     // the jump that is speed, and telling this player to go further is advice they cannot act on.
@@ -397,14 +423,28 @@ export class MoveCheck {
     m.canSkip = tMs - step.startT >= OFFER_SKIP_MS || step.attempts >= OFFER_SKIP_ATTEMPTS;
     m.canAccept = m.canSkip && CAN_ACCEPT.has(step.id);
     const sig =
-      (near ? 1 : 0) | (tooSlow ? 2 : 0) | (m.canSkip ? 4 : 0) | (m.canAccept ? 8 : 0) | (step.attempts << 4);
+      (near ? 1 : 0) |
+      (tooSlow ? 2 : 0) |
+      (m.canSkip ? 4 : 0) |
+      (m.canAccept ? 8 : 0) |
+      (more << 4) |
+      (step.attempts << 8);
     if (sig === step.hintSig) return;
     step.hintSig = sig;
     const out = m.canAccept ? 'use your best attempt' : 'skip this move';
-    const almost = tooSlow ? 'Almost — try a quicker hop' : 'Almost — go a bit further';
-    if ((near || tooSlow) && m.canSkip) m.hint = `${almost}, or ${out}`;
-    else if (near || tooSlow) m.hint = almost;
-    else if (m.canSkip) m.hint = `No luck yet — ${m.canAccept ? 'skip it, or use your best attempt' : 'you can skip this move'}`;
+    // One place decides what the player is short of, most specific first.
+    const lead =
+      more > 0
+        ? `Keep going — ${more} more step${more === 1 ? '' : 's'}`
+        : tooSlow
+          ? 'Almost — try a quicker hop'
+          : near
+            ? 'Almost — go a bit further'
+            : null;
+    if (lead && m.canSkip) m.hint = `${lead}, or ${out}`;
+    else if (lead) m.hint = lead;
+    else if (m.canSkip)
+      m.hint = `No luck yet — ${m.canAccept ? 'skip it, or use your best attempt' : 'you can skip this move'}`;
     else if (step.attempts > 0) m.hint = `${step.attempts} near ${step.attempts === 1 ? 'miss' : 'misses'} so far`;
     else m.hint = null;
   }
@@ -447,8 +487,8 @@ export class MoveCheck {
    * measurement that was never taken, drop it to the bottom of the band, and hand the player a game
    * where glancing sideways changes lane. Anything below the near-miss line is left alone.
    */
-  private contributions(): Map<ThresholdKey, { left: number | null; right: number | null; rest: number[] }> {
-    const out = new Map<ThresholdKey, { left: number | null; right: number | null; rest: number[] }>();
+  private contributions(): Map<ThresholdKey, Contribution> {
+    const out = new Map<ThresholdKey, Contribution>();
     for (const step of this.steps) {
       if (!step.tunable) continue;
       const used = step.signals.map((_, i) => step.needs[i] > 0 && step.peaks[i] >= NEAR_MISS_FRACTION * step.needs[i]);
@@ -458,13 +498,22 @@ export class MoveCheck {
       for (let i = 0; i < step.signals.length; i++) {
         if (!used[i]) continue;
         const key = step.signals[i].key;
-        const c = out.get(key) ?? { left: null, right: null, rest: [] };
+        const c = out.get(key) ?? { left: null, right: null, rest: [], ceiling: Infinity };
         if (step.id === 'left') c.left = step.peaks[i];
         else if (step.id === 'right') c.right = step.peaks[i];
         else c.rest.push(step.peaks[i]);
+        // A move the player was given for free, rather than one they made, can only get easier.
+        if (step.accepted && step.model.status !== 'done') c.ceiling = Math.min(c.ceiling, step.lives[i]);
         out.set(key, c);
       }
     }
+    return out;
+  }
+
+  /** The value each key may not exceed; only a step the player never actually made sets one. */
+  private ceilings(): Partial<Record<ThresholdKey, number>> {
+    const out: Partial<Record<ThresholdKey, number>> = {};
+    for (const [key, c] of this.contributions()) if (c.ceiling < Infinity) out[key] = c.ceiling;
     return out;
   }
 
@@ -489,7 +538,10 @@ export class MoveCheck {
 
   private finish(): void {
     const tuned: Partial<Thresholds> = {};
-    for (const [key, peak] of Object.entries(this.keyPeaks())) tuneKey(tuned, key as ThresholdKey, peak);
+    const ceilings = this.ceilings();
+    for (const [key, peak] of Object.entries(this.keyPeaks())) {
+      tuneKey(tuned, key as ThresholdKey, peak, ceilings[key as ThresholdKey]);
+    }
     this.view.summary = {
       mode: this.mode,
       steps: this.steps.map((s) => snapshot(s.model)),
@@ -511,7 +563,8 @@ export class MoveCheck {
       if (!c || c.left === null || c.right === null || !lopsided(c.left, c.right)) continue;
       const word = this.mode === 'full' ? 'step' : 'lean';
       const [small, large] = c.left < c.right ? ['left', 'right'] : ['right', 'left'];
-      return `Your ${small} ${word} is much smaller than your ${large} — the game is tuned to the smaller one, so both work.`;
+      const tail = 'the game is tuned to the smaller one, so both work.';
+      return `Your ${small} ${word} is much smaller than your ${large} — ${tail}`;
     }
     return null;
   }
