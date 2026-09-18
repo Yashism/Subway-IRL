@@ -95,6 +95,21 @@ export class Game {
     return this.state === 'playing' ? Math.max(0, this.idle.idleMs(this.clockMs)) : 0;
   }
 
+  /**
+   * Abandon whatever is on screen and go back to the menu ("Home"). The run is dropped, not
+   * scored: only a run that ends on its own reaches the summary and the profile.
+   */
+  toMenu(): GameEvent[] {
+    const events: GameEvent[] = [];
+    if (this.state === 'menu') return events;
+    this.pausedByLoss = false;
+    this.catchTimer = 0;
+    this.caughtReason = null;
+    this.idleLevel = 'ok';
+    this.setState('menu', events);
+    return events;
+  }
+
   pause(): void {
     if (this.state !== 'playing' && this.state !== 'countdown') return;
     this.pausedByLoss = false;
