@@ -1,0 +1,340 @@
+/*
+ * The shop screen. Shares the tokens, bars, coin chips and buttons in missions.css; this file
+ * is only the full-screen layer and the item grid.
+ */
+
+.shop {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 1.6vh, 18px);
+  box-sizing: border-box;
+  padding: clamp(14px, 2.4vh, 32px) 16px clamp(14px, 2vh, 26px);
+  overflow-y: auto;
+  pointer-events: auto;
+  color: #fff;
+  user-select: none;
+  font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
+  background: radial-gradient(ellipse at 50% 40%, rgba(20, 12, 45, 0.62), rgba(20, 12, 45, 0.94));
+  z-index: 4;
+}
+.shop[data-on='on'] {
+  display: flex;
+}
+
+/* ------------------------------------------------------------ header */
+
+.sh-top {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.4vw, 18px);
+  flex: none;
+}
+.sh-title {
+  font: 400 clamp(30px, 3.6vw, 52px) / 1 var(--font-game, sans-serif);
+  padding: 13px 34px 7px;
+  color: #fff;
+  background: var(--gold-deep, #f59e0b);
+  border: 5px solid var(--ms-ink);
+  border-radius: 18px;
+  box-shadow: 0 7px 0 var(--ms-ink), 0 16px 30px rgba(0, 0, 0, 0.3);
+  transform: rotate(-3deg);
+  text-shadow: 0 3px 0 #9a5f00;
+}
+.sh-purse {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 20px 8px;
+  border-radius: 999px;
+  border: 4px solid var(--ms-ink);
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 60%, #ffae00);
+  box-shadow: 0 5px 0 var(--ms-ink);
+  font: 400 clamp(20px, 2vw, 30px) / 1 var(--font-game, sans-serif);
+  color: var(--ms-ink);
+}
+
+.sh-level {
+  box-sizing: border-box;
+  width: min(820px, 96vw);
+  flex: none;
+  padding: clamp(10px, 1.3vh, 15px) clamp(14px, 1.6vw, 22px) clamp(11px, 1.4vh, 16px);
+  border-radius: 22px;
+  border: 5px solid var(--ms-ink);
+  background: linear-gradient(180deg, var(--ms-cream), var(--ms-cream-2));
+  box-shadow: 0 8px 0 var(--ms-ink), 0 20px 40px rgba(0, 0, 0, 0.36);
+  color: var(--ms-ink);
+}
+.sh-level-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+.sh-level-text {
+  flex: 1;
+  min-width: 0;
+  font: 400 clamp(18px, 1.8vw, 26px) / 1 var(--font-game, sans-serif);
+  text-shadow: 0 3px 0 rgba(27, 16, 53, 0.13);
+}
+.sh-level-sub,
+.sh-level-note {
+  font: 800 clamp(11px, 0.9vw, 13px) / 1.3 var(--font-ui, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ms-brown);
+  white-space: nowrap;
+}
+.sh-level-note {
+  margin-top: 7px;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  white-space: normal;
+}
+.sh-level .ms-bar-fill {
+  background: linear-gradient(180deg, #a9e6ff, var(--cyan, #29c7e0) 60%, #0e7f96);
+}
+
+/* ------------------------------------------------------------ sections */
+
+.sh-sections {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.8vh, 20px);
+  /* Two columns at full width: four skins land as a tidy 2x2 instead of a ragged 3 + 1. */
+  width: min(820px, 96vw);
+  flex: none;
+}
+.sh-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: clamp(7px, 1vh, 11px);
+}
+.sh-section-title {
+  font: 400 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, sans-serif);
+  color: #fff;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+.sh-section-note {
+  font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: clamp(9px, 1.2vw, 14px);
+}
+
+/* ------------------------------------------------------------ an item */
+
+.sh-item {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(10px, 1.1vw, 14px);
+  box-sizing: border-box;
+  padding: clamp(10px, 1.2vh, 14px) clamp(11px, 1.2vw, 15px);
+  border-radius: 22px;
+  border: 5px solid var(--ms-ink);
+  background: linear-gradient(180deg, var(--ms-cream), var(--ms-cream-2));
+  box-shadow: 0 7px 0 var(--ms-ink), 0 16px 30px rgba(0, 0, 0, 0.32);
+  color: var(--ms-ink);
+}
+.sh-item[data-state='equipped'] {
+  background: linear-gradient(180deg, #e6fbf1, #bdf0d8);
+  border-color: #1d6b48;
+  box-shadow: 0 7px 0 #1d6b48, 0 16px 30px rgba(0, 0, 0, 0.32);
+}
+.sh-item[data-state='locked'] {
+  /* Still fully readable: a player has to be able to see what they are saving for. */
+  background: linear-gradient(180deg, #efe9dd, #ded6c6);
+  border-color: #6c6484;
+  box-shadow: 0 7px 0 #6c6484, 0 16px 30px rgba(0, 0, 0, 0.3);
+}
+
+.sh-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  width: clamp(52px, 4.6vw, 64px);
+}
+.sh-art-glyph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  font-size: clamp(24px, 2.2vw, 32px);
+  background: #fff;
+  border: 3px solid var(--ms-ink);
+  box-shadow: 0 4px 0 var(--ms-ink);
+}
+.sh-item[data-state='locked'] .sh-art-glyph {
+  filter: grayscale(0.7);
+}
+.sh-swatch {
+  display: flex;
+  gap: 3px;
+}
+.sh-chip {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  border: 2px solid var(--ms-ink);
+}
+
+.sh-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sh-item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sh-name {
+  flex: 1;
+  min-width: 0;
+  font: 400 clamp(16px, 1.5vw, 22px) / 1.1 var(--font-game, sans-serif);
+  text-shadow: 0 2px 0 rgba(27, 16, 53, 0.12);
+}
+.sh-held {
+  flex: none;
+  padding: 3px 9px 2px;
+  border-radius: 999px;
+  border: 2px solid var(--ms-ink);
+  background: #fff;
+  font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
+}
+.sh-blurb {
+  font: 800 clamp(11px, 0.95vw, 14px) / 1.32 var(--font-ui, sans-serif);
+  color: #5d4a2c;
+}
+.sh-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+.sh-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  font: 800 clamp(12px, 1.05vw, 15px) / 1 var(--font-ui, sans-serif);
+  color: var(--ms-brown);
+}
+
+/* ------------------------------------------------------------ item buttons */
+
+.sh-btn {
+  appearance: none;
+  cursor: pointer;
+  flex: none;
+  border: 4px solid var(--ms-ink);
+  border-radius: 999px;
+  padding: 9px 18px 7px;
+  font: 800 clamp(12px, 1vw, 15px) / 1 var(--font-ui, sans-serif);
+  color: var(--ms-ink);
+  background: linear-gradient(180deg, #fff, #e4e0f3);
+  box-shadow: 0 5px 0 var(--ms-ink);
+  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s;
+  white-space: nowrap;
+}
+.sh-btn:not(:disabled):hover {
+  transform: translateY(-2px) scale(1.03);
+}
+.sh-btn:not(:disabled):active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ms-ink);
+}
+.sh-btn:focus-visible {
+  outline: 4px solid var(--gold, #ffd400);
+  outline-offset: 3px;
+}
+.sh-btn-buy {
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+}
+.sh-btn-equip {
+  color: #fff;
+  background: linear-gradient(180deg, #6fe0a3, var(--ms-green) 55%, #2a8c60);
+  text-shadow: 0 2px 0 #1d6b48;
+}
+.sh-btn-on {
+  cursor: default;
+  color: #1d6b48;
+  background: #fff;
+  border-color: #1d6b48;
+  box-shadow: 0 5px 0 #1d6b48;
+}
+.sh-btn-locked {
+  cursor: not-allowed;
+  color: #fff;
+  background: #6c6484;
+  border-color: #453f5a;
+  box-shadow: 0 5px 0 #453f5a;
+}
+
+.sh-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex: none;
+  padding-bottom: 6px;
+}
+
+/* ------------------------------------------------------------ small windows */
+
+@media (max-width: 760px), (max-height: 620px) {
+  .shop {
+    padding: 10px 10px 14px;
+    gap: 8px;
+  }
+  .sh-title {
+    font-size: clamp(22px, 5vw, 30px);
+    padding: 9px 20px 5px;
+    border-width: 4px;
+  }
+  .sh-purse {
+    font-size: clamp(16px, 4vw, 22px);
+    padding: 7px 14px 5px;
+  }
+  .sh-grid {
+    grid-template-columns: 1fr;
+  }
+  .sh-item,
+  .sh-level {
+    border-width: 4px;
+    border-radius: 16px;
+    box-shadow: 0 5px 0 var(--ms-ink), 0 12px 22px rgba(0, 0, 0, 0.33);
+  }
+  .sh-art {
+    width: 44px;
+  }
+  .sh-level-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .sh-level-sub {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-btn {
+    transition: none;
+  }
+}

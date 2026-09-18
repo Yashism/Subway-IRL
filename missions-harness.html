@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Missions Harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: auto;
+        background: radial-gradient(ellipse at 50% 30%, #3a2a6b, #1b1035 70%);
+      }
+      #stage {
+        background: radial-gradient(ellipse at 50% 30%, #3a2a6b, #1b1035 70%);
+        min-height: 100vh;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px 44px;
+      }
+      .harness-nav {
+        position: fixed;
+        left: 50%;
+        bottom: 4px;
+        transform: translateX(-50%);
+        z-index: 50;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+        font: 12px system-ui, sans-serif;
+        opacity: 0.25;
+      }
+      .harness-nav:hover {
+        opacity: 1;
+      }
+      .harness-nav a {
+        color: #fff;
+        background: #000a;
+        padding: 2px 6px;
+        border-radius: 4px;
+        text-decoration: none;
+      }
+      .harness-nav a[data-on='on'] {
+        background: #e5399b;
+      }
+      body.shot .harness-nav {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="board"></div>
+      <div id="loose"></div>
+    </div>
+    <div id="shop"></div>
+    <nav class="harness-nav" id="nav"></nav>
+    <script type="module" src="/src/ui/missions.harness.ts"></script>
+  </body>
+</html>
