@@ -28,6 +28,21 @@ Allow the camera, stand back far enough to be seen, hold still for two seconds t
 **Keyboard** (works alongside, and on its own): ← → lanes · Space jump · S roll · Ctrl hoverboard ·
 Enter start · Esc pause · N mute · M live monitor.
 
+### On another device (phone, tablet, second laptop)
+
+```bash
+npm run lan            # serves https://<this computer's Wi-Fi address>:5174/ — it prints the link
+npm run lan:forward    # WSL only, once (and again after a reboot): Windows asks for permission
+```
+
+Open the printed link on a device on the **same Wi-Fi**. It has to be `https`, because a browser
+only lets a page use the camera on https or on localhost; the certificate is made by this computer,
+so the first visit shows a "not private" warning — choose Advanced → Proceed (Chrome) or Show
+Details → visit this website (Safari). Under WSL, `lan:forward` forwards port 5174 from Windows
+into WSL and adds a firewall rule that lets in only that port and only devices on the local subnet;
+`npm run lan:stop` removes both. `npm run lan` warns if WSL's address has changed since (it does
+after a restart) — just run `lan:forward` again. This computer can keep using http://localhost:5173.
+
 ### Two play modes
 
 - **Full body** — room to jog, knees and arms visible. Lanes change by stepping sideways.

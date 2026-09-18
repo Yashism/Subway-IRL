@@ -1,7 +1,18 @@
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+/**
+ * Set by `npm run lan` (scripts/lan.mjs): serve over HTTPS with the locally made certificate, so a
+ * phone or tablet on the same Wi-Fi may use its camera. Unset, `npm run dev` stays plain http on
+ * localhost, where the camera is allowed anyway.
+ */
+const lanCert = process.env.SUBWAY_LAN_CERT_DIR;
+
 export default defineConfig({
+  server: lanCert
+    ? { https: { key: readFileSync(resolve(lanCert, 'lan-key.pem')), cert: readFileSync(resolve(lanCert, 'lan-cert.pem')) } }
+    : undefined,
   build: {
     rollupOptions: {
       input: {

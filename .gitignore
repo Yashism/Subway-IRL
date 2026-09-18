@@ -6,3 +6,4 @@ public/mediapipe/
 # Third-party character rips supplied by the user: local use only, never commit
 assets/
 .worktrees/
+.cert/

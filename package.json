@@ -6,6 +6,10 @@
   "scripts": {
     "predev": "node scripts/fetch-mediapipe.mjs",
     "dev": "vite",
+    "prelan": "node scripts/fetch-mediapipe.mjs",
+    "lan": "node scripts/lan.mjs serve",
+    "lan:forward": "node scripts/lan.mjs forward",
+    "lan:stop": "node scripts/lan.mjs stop",
     "prebuild": "node scripts/fetch-mediapipe.mjs",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
