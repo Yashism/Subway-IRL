@@ -1,0 +1,509 @@
+/*
+ * The workout screen. Shares the layer, buttons and palette with settings.css (.sw-*); everything
+ * here is the reading side: the hero number, the week chart, the tiles and the run list.
+ *
+ * Same distance rule: the headline numbers are read from across the room, so the ones that matter
+ * (today's minutes, the streak) are set in the game face at display sizes, and the supporting
+ * numbers stay above 15px. Every value cell reserves its width so counting up shifts nothing.
+ */
+
+.wk-tab {
+  background: var(--sw-green);
+  text-shadow: 0 3px 0 #1d6b48;
+}
+
+/* ------------------------------------------------------------ the empty state */
+
+.wk-invite {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  width: min(560px, 100%);
+  margin: auto 0;
+  padding: 34px 28px 28px;
+  box-sizing: border-box;
+  border-radius: 32px;
+  background: linear-gradient(180deg, var(--sw-cream), var(--sw-cream-2));
+  border: 5px solid var(--sw-ink);
+  box-shadow: 0 10px 0 var(--sw-ink), 0 30px 60px rgba(0, 0, 0, 0.45);
+  color: var(--sw-ink);
+  animation: sw-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.wk-screen[data-empty='yes'] .wk-invite {
+  display: flex;
+}
+.wk-screen[data-empty='yes'] .wk-grid,
+.wk-screen[data-empty='yes'] .wk-foot-run {
+  display: none;
+}
+.wk-invite-icon {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 28px;
+  font-size: 48px;
+  background: radial-gradient(circle at 35% 30%, #9ff4ff, var(--sw-cyan) 55%, #1583a0);
+  border: 5px solid var(--sw-ink);
+  box-shadow: 0 7px 0 var(--sw-ink), inset 0 -8px 0 rgba(14, 109, 134, 0.45);
+  transform: rotate(-5deg);
+  animation: wk-bob 2.4s ease-in-out infinite;
+}
+.wk-invite-title {
+  font: 400 clamp(28px, 3.2vw, 40px) / 1.05 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding-top: 6px;
+}
+.wk-invite-body {
+  font: 700 clamp(15px, 1.25vw, 19px) / 1.4 var(--font-ui, sans-serif);
+  color: #5d4a2c;
+  max-width: 420px;
+}
+.wk-invite-actions {
+  justify-content: center;
+  margin-top: 6px;
+}
+
+/* ------------------------------------------------------------ layout */
+
+.wk-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: clamp(12px, 1.6vw, 20px);
+  width: min(1160px, 100%);
+  flex: none;
+}
+.wk-col {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.6vw, 20px);
+  min-width: 0;
+}
+.wk-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 26px;
+  background: linear-gradient(180deg, var(--sw-cream), var(--sw-cream-2));
+  border: 5px solid var(--sw-ink);
+  box-shadow: 0 8px 0 var(--sw-ink), 0 20px 36px rgba(0, 0, 0, 0.32);
+  color: var(--sw-ink);
+  overflow: hidden;
+  animation: sw-rise 0.4s ease-out both;
+}
+.wk-card-week { animation-delay: 0.06s; }
+.wk-card-all { animation-delay: 0.12s; }
+.wk-card-recent { animation-delay: 0.18s; }
+.wk-card-title {
+  padding: 10px 16px 9px;
+  background: var(--sw-ink);
+  font: 800 clamp(14px, 1.15vw, 17px) / 1 var(--font-ui, sans-serif);
+  letter-spacing: 0.18em;
+  color: var(--gold, #ffd400);
+}
+.wk-card-today .wk-card-title {
+  background: linear-gradient(90deg, var(--magenta, #e5399b), #a12a6d);
+  color: #fff;
+}
+.wk-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+/* ------------------------------------------------------------ today */
+
+.wk-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px 14px;
+  border-radius: 20px;
+  background: #fff;
+  border: 3px solid var(--sw-ink);
+  box-shadow: 0 4px 0 var(--sw-ink);
+}
+.wk-hero-num {
+  font: 400 clamp(52px, 6.5vw, 86px) / 0.9 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding-top: 8px;
+  /* Four digits' worth: 7 → 120 must not slide the words beside it. */
+  min-width: 2.4ch;
+  text-align: center;
+  color: var(--magenta, #e5399b);
+  -webkit-text-stroke: 3px var(--sw-ink);
+  paint-order: stroke fill;
+}
+.wk-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.wk-hero-unit {
+  font: 800 clamp(17px, 1.5vw, 22px) / 1.1 var(--font-ui, sans-serif);
+  letter-spacing: 0.02em;
+}
+.wk-cals {
+  font: 700 clamp(13px, 1.05vw, 15px) / 1.3 var(--font-ui, sans-serif);
+  color: var(--sw-brown);
+}
+
+/* ------------------------------------------------------------ tiles */
+
+.wk-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.wk-tiles-all {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.wk-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px 9px;
+  border-radius: 16px;
+  background: #fff;
+  border: 3px solid var(--sw-ink);
+  box-shadow: 0 4px 0 var(--sw-ink);
+  min-width: 0;
+}
+.wk-tile-val {
+  font: 400 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding-top: 4px;
+  color: var(--sw-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.wk-tile-label {
+  font: 800 11.5px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sw-brown);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ streak */
+
+.wk-streak {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px 11px;
+  border-radius: 20px;
+  background: #fff;
+  border: 3px solid var(--sw-ink);
+  box-shadow: 0 4px 0 var(--sw-ink);
+}
+.wk-streak-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 8px 16px 7px 12px;
+  border-radius: 999px;
+  background: #ece8f8;
+  border: 3px solid var(--sw-ink);
+  box-shadow: inset 0 -3px 0 rgba(27, 16, 53, 0.12);
+}
+.wk-streak-badge[data-on='on'] {
+  background: linear-gradient(180deg, #ffc46b, var(--orange, #ff7a29) 70%, #d1490a);
+}
+.wk-streak-flame {
+  font-size: 26px;
+  line-height: 1;
+  filter: grayscale(1) opacity(0.45);
+}
+.wk-streak-badge[data-on='on'] .wk-streak-flame {
+  filter: none;
+  animation: wk-flicker 1.6s ease-in-out infinite;
+}
+.wk-streak-num {
+  font: 400 clamp(26px, 2.6vw, 36px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding-top: 4px;
+  /* Reserved: 9 → 10 must not resize the badge. */
+  min-width: 1.6ch;
+  text-align: center;
+  color: var(--sw-ink);
+}
+.wk-streak-badge[data-on='on'] .wk-streak-num {
+  color: #fff;
+  -webkit-text-stroke: 3px var(--sw-ink);
+  paint-order: stroke fill;
+}
+.wk-streak-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wk-streak-words {
+  font: 800 clamp(16px, 1.35vw, 20px) / 1.15 var(--font-ui, sans-serif);
+}
+.wk-streak-best {
+  font: 700 13px/1.2 var(--font-ui, sans-serif);
+  color: var(--sw-brown);
+  /* Reserved: the line is empty until they have beaten it. */
+  min-height: 1.2em;
+}
+
+/* ------------------------------------------------------------ the week chart */
+
+.wk-chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  border-radius: 20px;
+  background: #fff;
+  border: 3px solid var(--sw-ink);
+  box-shadow: 0 4px 0 var(--sw-ink);
+}
+.wk-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.wk-bar-cap {
+  font: 800 12.5px/1 var(--font-ui, sans-serif);
+  color: var(--sw-brown);
+  /* Always reserved, so a day earning a label does not shorten the bars beside it. */
+  min-height: 1em;
+}
+.wk-bar-track {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: clamp(74px, 12vh, 120px);
+  border-radius: 10px;
+  background: repeating-linear-gradient(0deg, #efecf8 0 1px, transparent 1px 25%);
+  box-shadow: inset 0 0 0 2px #e4e0f3;
+  overflow: hidden;
+}
+.wk-bar-fill {
+  width: 100%;
+  height: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #7fe7f7, var(--sw-cyan) 60%, #1583a0);
+  box-shadow: inset 0 0 0 2px rgba(27, 16, 53, 0.35);
+  transform-origin: bottom;
+  animation: sw-grow 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.wk-bar[data-today='on'] .wk-bar-fill {
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+}
+.wk-bar[data-today='on'] .wk-bar-track {
+  box-shadow: inset 0 0 0 3px var(--sw-ink);
+}
+.wk-bar[data-empty='yes'] .wk-bar-track::after {
+  /* A day with nothing on it still reads as a day: a flat ink line, not a missing column. */
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: #c7bfe0;
+}
+.wk-bar-day {
+  font: 800 13px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.06em;
+  color: var(--sw-brown);
+}
+.wk-bar[data-today='on'] .wk-bar-day {
+  color: var(--sw-ink);
+  padding: 2px 8px 1px;
+  border-radius: 999px;
+  background: var(--gold, #ffd400);
+  box-shadow: 0 2px 0 var(--sw-ink);
+}
+.wk-week-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px;
+}
+.wk-week-total {
+  font: 800 clamp(15px, 1.2vw, 18px) / 1.2 var(--font-ui, sans-serif);
+}
+
+/* ------------------------------------------------------------ the run list */
+
+/* The list scrolls, so the card fades its last row out rather than guillotining it. */
+.wk-card-recent .wk-card-body {
+  position: relative;
+}
+.wk-card-recent .wk-card-body::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 26px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 233, 194, 0), var(--sw-cream-2));
+}
+.wk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room for the scrollbar, so a 31st run cannot crop the coins column. */
+  padding-right: 4px;
+}
+.wk-list-empty {
+  font: 700 15px/1.3 var(--font-ui, sans-serif);
+  color: var(--sw-brown);
+  padding: 6px 4px;
+}
+.wk-list-empty[hidden] {
+  display: none;
+}
+.wk-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) auto minmax(0, 1.5fr);
+  align-items: center;
+  gap: 12px;
+  padding: 9px 13px 9px 11px;
+  border-radius: 16px;
+  background: #fff;
+  border: 3px solid var(--sw-ink);
+  box-shadow: 0 3px 0 var(--sw-ink);
+}
+.wk-run[data-best='on'] {
+  background: linear-gradient(180deg, #fffbe6, #fff0b8);
+  box-shadow: 0 3px 0 var(--sw-ink), inset 0 0 0 2px var(--gold, #ffd400);
+}
+.wk-run-when {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.wk-run-day {
+  font: 800 clamp(15px, 1.2vw, 17px) / 1.1 var(--font-ui, sans-serif);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wk-run-how {
+  font: 700 12px/1.1 var(--font-ui, sans-serif);
+  color: var(--sw-brown);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wk-run-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  min-width: 7ch;
+}
+.wk-run-score-num {
+  font: 400 clamp(21px, 2vw, 28px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding-top: 4px;
+}
+.wk-run-score-label {
+  font: 800 10.5px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sw-brown);
+}
+.wk-run[data-best='on'] .wk-run-score-label {
+  color: #8a6400;
+}
+.wk-run-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.wk-run-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 4px 3px;
+  border-radius: 10px;
+  background: #f4f1fb;
+  min-width: 0;
+}
+.wk-run[data-best='on'] .wk-run-stat {
+  background: rgba(255, 255, 255, 0.72);
+}
+.wk-run-stat-val {
+  font: 800 clamp(13px, 1.1vw, 16px) / 1.1 var(--font-ui, sans-serif);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.wk-run-stat-label {
+  font: 800 10px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sw-brown);
+}
+
+/* ------------------------------------------------------------ small windows */
+
+@media (max-width: 900px) {
+  .wk-grid {
+    grid-template-columns: 1fr;
+    gap: clamp(12px, 1.6vw, 20px);
+    width: min(560px, 100%);
+  }
+  .wk-tiles-all {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .wk-run {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 7px;
+  }
+  .wk-run-stats {
+    grid-column: 1 / -1;
+  }
+  .wk-list {
+    max-height: none;
+    overflow: visible;
+  }
+  .wk-card-recent .wk-card-body::after {
+    display: none;
+  }
+  .wk-hero-num {
+    font-size: clamp(44px, 13vw, 64px);
+  }
+}
+@media (max-height: 620px) {
+  .wk-bar-track {
+    height: 64px;
+  }
+  .wk-invite-icon {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------ keyframes */
+
+@keyframes wk-bob {
+  0%, 100% { transform: rotate(-5deg) translateY(0); }
+  50% { transform: rotate(4deg) translateY(-6px); }
+}
+@keyframes wk-flicker {
+  0%, 100% { transform: scale(1) rotate(-3deg); }
+  50% { transform: scale(1.12) rotate(3deg); }
+}

@@ -1,0 +1,616 @@
+/*
+ * Settings and workout screens — the same visual language as poseScreens.css / moveCheck.css:
+ * chunky cream cards, 5px ink borders, hard drop shadows, Luckiest Guy headings.
+ * Tokens come from hud.css (--ink, --gold, --font-game…).
+ *
+ * Sizing rule for everything in here: it is read standing up, about two metres back from a laptop.
+ * Nothing is smaller than 15px, every target is at least 44px tall, and every state a control can
+ * be in reserves its own space so a toggle flipping never moves the row under the player's finger.
+ *
+ * The palette lives on :root so the workout screen (workout.css) shares it without importing twice.
+ */
+
+:root {
+  --sw-ink: var(--ink, #1b1035);
+  --sw-cream: #fff9ec;
+  --sw-cream-2: #ffe9c2;
+  --sw-brown: #8a6a3a;
+  --sw-green: var(--green, #3fb27f);
+  --sw-red: var(--red, #e8433a);
+  --sw-amber: #ffb020;
+  --sw-grey: #bdb6d8;
+  --sw-cyan: var(--cyan, #29c7e0);
+}
+
+/* ------------------------------------------------------------ the layer */
+
+.sw-screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 1.8vh, 20px);
+  box-sizing: border-box;
+  padding: clamp(14px, 2.6vh, 32px) clamp(12px, 2vw, 28px) clamp(14px, 2.2vh, 28px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  color: #fff;
+  user-select: none;
+  font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
+  background: radial-gradient(ellipse at 50% 40%, rgba(20, 12, 45, 0.62), rgba(20, 12, 45, 0.92));
+  z-index: 6;
+}
+.sw-screen[data-on='on'] {
+  display: flex;
+}
+
+/* ------------------------------------------------------------ the title tab */
+
+.sw-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.sw-tab {
+  font: 400 clamp(30px, 3.6vw, 52px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  white-space: nowrap;
+  padding: 13px 34px 7px;
+  color: #fff;
+  background: var(--magenta, #e5399b);
+  border: 5px solid var(--sw-ink);
+  border-radius: 18px;
+  box-shadow: 0 7px 0 var(--sw-ink), 0 16px 30px rgba(0, 0, 0, 0.3);
+  transform: rotate(-2deg);
+  text-shadow: 0 3px 0 #8e1d5c;
+  animation: sw-drop 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.sw-tab-sub {
+  font: 800 clamp(14px, 1.4vw, 18px) / 1 var(--font-ui, sans-serif);
+  padding: 8px 18px 6px;
+  border-radius: 999px;
+  background: rgba(20, 12, 45, 0.75);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+}
+
+/* ------------------------------------------------------------ buttons */
+
+.sw-btn {
+  appearance: none;
+  cursor: pointer;
+  border: 4px solid var(--sw-ink);
+  border-radius: 999px;
+  min-height: 52px;
+  padding: 13px 26px 10px;
+  font: 800 clamp(16px, 1.25vw, 20px) / 1 var(--font-ui, sans-serif);
+  color: var(--sw-ink);
+  background: linear-gradient(180deg, #fff, #e4e0f3);
+  box-shadow: 0 5px 0 var(--sw-ink);
+  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s, filter 0.12s;
+  white-space: nowrap;
+}
+.sw-btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.03);
+}
+.sw-btn:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--sw-ink);
+}
+.sw-btn:focus-visible,
+.sw-chip:focus-visible,
+.sw-toggle:focus-visible,
+.sw-weight:focus-visible,
+.sw-select:focus-visible,
+.sw-slider:focus-visible {
+  outline: 4px solid var(--gold, #ffd400);
+  outline-offset: 3px;
+}
+.sw-btn:disabled,
+.sw-select:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  opacity: 0.5;
+}
+.sw-btn-go {
+  color: #fff;
+  background: linear-gradient(180deg, #6fe0a3, var(--sw-green) 55%, #2a8c60);
+  text-shadow: 0 2px 0 #1d6b48;
+}
+.sw-btn-warn {
+  color: var(--sw-ink);
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+}
+.sw-btn-danger {
+  color: #fff;
+  background: linear-gradient(180deg, #ff7d74, var(--sw-red) 55%, #b32a22);
+  text-shadow: 0 2px 0 #8c1f19;
+}
+.sw-btn-ghost {
+  color: #fff;
+  background: rgba(20, 12, 45, 0.55);
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 5px 0 rgba(20, 12, 45, 0.6);
+}
+.sw-btn-wide {
+  font: 400 clamp(24px, 2.4vw, 34px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding: 16px 52px 11px;
+  min-height: 62px;
+}
+
+/* ------------------------------------------------------------ group cards */
+
+/*
+ * Columns, not a grid: the groups are independent cards of very different heights, and a grid row
+ * would leave the short one (Camera) holding a hole as tall as the long one (Movement) beside it.
+ */
+.sw-grid {
+  column-width: 440px;
+  column-gap: clamp(12px, 1.6vw, 20px);
+  width: min(1160px, 100%);
+  flex: none;
+}
+.sw-group {
+  display: flex;
+  flex-direction: column;
+  break-inside: avoid;
+  margin-bottom: clamp(12px, 1.6vw, 20px);
+  border-radius: 26px;
+  background: linear-gradient(180deg, var(--sw-cream), var(--sw-cream-2));
+  border: 5px solid var(--sw-ink);
+  box-shadow: 0 8px 0 var(--sw-ink), 0 20px 36px rgba(0, 0, 0, 0.32);
+  color: var(--sw-ink);
+  overflow: hidden;
+  animation: sw-rise 0.4s ease-out both;
+}
+.sw-group:nth-child(2) { animation-delay: 0.05s; }
+.sw-group:nth-child(3) { animation-delay: 0.1s; }
+.sw-group:nth-child(4) { animation-delay: 0.15s; }
+.sw-group:nth-child(5) { animation-delay: 0.2s; }
+/* Keyboard mode, or no camera: the group stays put and stops pretending to be live. */
+.sw-group[data-off='on'] .sw-group-body {
+  opacity: 0.45;
+}
+.sw-group-note {
+  display: none;
+  padding: 9px 16px 8px;
+  background: var(--sw-amber);
+  border-bottom: 4px solid var(--sw-ink);
+  font: 800 clamp(13px, 1.05vw, 15px) / 1.25 var(--font-ui, sans-serif);
+  color: var(--sw-ink);
+}
+.sw-group[data-off='on'] .sw-group-note {
+  display: block;
+}
+.sw-group-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px 10px;
+  background: var(--sw-ink);
+  color: #fff;
+}
+.sw-group-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28);
+}
+.sw-group-title {
+  font: 800 clamp(15px, 1.2vw, 18px) / 1 var(--font-ui, sans-serif);
+  letter-spacing: 0.16em;
+  color: var(--gold, #ffd400);
+}
+.sw-group-blurb {
+  margin-top: 3px;
+  font: 700 clamp(13px, 1vw, 15px) / 1.2 var(--font-ui, sans-serif);
+  color: rgba(255, 255, 255, 0.72);
+}
+.sw-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  transition: opacity 0.2s;
+}
+
+/* ------------------------------------------------------------ rows */
+
+.sw-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 13px 12px;
+  border-radius: 18px;
+  background: #fff;
+  border: 3px solid var(--sw-ink);
+  box-shadow: 0 4px 0 var(--sw-ink);
+}
+.sw-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sw-row-label {
+  font: 800 clamp(16px, 1.3vw, 20px) / 1.1 var(--font-ui, sans-serif);
+}
+.sw-row-value {
+  font: 400 clamp(18px, 1.5vw, 24px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding-top: 3px;
+  /* Reserved so a value going 100% → 95% cannot nudge the label. */
+  min-width: 3.4ch;
+  text-align: right;
+  color: var(--sw-brown);
+}
+.sw-row-sub {
+  font: 700 clamp(13px, 1.05vw, 15px) / 1.3 var(--font-ui, sans-serif);
+  color: var(--sw-brown);
+}
+.sw-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sw-note {
+  /* Two lines' worth, always: the sensitivity wording changes length as the slider moves. */
+  min-height: 2.5em;
+  display: flex;
+  align-items: center;
+  font: 800 clamp(14px, 1.15vw, 17px) / 1.3 var(--font-ui, sans-serif);
+  color: var(--sw-brown);
+}
+
+/* ------------------------------------------------------------ sliders */
+
+.sw-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 26px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.sw-slider::-webkit-slider-runnable-track {
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #d9d2f0, var(--sw-cyan));
+  border: 3px solid var(--sw-ink);
+  box-sizing: border-box;
+}
+.sw-slider::-moz-range-track {
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #d9d2f0, var(--sw-cyan));
+  border: 3px solid var(--sw-ink);
+  box-sizing: border-box;
+}
+.sw-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 32px;
+  height: 32px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+  border: 4px solid var(--sw-ink);
+  box-shadow: 0 3px 0 rgba(27, 16, 53, 0.45);
+  box-sizing: border-box;
+}
+.sw-slider::-moz-range-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+  border: 4px solid var(--sw-ink);
+  box-shadow: 0 3px 0 rgba(27, 16, 53, 0.45);
+  box-sizing: border-box;
+}
+.sw-slider[data-muted='on'] {
+  filter: grayscale(0.9);
+  opacity: 0.55;
+}
+.sw-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sw-scale-end {
+  font: 800 12px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sw-grey);
+}
+
+/* ------------------------------------------------------------ chips (segmented choices) */
+
+.sw-chips {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+}
+.sw-chip {
+  appearance: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 62px;
+  padding: 9px 8px 8px;
+  border-radius: 16px;
+  border: 3px solid var(--sw-ink);
+  background: linear-gradient(180deg, #fff, #ece8f8);
+  box-shadow: 0 4px 0 var(--sw-ink);
+  color: var(--sw-ink);
+  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), background 0.15s, box-shadow 0.12s;
+}
+.sw-chip:hover {
+  transform: translateY(-2px);
+}
+.sw-chip:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--sw-ink);
+}
+.sw-chip[data-on='on'] {
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+  box-shadow: 0 4px 0 var(--sw-ink), inset 0 0 0 3px #fff;
+}
+.sw-chip-name {
+  font: 800 clamp(15px, 1.25vw, 19px) / 1 var(--font-ui, sans-serif);
+}
+.sw-chip-blurb {
+  font: 700 11.5px/1.15 var(--font-ui, sans-serif);
+  text-align: center;
+  color: var(--sw-brown);
+}
+.sw-chip[data-on='on'] .sw-chip-blurb {
+  color: #7a5a14;
+}
+
+/* ------------------------------------------------------------ toggles */
+
+.sw-row-toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.sw-toggle {
+  appearance: none;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+  width: 108px;
+  height: 52px;
+  padding: 0 12px 0 0;
+  border-radius: 999px;
+  border: 4px solid var(--sw-ink);
+  background: #d9d2f0;
+  box-shadow: 0 4px 0 var(--sw-ink);
+  color: var(--sw-ink);
+  transition: background 0.18s;
+}
+.sw-toggle[data-on='on'] {
+  background: linear-gradient(180deg, #6fe0a3, var(--sw-green) 60%, #2a8c60);
+  padding: 0 0 0 12px;
+  flex-direction: row-reverse;
+}
+.sw-toggle-knob {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin: 0 6px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff, #ddd7ee);
+  border: 3px solid var(--sw-ink);
+  box-sizing: border-box;
+}
+.sw-toggle-word {
+  flex: 1;
+  text-align: center;
+  font: 800 15px/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.1em;
+}
+.sw-toggle[data-on='on'] .sw-toggle-word {
+  color: #fff;
+  text-shadow: 0 2px 0 #1d6b48;
+}
+
+/* ------------------------------------------------------------ select */
+
+.sw-select {
+  appearance: none;
+  cursor: pointer;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 42px 11px 14px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 3px solid var(--sw-ink);
+  box-shadow: 0 4px 0 var(--sw-ink);
+  font: 800 clamp(15px, 1.2vw, 18px) / 1.1 var(--font-ui, sans-serif);
+  color: var(--sw-ink);
+  background:
+    linear-gradient(45deg, transparent 50%, var(--sw-ink) 50%) calc(100% - 22px) 55% / 8px 8px no-repeat,
+    linear-gradient(135deg, var(--sw-ink) 50%, transparent 50%) calc(100% - 15px) 55% / 8px 8px no-repeat,
+    #fff;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------ weight picker */
+
+.sw-weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.sw-weight {
+  appearance: none;
+  cursor: pointer;
+  min-width: 56px;
+  min-height: 46px;
+  padding: 10px 12px 9px;
+  border-radius: 14px;
+  border: 3px solid var(--sw-ink);
+  background: linear-gradient(180deg, #fff, #ece8f8);
+  box-shadow: 0 3px 0 var(--sw-ink);
+  font: 800 16px/1 var(--font-ui, sans-serif);
+  color: var(--sw-ink);
+  transition: transform 0.12s, background 0.15s;
+}
+.sw-weight:hover {
+  transform: translateY(-2px);
+}
+.sw-weight[data-on='on'] {
+  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+  box-shadow: 0 3px 0 var(--sw-ink), inset 0 0 0 2px #fff;
+}
+
+/* ------------------------------------------------------------ action rows */
+
+.sw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.sw-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 4px;
+  flex: none;
+}
+
+/* ------------------------------------------------------------ confirm dialog */
+
+.sw-dialog {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: safe center;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: rgba(12, 7, 28, 0.72);
+  backdrop-filter: blur(5px);
+  z-index: 3;
+}
+.sw-dialog[data-on='on'] {
+  display: flex;
+}
+.sw-dialog-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  width: min(560px, 100%);
+  padding: 26px 26px 22px;
+  box-sizing: border-box;
+  border-radius: 28px;
+  background: linear-gradient(180deg, var(--sw-cream), var(--sw-cream-2));
+  border: 5px solid var(--sw-ink);
+  box-shadow: 0 10px 0 var(--sw-ink), 0 30px 60px rgba(0, 0, 0, 0.5);
+  color: var(--sw-ink);
+  animation: sw-card-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.sw-dialog-title {
+  font: 400 clamp(26px, 2.8vw, 36px) / 1.05 var(--font-game, 'Luckiest Guy', sans-serif);
+  padding-top: 4px;
+}
+.sw-dialog-body {
+  font: 700 clamp(15px, 1.2vw, 18px) / 1.4 var(--font-ui, sans-serif);
+  color: #5d4a2c;
+  max-width: 460px;
+}
+.sw-dialog-actions {
+  justify-content: center;
+  margin-top: 4px;
+}
+/* The way out: plain, wide and first, so it is the easiest thing on the card to hit. */
+.sw-btn-cancel {
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+/* ------------------------------------------------------------ small windows */
+
+@media (max-width: 900px) {
+  .sw-grid {
+    column-width: auto;
+    column-count: 1;
+    width: min(560px, 100%);
+  }
+  .sw-tab {
+    font-size: clamp(24px, 7vw, 34px);
+    padding: 10px 22px 6px;
+  }
+  .sw-chip-blurb {
+    display: none;
+  }
+  .sw-chip {
+    min-height: 52px;
+  }
+}
+@media (max-height: 620px) {
+  .sw-tab-sub {
+    display: none;
+  }
+  .sw-group-blurb {
+    display: none;
+  }
+  .sw-note {
+    min-height: 1.4em;
+  }
+}
+
+/* ------------------------------------------------------------ keyframes */
+
+@keyframes sw-drop {
+  from { transform: translateY(-40px) rotate(-2deg) scale(0.75); opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sw-rise {
+  from { translate: 0 22px; opacity: 0; }
+  to { translate: 0 0; opacity: 1; }
+}
+@keyframes sw-card-in {
+  from { transform: translateY(40px) scale(0.85); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes sw-pop {
+  0% { transform: scale(0.4); }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes sw-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-screen *,
+  .sw-screen *::before,
+  .sw-screen *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
