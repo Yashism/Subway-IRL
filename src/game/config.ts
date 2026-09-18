@@ -22,8 +22,20 @@ export const TUNING = {
   minGapFloor: 0.8,
   // runner
   laneChangeSeconds: 0.15,
-  jumpSeconds: 0.6,
-  jumpHeight: 1.2,
+  /**
+   * Airtime and apex of a normal jump. Raised from 0.6 s / 1.2 m (2026-09-18, the user: jumping over
+   * an obstacle should be "a little lenient … do not make it unrealistic"): at 0.6 s a handcart could
+   * not be cleared at all at the starting speed, and a barrier left a 137 ms window. 0.7 s / 1.3 m
+   * with `jumpForgiveness` roughly doubles every window while staying a believable jump.
+   */
+  jumpSeconds: 0.7,
+  jumpHeight: 1.3,
+  /**
+   * How much of the top edge of a jump obstacle a jump may brush without crashing. A shoe grazing
+   * the top of a barrier reads as a clean jump to a player, and it widens the timing window without
+   * making the jump itself higher. Applied identically by the game and the passability solver.
+   */
+  jumpForgiveness: 0.12,
   chappalJumpSeconds: 0.9,
   chappalJumpHeight: 3.8,
   rollSeconds: 0.6,

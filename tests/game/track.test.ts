@@ -85,7 +85,8 @@ describe('Track', () => {
     const arc = t.coins.filter((c) => c.lane === 0 && c.s < 90).map((c) => [c.s, c.y]);
     expect(arc.map(([s]) => s)).toEqual([54, 57, 60, 63, 66]);
     expect(arc[0][1]).toBeCloseTo(TUNING.coinHeight, 6);
-    expect(arc[2][1]).toBeCloseTo(TUNING.coinHeight + 1.2, 6);
+    // The arc peaks one jump's height up, so its top coin sits where a jumping runner's middle is.
+    expect(arc[2][1]).toBeCloseTo(TUNING.coinHeight + TUNING.jumpHeight, 6);
     const roofCoins = t.coins.filter((c) => c.lane === 1 && c.s < 90);
     expect(roofCoins.map((c) => c.y)).toEqual([TUNING.coinHeight + TUNING.trainHeight, TUNING.coinHeight + TUNING.trainHeight]);
   });

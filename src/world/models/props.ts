@@ -1137,35 +1137,42 @@ export function buildAuto(seed = 0): THREE.Group {
 
 // ---------------------------------------------------------------------------
 // Cow (standing or sitting), head toward +z.
+//
+// The two postures are different obstacles, not two looks of one: a standing cow (`cow`, 1.6 m) is
+// dodged, a sitting one (`cowSitting`, 0.95 m) is jumped. So the posture is the caller's to choose,
+// and the sitting model keeps everything — head and horns included — under its 0.95 m collision top.
 
 const COW_COATS = [0xfffaf2, 0xf2e2c4, 0xe6e2dc];
+export type CowPosture = 'stand' | 'sit';
 
-export function buildCow(seed = 0): THREE.Group {
+/** `posture` defaults to the old seed-based pick, which only the gallery relies on. */
+export function buildCow(seed = 0, posture?: CowPosture): THREE.Group {
   const s = Math.abs(Math.floor(seed));
-  const sitting = s % 2 === 1;
+  const sitting = posture ? posture === 'sit' : s % 2 === 1;
   const coat = COW_COATS[s % COW_COATS.length];
   const baked = bake(`cow:${sitting ? 'sit' : 'stand'}:${s % COW_COATS.length}`, () => {
     const kit = new Kit();
     const bodyY = sitting ? 0.46 : 1.0;
     const dark = shade(coat, 0.72);
-    // body, hump, jhool cloth
+    // body, hump, jhool cloth (the hump sits lower on a cow lying down, so its top stays under 0.95)
     kit.add('paint', ball(1, 14, 10), { p: [0, bodyY, -1.45], s: [0.46, 0.37, 0.86] }, coat);
-    kit.add('paint', ball(1, 10, 8), { p: [0, bodyY + 0.3, -0.85], s: [0.2, 0.2, 0.26] }, coat);
+    if (sitting) kit.add('paint', ball(1, 10, 8), { p: [0, bodyY + 0.25, -0.85], s: [0.2, 0.18, 0.26] }, coat);
+    else kit.add('paint', ball(1, 10, 8), { p: [0, bodyY + 0.3, -0.85], s: [0.2, 0.2, 0.26] }, coat);
     kit.add('jhool', new THREE.SphereGeometry(1, 14, 5, 0, Math.PI * 2, 0, 1.2), { p: [0, bodyY - 0.02, -1.5], s: [0.48, 0.4, 0.74] });
     // patches on the flank
     if (s % 3 === 2) {
       for (const [x, y, z] of [[0.3, 0.1, -1.7], [-0.32, 0.05, -1.25]] as V3[]) kit.add('paint', ball(1, 8, 6), { p: [x, bodyY + y, z], s: [0.14, 0.16, 0.22] }, 0x8a8580);
     }
-    // neck and dewlap
+    // neck and dewlap: lying down, the neck reaches forward and low, head resting near the ground
     if (sitting) {
-      kit.add('paint', ball(1, 10, 8), { p: [0, 0.86, -0.52], r: [-0.5, 0, 0], s: [0.19, 0.38, 0.22] }, coat);
-      kit.add('paint', ball(1, 8, 6), { p: [0, 0.7, -0.36], s: [0.05, 0.22, 0.14] }, coat);
+      kit.add('paint', ball(1, 10, 8), { p: [0, 0.56, -0.56], r: [-1.1, 0, 0], s: [0.19, 0.3, 0.22] }, coat);
+      kit.add('paint', ball(1, 8, 6), { p: [0, 0.42, -0.4], s: [0.05, 0.16, 0.12] }, coat);
     } else {
       kit.add('paint', ball(1, 10, 8), { p: [0, 1.12, -0.58], r: [0.4, 0, 0], s: [0.19, 0.26, 0.3] }, coat);
       kit.add('paint', ball(1, 8, 6), { p: [0, 0.86, -0.5], s: [0.05, 0.24, 0.2] }, coat);
     }
-    // head
-    const hy = 1.18;
+    // head: horn tips reach `hy + 0.38`, so a sitting head at 0.55 keeps them at 0.93 m
+    const hy = sitting ? 0.55 : 1.18;
     const hz = -0.32;
     kit.add('paint', ball(1, 10, 8), { p: [0, hy, hz], r: [0.55, 0, 0], s: [0.16, 0.18, 0.28] }, coat);
     kit.add('paint', ball(1, 10, 6), { p: [0, hy - 0.15, hz + 0.21], s: [0.12, 0.1, 0.1] }, 0xc9a09a);
@@ -1179,7 +1186,7 @@ export function buildCow(seed = 0): THREE.Group {
       // painted horns (two segments) with brass tips
       const base: V3 = [sx * 0.08, hy + 0.14, hz - 0.12];
       const mid: V3 = [sx * 0.17, hy + 0.27, hz - 0.14];
-      const tip: V3 = [sx * 0.15, 1.56, hz - 0.08];
+      const tip: V3 = [sx * 0.15, hy + 0.38, hz - 0.08];
       rod(kit, 'paint', base, mid, 0.045, sx < 0 ? 0xe8433a : 0x2f80c9, 6, 0.035);
       rod(kit, 'paint', mid, tip, 0.035, sx < 0 ? 0x2f80c9 : 0xe8433a, 6, 0.018);
       kit.add('detail', ball(0.026, 6, 4), { p: tip }, 0xffc93c);
@@ -1187,7 +1194,7 @@ export function buildCow(seed = 0): THREE.Group {
     // tilak on the forehead
     kit.add('detail', cyl(0.035, 0.035, 0.01, 8), { p: [0, hy + 0.1, hz + 0.13], r: [1.05, 0, 0] }, 0xe8261e);
     // neck cord, bell and bead necklace
-    const cordY = sitting ? 0.82 : 0.98;
+    const cordY = sitting ? 0.5 : 0.98;
     const cordZ = sitting ? -0.46 : -0.5;
     kit.add('paint', new THREE.TorusGeometry(0.2, 0.025, 4, 14), { p: [0, cordY, cordZ], r: [HALF_PI + 0.5, 0, 0] }, 0xe8433a);
     const bellY = cordY - 0.2;

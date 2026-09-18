@@ -193,7 +193,9 @@ function buildObstacle(kind: ObstacleKind, variant: number, length: number, dest
     case 'auto':
       return buildAuto(variant);
     case 'cow':
-      return buildCow(variant);
+      return buildCow(variant, 'stand');
+    case 'cowSitting':
+      return buildCow(variant, 'sit');
   }
 }
 

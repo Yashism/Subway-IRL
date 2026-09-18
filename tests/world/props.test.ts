@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { OBSTACLES } from '../../src/game/obstacles';
 import {
   buildAuto,
   buildBanner,
@@ -93,8 +94,15 @@ describe('obstacle props match the model contract', () => {
     expectContract(buildAuto(seed), 3.0, 2.0, 1.4);
   });
 
-  it.each([0, 1, 2])('cow (seed %i): 2.5 long, 1.6 tall, 1.0 wide', (seed) => {
-    expectContract(buildCow(seed), 2.5, 1.6, 1.0);
+  it.each([0, 1, 2])('standing cow (seed %i): 2.5 long, 1.6 tall, 1.0 wide', (seed) => {
+    expectContract(buildCow(seed, 'stand'), 2.5, OBSTACLES.cow.yMax, 1.0);
+  });
+
+  it.each([0, 1, 2])('sitting cow (seed %i): 2.5 long, 0.95 tall, 1.0 wide — nothing pokes above what a jump clears', (seed) => {
+    const cow = buildCow(seed, 'sit');
+    expectContract(cow, 2.5, OBSTACLES.cowSitting.yMax, 1.0);
+    // A runner passes over this: a head or horn above the collision top would be jumped *through*.
+    expect(boxOf(cow).max.y).toBeLessThanOrEqual(OBSTACLES.cowSitting.yMax + 0.02);
   });
 
   it('obstacles are outlined and cast shadows', () => {

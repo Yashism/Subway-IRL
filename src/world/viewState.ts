@@ -63,7 +63,9 @@ export const OBSTACLE_VARIANTS: Record<ObstacleKind, number> = {
   handcart: 3,
   bannerHigh: 3,
   auto: 2,
-  cow: 6,
+  // One per coat. The posture is the obstacle's kind, not a look, so each kind has its own three.
+  cow: 3,
+  cowSitting: 3,
   ramp: 2,
 };
 

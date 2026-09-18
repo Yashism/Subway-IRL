@@ -9,6 +9,7 @@ export type ObstacleKind =
   | 'bannerHigh'
   | 'auto'
   | 'cow'
+  | 'cowSitting'
   | 'ramp';
 
 /** What the player must do: leave the lane, jump, roll, or nothing (ramps). */
@@ -33,9 +34,26 @@ export const OBSTACLES: Record<ObstacleKind, ObstacleInfo> = {
   handcart: { length: 1.5, yMin: 0, yMax: 1.1, walkTop: null, action: 'jump', moving: false },
   bannerHigh: { length: 0.5, yMin: 1.0, yMax: 3.0, walkTop: null, action: 'roll', moving: false },
   auto: { length: 3, yMin: 0, yMax: 2.0, walkTop: null, action: 'lane', moving: false },
+  /** A standing cow: head and horns up at 1.6 m, too tall to jump — go round. */
   cow: { length: 2.5, yMin: 0, yMax: 1.6, walkTop: null, action: 'lane', moving: false },
+  /**
+   * A cow lying down, head low: jump it. It used to be drawn at random for `cow` while still
+   * colliding at a standing cow's 1.6 m, so a cow that looked jumpable was not — its own kind now,
+   * with a model that stays under this height.
+   */
+  cowSitting: { length: 2.5, yMin: 0, yMax: 0.95, walkTop: null, action: 'jump', moving: false },
   ramp: { length: 8, yMin: 0, yMax: 0, walkTop: H, action: 'none', moving: false },
 };
+
+/**
+ * The height a jump must clear to pass over an obstacle. For a jump obstacle that is a little under
+ * its real top — a shoe brushing the upper edge is not a crash (`TUNING.jumpForgiveness`) — and for
+ * everything else its full height. The game's collision and the passability solver both use this,
+ * so they can never disagree about what a jump clears.
+ */
+export function clearTop(info: ObstacleInfo): number {
+  return info.action === 'jump' ? info.yMax - TUNING.jumpForgiveness : info.yMax;
+}
 
 export interface ObstacleSpec {
   kind: ObstacleKind;

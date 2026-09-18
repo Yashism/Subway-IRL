@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TUNING } from '../../src/game/config';
 import { findHit, overlaps, surfaceAt } from '../../src/game/collision';
-import { meetPointOf, movingFrontAt, type Obstacle, type ObstacleKind } from '../../src/game/obstacles';
+import { clearTop, meetPointOf, movingFrontAt, OBSTACLES, type Obstacle, type ObstacleKind } from '../../src/game/obstacles';
 import type { Lane } from '../../src/pose/types';
 
 let nextId = 1;
@@ -18,6 +18,20 @@ describe('overlaps', () => {
     expect(overlaps(box(9.5), barrier)).toBe(false);
     expect(overlaps(box(10.2, 2.5), barrier)).toBe(false);
     expect(overlaps(box(10.2, 1.1), barrier)).toBe(true);
+  });
+
+  it('forgives a jump that brushes the top edge of a jump obstacle, and nothing else', () => {
+    const top = OBSTACLES.barrierLow.yMax;
+    const f = TUNING.jumpForgiveness;
+    // Feet inside the forgiven band clear it; below the band they hit.
+    expect(overlaps(box(10.2, 0, top - f + 0.01), barrier)).toBe(false);
+    expect(overlaps(box(10.2, 0, top - f - 0.01), barrier)).toBe(true);
+    // A cow you are meant to go round is not shaved.
+    const cow = ob('cow', 0, 10, 2.5);
+    expect(overlaps(box(11, 0, OBSTACLES.cow.yMax - 0.05), cow)).toBe(true);
+    // And the solver clears exactly the same height the game does.
+    expect(clearTop(OBSTACLES.barrierLow)).toBeCloseTo(top - f, 9);
+    expect(clearTop(OBSTACLES.cow)).toBe(OBSTACLES.cow.yMax);
   });
 
   it('lets a rolling runner under a banner but not a jumping one', () => {

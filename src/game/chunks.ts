@@ -49,7 +49,10 @@ export const CHUNKS: readonly ChunkDef[] = [
     pickup: { lane: R, s: 30 },
   },
   { id: 't1-auto-barrier', tier: 1, obstacles: [o('auto', C, 20), o('barrierLow', L, 45)], coins: [line(R, 15, 45)], pickup: { lane: C, s: 50 } },
-  { id: 't1-banner-cow', tier: 1, obstacles: [o('bannerHigh', C, 25), o('cow', L, 25)], coins: [line(R, 20, 45)] },
+  // A resting cow is jumped, like the barrier: so this is roll, jump or run clear.
+  { id: 't1-banner-cow', tier: 1, obstacles: [o('bannerHigh', C, 25), o('cowSitting', L, 25)], coins: [line(R, 20, 45)] },
+  // Introduces the resting cow on its own, with coins over it to show the jump.
+  { id: 't1-cow-resting', tier: 1, obstacles: [o('cowSitting', C, 30)], coins: [arc(C, 31.25), line(L, 15, 45)] },
   { id: 't1-handcarts', tier: 1, obstacles: [o('handcart', L, 25), o('handcart', R, 25)], coins: [line(C, 15, 45)], pickup: { lane: L, s: 50 } },
   { id: 't1-oncoming', tier: 1, obstacles: [o('trainMoving', R, 25)], coins: [line(C, 15, 45)] },
   {

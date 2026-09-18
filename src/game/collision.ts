@@ -1,6 +1,6 @@
 import type { Lane } from '../pose/types';
 import { laneX, TUNING } from './config';
-import { OBSTACLES, type Obstacle } from './obstacles';
+import { clearTop, OBSTACLES, type Obstacle } from './obstacles';
 
 export interface RunnerBox {
   s: number;
@@ -17,8 +17,9 @@ export function overlaps(r: RunnerBox, o: Obstacle): boolean {
   const hd = TUNING.runnerHalfDepth;
   if (r.s + hd <= o.front || r.s - hd >= o.front + o.length) return false;
   if (!nearLane(r.x, o.lane, TUNING.obstacleHalfWidth + TUNING.runnerHalfWidth)) return false;
-  // A runner a hair below a roof it is stepping onto or off grazes it rather than crashing.
-  const top = info.walkTop === null ? info.yMax : info.yMax - TUNING.surfaceSnap;
+  // A runner a hair below a roof it is stepping onto or off grazes it rather than crashing; one whose
+  // feet brush the top edge of a jump obstacle has cleared it.
+  const top = info.walkTop === null ? clearTop(info) : info.yMax - TUNING.surfaceSnap;
   return r.y < top && r.y + r.height > info.yMin;
 }
 

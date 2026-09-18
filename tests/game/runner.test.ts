@@ -34,14 +34,15 @@ describe('Runner jump and roll', () => {
     const r = new Runner();
     expect(r.jump()).toBe(true);
     expect(r.jump()).toBe(false);
-    for (let f = 1; f < 36; f++) {
+    const frames = Math.round(TUNING.jumpSeconds / DT);
+    for (let f = 1; f < frames; f++) {
       r.update(DT, 0);
       expect(r.y).toBeCloseTo(jumpHeightAt(f * DT, NORMAL_JUMP), 9);
     }
     r.update(DT, 0);
     expect(r.y).toBe(0);
     expect(r.airborne).toBe(false);
-    expect(jumpHeightAt(0.3, NORMAL_JUMP)).toBeCloseTo(TUNING.jumpHeight, 9);
+    expect(jumpHeightAt(TUNING.jumpSeconds / 2, NORMAL_JUMP)).toBeCloseTo(TUNING.jumpHeight, 9);
   });
 
   it('rolls for 0.6 s at reduced height', () => {

@@ -35,7 +35,8 @@
 | `handcart` | 1.5 | 0 → 1.1 | 1.6 | wooden thela with fruit and vegetables: jump over it |
 | `bannerHigh` | 0.5 | a 1.0 → 3.0 board | 2.2 | a flex banner or signboard on two thin posts; the posts must be thin and at the lane edges (x = ±1.1) |
 | `auto` | 3.0 | 0 → 2.0 | 1.4 | a Mumbai black-and-yellow auto-rickshaw facing +z |
-| `cow` | 2.5 | 0 → 1.6 | 1.0 | a sitting or standing cow |
+| `cow` | 2.5 | 0 → 1.6 | 1.0 | a standing cow: dodge it |
+| `cowSitting` | 2.5 | 0 → 0.95 | 1.0 | a cow lying down, head low: jump it. Head and horns must stay under 0.95 (added 2026-09-18 — it used to be a random look for `cow` while colliding at 1.6 m, so a cow that looked jumpable was not) |
 | `ramp` | 8 | walkable surface rising 0 → 3.2 over the first 7 m | 2.2 | a wooden or steel ramp up to the train roof |
 
 - Pickups: coin (a ₹ coin about 0.7 m in diameter, gold and emissive), magnet, Diwali rocket and Kolhapuri chappals, each about 0.9 m, centred at y = 1.

@@ -1,6 +1,6 @@
 import type { Lane } from '../pose/types';
 import { TUNING } from './config';
-import { lengthOf, OBSTACLES, type ObstacleSpec } from './obstacles';
+import { clearTop, lengthOf, OBSTACLES, type ObstacleSpec } from './obstacles';
 import { jumpHeightAt, NORMAL_JUMP, type JumpProfile } from './runner';
 
 export interface Block {
@@ -84,7 +84,7 @@ export function toBlocks(specs: readonly ObstacleSpec[], speed: number): Block[]
     }
     const ramp =
       info.walkTop === null ? undefined : ramps.find((r) => r.lane === o.lane && Math.abs(r.s + lengthOf(r) - o.s) < 0.5);
-    out.push({ lane: o.lane, s0, s1, need, top: info.yMax, rampS: ramp ? ramp.s : null });
+    out.push({ lane: o.lane, s0, s1, need, top: clearTop(info), rampS: ramp ? ramp.s : null });
   }
   return out;
 }

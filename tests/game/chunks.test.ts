@@ -20,7 +20,7 @@ const shifted = (c: ChunkDef, by: number): ObstacleSpec[] => c.obstacles.map((o)
 describe('chunk data', () => {
   it('has the planned number of chunks per tier and unique ids', () => {
     const count = (t: Tier) => CHUNKS.filter((c) => c.tier === t).length;
-    expect([0, 1, 2, 3, 4].map((t) => count(t as Tier))).toEqual([4, 7, 7, 6, 6]);
+    expect([0, 1, 2, 3, 4].map((t) => count(t as Tier))).toEqual([4, 8, 7, 6, 6]);
     expect(new Set(CHUNKS.map((c) => c.id)).size).toBe(CHUNKS.length);
   });
 

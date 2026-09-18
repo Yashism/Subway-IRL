@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ObstacleSpec } from '../../src/game/obstacles';
+import { TUNING } from '../../src/game/config';
+import { clearTop, OBSTACLES, type ObstacleSpec } from '../../src/game/obstacles';
+import { NORMAL_JUMP } from '../../src/game/runner';
 import { plan, toBlocks, unpassableFrom } from '../../src/game/solver';
 import { replayPlan } from './helpers/replay';
 
@@ -44,12 +46,60 @@ describe('plan', () => {
     }
   });
 
+  it('jumps a row of resting cows, and the real runner clears it — even at the starting speed', () => {
+    const speed = TUNING.startSpeed;
+    const specs = [spec('cowSitting', -1, 30), spec('cowSitting', 0, 30), spec('cowSitting', 1, 30)];
+    const actions = plan(toBlocks(specs, speed), 0, 60, { speed, minGap: 1, startLane: 0 });
+    expect(actions!.map((a) => a.type)).toEqual(['jump']);
+    expect(replayPlan(specs, actions!, 0, speed, 60)).toBeNull();
+  });
+
+  it('still cannot jump a row of standing cows: those you go round', () => {
+    const specs = [spec('cow', -1, 30), spec('cow', 0, 30), spec('cow', 1, 30)];
+    expect(plan(toBlocks(specs, 20), 0, 60, { speed: 20, minGap: 1, startLane: 0 })).toBeNull();
+  });
+
+  it('clears a handcart at the starting speed (the old jump could not, at any timing)', () => {
+    const speed = TUNING.startSpeed;
+    const specs = [spec('handcart', -1, 30), spec('handcart', 0, 30), spec('handcart', 1, 30)];
+    const actions = plan(toBlocks(specs, speed), 0, 60, { speed, minGap: 1, startLane: 0 });
+    expect(actions).not.toBeNull();
+    expect(replayPlan(specs, actions!, 0, speed, 60)).toBeNull();
+  });
+
   it('respects the minimum gap between actions', () => {
-    // Two barriers too far apart for one jump; the side lanes are walled, so both must be jumped.
-    // At 30 m/s a jump lasts 18 m, so the second barrier must be at least ~33 m in for the first jump to land in time.
-    const specs = [spec('barrierLow', 0, 20), spec('barrierLow', 0, 36), spec('trainParked', -1, 10), spec('trainParked', 1, 10)];
-    expect(plan(toBlocks(specs, 30), 0, 60, { speed: 30, minGap: 0.8, startLane: 0 })).toBeNull();
-    expect(unpassableFrom(specs, 0, 60, 30, 0.1)).toBeNull();
+    // Two barriers in one lane, the side lanes walled, so both must be jumped. Space them too far
+    // apart for one jump to clear both, yet too close for two jumps a legal `minGap` apart. The
+    // spacing is derived from the jump itself, so a change to the jump tuning cannot quietly turn
+    // this into a passable track (it did once: a longer jump made a hand-picked 16 m passable).
+    const speed = 30;
+    const minGap = 0.8;
+    const pad = TUNING.runnerHalfDepth;
+    const L = OBSTACLES.barrierLow.length;
+    const b1 = 20;
+    // Where, after take-off, the feet are above the barrier's clear-top: [enter, leave] metres.
+    const span = speed * NORMAL_JUMP.seconds;
+    const above = Math.sqrt(1 - clearTop(OBSTACLES.barrierLow) / NORMAL_JUMP.height);
+    const enter = (span * (1 - above)) / 2;
+    const leave = (span * (1 + above)) / 2;
+    // Take-offs that clear a barrier at x: [x + L + pad - leave, x - pad - enter].
+    const earliest = (x: number) => x + L + pad - leave;
+    const latest = (x: number) => x - pad - enter;
+    // One jump clears both while b2's earliest take-off is no later than b1's latest. Two jumps need
+    // b2's latest take-off to follow b1's earliest by the gap between them — and a second jump cannot
+    // start before the first has landed, so that gap is never less than one jump's length.
+    const oneJumpUpTo = latest(b1) + leave - L - pad;
+    const twoJumpsFrom = (gap: number) => earliest(b1) + Math.max(span, gap * speed) + pad + enter;
+    // Too far for one jump, and far enough that landing is no obstacle, but inside the gap rule:
+    const lo = Math.max(oneJumpUpTo, twoJumpsFrom(0));
+    const hi = twoJumpsFrom(minGap);
+    expect(hi - lo).toBeGreaterThan(1); // such a spacing exists, with room either side
+    const b2 = (lo + hi) / 2;
+
+    const specs = [spec('barrierLow', 0, b1), spec('barrierLow', 0, b2), spec('trainParked', -1, 10), spec('trainParked', 1, 10)];
+    expect(plan(toBlocks(specs, speed), 0, 60, { speed, minGap, startLane: 0 })).toBeNull();
+    // Only the gap rule stands in the way: allow closer actions and it is passable.
+    expect(unpassableFrom(specs, 0, 60, speed, 0.1)).toBeNull();
   });
 
   it('runs over a train by taking its ramp', () => {
