@@ -733,16 +733,21 @@ document.addEventListener('visibilitychange', () => {
 
 // The GPU can drop the context (driver reset, too many tabs). preventDefault lets the browser
 // restore it; three.js re-uploads its resources then, and the player resumes with Enter.
+// The pause card says so: a black screen under an ordinary "Press Enter to resume" would invite
+// the player to resume a run they cannot see. While the graphics are gone the run is held paused
+// every frame (see frame()), so Enter cannot start it blind.
 let contextLost = false;
 canvas.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
   contextLost = true;
   loop.pauseGame();
+  hud.setPauseNotice('The graphics are restarting — hang on a moment');
   console.warn('WebGL context lost; game paused until it is restored.');
 });
 canvas.addEventListener('webglcontextrestored', () => {
   contextLost = false;
   resize();
+  hud.setPauseNotice('Graphics are back — press Enter to carry on');
   console.warn('WebGL context restored; press Enter to resume.');
 });
 
@@ -911,6 +916,11 @@ function frame(now: number): void {
 
   updateProgressionUi(now, dt);
   hud.setSound({ muted: audio.muted, ready: audio.audible });
+
+  // No graphics, no run: hold a live run paused until the context comes back. Once the player
+  // has resumed after a restore, the notice has done its job.
+  if (contextLost && (game.state === 'playing' || game.state === 'countdown')) loop.pauseGame();
+  else if (!contextLost && game.state !== 'paused') hud.setPauseNotice(null);
 
   if (!contextLost) {
     // Asked *after* the step, not before it: the step is where a held `startGame` begins the

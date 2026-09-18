@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FlowInput, ScreenModel } from '../../src/app/flow';
+import { Game } from '../../src/game/game';
 import { MOVE_ORDER, type MoveCheckSummary } from '../../src/pose/moveCheckTypes';
 import type { PlayMode } from '../../src/pose/types';
 import { Hud, MONITOR_URL, MONITOR_WINDOW } from '../../src/ui/hud';
@@ -168,6 +169,32 @@ describe('Hud: the pause screen’s Controls card', () => {
     expect(box.firstElementChild).toBe(other);
     hud.setControls(null);
     expect(box.children).toHaveLength(0);
+  });
+});
+
+describe('Hud: a pause notice the player did not ask for', () => {
+  it('replaces the usual hint while set, stands out, and gives the hint back when cleared', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const hud = new Hud(root);
+    const game = new Game({ seed: 1, difficulty: 'cardio' });
+    game.state = 'paused';
+    const sub = root.querySelector<HTMLElement>('.hud-pause-sub')!;
+
+    hud.update(game);
+    const usual = sub.textContent;
+    expect(usual).toBe('Press Enter to resume');
+    expect(sub.classList.contains('notice')).toBe(false);
+
+    hud.setPauseNotice('The graphics are restarting — hang on a moment');
+    hud.update(game);
+    expect(sub.textContent).toBe('The graphics are restarting — hang on a moment');
+    expect(sub.classList.contains('notice')).toBe(true);
+
+    hud.setPauseNotice(null);
+    hud.update(game);
+    expect(sub.textContent).toBe(usual);
+    expect(sub.classList.contains('notice')).toBe(false);
   });
 });
 

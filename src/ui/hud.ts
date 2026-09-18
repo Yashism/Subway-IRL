@@ -322,6 +322,7 @@ export class Hud {
   private readonly pauseControls: HTMLElement;
   private readonly handlers: HudHandlers;
   private controlsCard: HTMLElement | null = null;
+  private pauseNotice: string | null = null;
   private toastEl: HTMLElement | null = null;
   private readonly sum: Record<keyof HudSummary, HTMLElement>;
   private readonly best: HTMLElement;
@@ -549,6 +550,14 @@ export class Hud {
     else this.pauseControls.replaceChildren();
   }
 
+  /**
+   * A line that replaces the pause card's usual hint while it is set — for a pause the player did
+   * not ask for and needs explaining (the GPU dropped the graphics). Null restores the hint.
+   */
+  setPauseNotice(text: string | null): void {
+    this.pauseNotice = text;
+  }
+
   /** The menu's input line (see menuNotice). */
   setInputNotice(text: string): void {
     this.text(this.menuFoot, text);
@@ -606,7 +615,8 @@ export class Hud {
     if (m.state === 'caught') this.text(this.caughtReason, m.sub);
     if (m.state === 'paused') {
       this.text(this.pauseTitle, m.center);
-      this.text(this.pauseSub, m.sub);
+      this.text(this.pauseSub, this.pauseNotice ?? m.sub);
+      this.flag(this.pauseSub, 'notice', this.pauseNotice !== null);
       this.text(this.pauseIcon, g.pausedByLoss ? '📷' : '');
       this.flag(this.pauseIcon, 'lost', g.pausedByLoss);
     }

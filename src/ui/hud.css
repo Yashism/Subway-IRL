@@ -1022,6 +1022,11 @@ body {
 .hud-pause-sub:empty {
   display: none;
 }
+/* A pause the player did not ask for (the graphics dropped): set apart from the usual hint. */
+.hud-pause-sub.notice {
+  background: var(--orange);
+  color: var(--ink);
+}
 
 /* ------------------------------------------------------------ reduced motion */
 
