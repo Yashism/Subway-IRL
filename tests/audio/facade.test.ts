@@ -108,3 +108,39 @@ describe('GameAudio', () => {
     expect(Number.isFinite(game.chaser.gap)).toBe(true);
   });
 });
+
+describe('GameAudio: ready is not the same fact as audible', () => {
+  it('a context the browser will not run is built but not audible', () => {
+    // Exactly the raised-hand case: the call had no user activation, so the context is created
+    // suspended. `ready` says the graph exists; only `audible` says anything is coming out.
+    const ctx = new FakeOfflineContext(64, 8000);
+    const audio = make({ makeContext: () => asContext(ctx) });
+    audio.unlock();
+    expect(audio.ready).toBe(true);
+    expect(ctx.state).toBe('suspended');
+    expect(audio.audible).toBe(false);
+
+    ctx.state = 'running';
+    expect(audio.audible).toBe(true);
+  });
+
+  it('neither is true before a gesture', () => {
+    const audio = make();
+    expect(audio.ready).toBe(false);
+    expect(audio.audible).toBe(false);
+  });
+
+  it('a browser with no AudioContext is asked once, not once per gesture', () => {
+    let made = 0;
+    const audio = make({
+      makeContext: () => {
+        made++;
+        return null as unknown as BaseAudioContext;
+      },
+    });
+    for (let i = 0; i < 20; i++) audio.unlock();
+    expect(made).toBe(1);
+    expect(audio.ready).toBe(false);
+    expect(audio.audible).toBe(false);
+  });
+});

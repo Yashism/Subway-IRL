@@ -87,6 +87,7 @@ function page(o: { intro?: boolean; autopilot?: boolean; replay?: boolean; searc
     target,
     enabled: soundAllowed({ autopilot: !!o.autopilot, replay: !!o.replay, search: o.search ?? '' }),
     onUnlock: () => audio.unlock(),
+    audible: () => audio.audible,
   });
 
   const loop: AppLoop = new AppLoop({
@@ -156,7 +157,7 @@ describe('the audio frame', () => {
 });
 
 describe('nothing sounds before a gesture', () => {
-  it('the graph is not built at boot, and is built once on the first key', () => {
+  it('the graph is not built at boot, and is built on the first key', () => {
     const p = page();
     p.frame(30);
     expect(p.unlocks).not.toHaveBeenCalled();
@@ -164,9 +165,35 @@ describe('nothing sounds before a gesture', () => {
 
     p.key('Enter');
     expect(p.unlocks).toHaveBeenCalledTimes(1);
+    // jsdom has no AudioContext, so this page is the "no output device" case: the graph is never
+    // built, and asking again must stay cheap rather than trying to construct one per keystroke.
+    expect(p.audio.ready).toBe(false);
+    expect(p.audio.audible).toBe(false);
+  });
+
+  it('keeps offering gestures while the context is built but not running', () => {
+    // No AudioContext is ever made here, so `audible` stays false — which is the same shape as a
+    // context the browser built suspended and would not resume. The page must keep trying.
+    const p = page();
+    expect(p.audio.audible).toBe(false);
+    p.key('Enter');
     p.key('Space');
     p.target.dispatchEvent(new Event('pointerdown'));
+    expect(p.unlocks.mock.calls.length).toBeGreaterThan(1);
+    expect(p.gesture.attempts).toBe(3);
+  });
+
+  it('a mute press is a gesture, so it can rescue a session that started silent', () => {
+    const p = page();
+    // The raised hand: a pose start with no user activation behind it.
+    p.gesture.fire();
     expect(p.unlocks).toHaveBeenCalledTimes(1);
+    expect(p.audio.audible).toBe(false);
+    // Pressing the speaker afterwards still reaches unlock(), rather than only toggling mute.
+    p.gesture.fire();
+    p.audio.toggleMute();
+    expect(p.unlocks).toHaveBeenCalledTimes(2);
+    expect(p.audio.muted).toBe(true);
   });
 
   it('an autopilot or replay demo never unlocks, however many keys it sees', () => {
@@ -176,6 +203,7 @@ describe('nothing sounds before a gesture', () => {
       p.frame(60);
       p.target.dispatchEvent(new Event('pointerdown'));
       expect(p.unlocks, JSON.stringify(o)).not.toHaveBeenCalled();
+      expect(p.gesture.attempts, JSON.stringify(o)).toBe(0);
       // The director still runs — it is only the output that is missing.
       expect(p.updates.mock.calls.length).toBeGreaterThan(0);
     }

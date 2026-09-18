@@ -605,6 +605,10 @@ const gesture = new GestureUnlock({
   target: window,
   enabled: soundAllowed({ autopilot: autopilotOn, replay: runtime.isReplay, search: location.search }),
   onUnlock: () => audio.unlock(),
+  // Not `audio.ready`: the raised hand that starts a run arrives on a pose frame with no user
+  // activation, which builds a context the browser will not resume. Only a context that is really
+  // running counts as unlocked; anything else and the next key or click gets another go.
+  audible: () => audio.audible,
 });
 
 function toggleSound(): void {
@@ -612,7 +616,7 @@ function toggleSound(): void {
   // anything else should end up with sound, not with a muted graph that was never built.
   gesture.fire();
   audio.toggleMute();
-  hud.setSound({ muted: audio.muted, ready: audio.ready });
+  hud.setSound({ muted: audio.muted, ready: audio.audible });
 }
 
 // N, because M opens the live monitor.
@@ -645,6 +649,7 @@ Object.assign(window as unknown as Record<string, unknown>, {
   __settings: settingsStore,
   __audio: audio,
   __intro: intro,
+  __gesture: gesture,
   __flow: flow,
   __runtime: runtime,
   __moveCheck: moveCheck,
@@ -843,7 +848,7 @@ function frame(now: number): void {
   if (`${inputLabel()}|${currentMode()}` !== metaKey) sendMeta();
 
   updateProgressionUi(now, dt);
-  hud.setSound({ muted: audio.muted, ready: audio.ready });
+  hud.setSound({ muted: audio.muted, ready: audio.audible });
 
   if (!contextLost) {
     // Asked *after* the step, not before it: the step is where a held `startGame` begins the

@@ -37,22 +37,34 @@ export function soundAllowed(c: SoundContext): boolean {
 export interface GestureUnlockOptions {
   /** Usually `window`. */
   target: EventTarget;
-  /** Run inside the gesture. Called at most once. */
+  /** Run inside the gesture. Called on every gesture until `audible()` says it took. */
   onUnlock(): void;
+  /**
+   * True once sound is really coming out. This is the whole point of the class: a browser builds
+   * an AudioContext **suspended** when the call did not come from a real user gesture, and then
+   * refuses to resume it. "We called unlock" and "it worked" are different facts, and only the
+   * second one is allowed to stop us trying.
+   */
+  audible(): boolean;
   /** False means this page never makes a sound: no listeners, and `fire()` does nothing. */
   enabled?: boolean;
 }
 
 /**
- * Unlocks on the first key, pointer or hand-raise, once, and then gets out of the way — the
- * listeners are capture-phase so a focused button cannot swallow the gesture, and they are removed
- * the moment they have done their job rather than running for the rest of the session.
+ * Unlocks on a key, a pointer or a raised hand, and keeps offering every later gesture until the
+ * sound is actually running. The listeners are capture-phase so a focused button cannot swallow
+ * the gesture, and they come off as soon as they are not needed.
+ *
+ * The retry is not belt-and-braces: the raised hand that starts a run arrives on a pose frame,
+ * which carries no user activation, so that attempt is expected to fail. Latching on it would
+ * leave the player silent for the whole session with no way back — which is exactly what it did.
  */
 export class GestureUnlock {
   private readonly o: GestureUnlockOptions;
   private readonly handler: () => void;
-  private done = false;
   private attached = false;
+  /** Gestures offered to `onUnlock`, for the tests and for anyone debugging a silent page. */
+  attempts = 0;
 
   constructor(o: GestureUnlockOptions) {
     this.o = o;
@@ -63,16 +75,26 @@ export class GestureUnlock {
     this.attached = true;
   }
 
+  /** Sound is running. Asked of the owner, never remembered here. */
   get unlocked(): boolean {
-    return this.done;
+    return this.o.enabled !== false && this.o.audible();
   }
 
-  /** A gesture that never reaches the DOM: the raised hand that starts a run. */
+  /**
+   * A gesture. Tries again if the last attempt did not take, and stands down once it has —
+   * including for a gesture that never reaches the DOM, like the raised hand that starts a run.
+   */
   fire(): void {
-    if (this.done || this.o.enabled === false) return;
-    this.done = true;
-    this.detach();
+    if (this.o.enabled === false) return;
+    if (this.o.audible()) {
+      this.detach();
+      return;
+    }
+    this.attempts++;
     this.o.onUnlock();
+    // A resume granted inside this gesture is immediate; one that needs a round trip is picked up
+    // by the next gesture, which finds it audible and stands the listeners down then.
+    if (this.o.audible()) this.detach();
   }
 
   detach(): void {
