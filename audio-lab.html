@@ -82,6 +82,7 @@
       <h1>Audio lab</h1>
       <button id="enable" class="primary">▶ Enable audio</button>
       <span id="ctxState" class="hint">no context yet</span>
+      <span id="bankState" class="hint">samples: loading…</span>
       <label>master <input id="vMaster" type="range" min="0" max="1" step="0.01" /></label>
       <label>music <input id="vMusic" type="range" min="0" max="1" step="0.01" /></label>
       <label>sfx <input id="vSfx" type="range" min="0" max="1" step="0.01" /></label>
@@ -136,6 +137,15 @@
       <section>
         <h2>Each layer alone — rendered offline</h2>
         <div class="beds" id="layers"></div>
+      </section>
+
+      <section>
+        <h2>Recorded vs fallback — the same cue with and without its file</h2>
+        <p class="hint" style="margin-top: -4px">
+          Left of each pair is the recording, right is the synth patch that plays when the file is
+          missing or has not arrived yet. Neither may be silent.
+        </p>
+        <div class="grid" id="fallbacks"></div>
       </section>
 
       <section>

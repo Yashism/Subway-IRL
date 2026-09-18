@@ -158,6 +158,41 @@ function route(v: VoiceCtx, node: AudioNode, send = 0): void {
   node.connect(v.sends[best]);
 }
 
+/**
+ * A recorded sample, through the same bus and the same reverb taps as a synth voice.
+ * `rate` is the playback ratio, so the coin ladder and the chaser's whistle ride a recording
+ * exactly as they ride an oscillator.
+ */
+export function playBuffer(
+  v: VoiceCtx,
+  buffer: AudioBuffer,
+  t: number,
+  peak: number,
+  rate = 1,
+  send = 0,
+): void {
+  if (peak <= 0.0005) return;
+  const s = v.ctx.createBufferSource();
+  s.buffer = buffer;
+  s.playbackRate.value = rate > 0 && Number.isFinite(rate) ? Math.min(4, Math.max(0.25, rate)) : 1;
+  const g = gain(v.ctx, peak);
+  s.connect(g);
+  route(v, g, send);
+  s.start(t);
+  // A hard stop at the end so a long tail cannot outlive the node; +0.05 s of slack for the rate.
+  s.stop(t + buffer.duration / s.playbackRate.value + 0.05);
+}
+
+/** A looping bed from a sample — the station ambience, once its file has landed. */
+export function loopBuffer(v: VoiceCtx, buffer: AudioBuffer, t: number): AudioBufferSourceNode {
+  const s = v.ctx.createBufferSource();
+  s.buffer = buffer;
+  s.loop = true;
+  s.connect(v.out);
+  s.start(t);
+  return s;
+}
+
 // ------------------------------------------------------------------ building blocks
 
 /** A struck tone with a pitch fall — the shape behind drums, thumps and blips. */

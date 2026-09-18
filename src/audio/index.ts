@@ -16,12 +16,16 @@ import { speedFraction } from '../game/speed';
 import type { ActivityStatus } from '../input/commands';
 import { Director, type DirectorFrame } from './director';
 import { AudioEngine } from './engine';
+import { SampleBank, type SampleBankOptions } from './loader';
+import { coreSampleNames, restSampleNames } from './manifest';
 import { applyUrlFlags, AudioSettingsStore } from './settings';
 import type { AudioSettings, AudioSink, CueName, MixChannel } from './types';
 
 export * from './types';
 export { Director, JogPulse, PULSE, type DirectorFrame } from './director';
 export { AudioEngine } from './engine';
+export { SampleBank, pickFormat, type SampleBankOptions } from './loader';
+export { CUE_SAMPLES, LAYER_SAMPLES, allSampleNames, coreSampleNames, restSampleNames } from './manifest';
 export { applyUrlFlags, AudioSettingsStore, cleanSettings } from './settings';
 
 const NO_ACTIVITY: ActivityStatus = {
@@ -42,14 +46,20 @@ export interface GameAudioOptions {
   /** Injected for tests. */
   makeContext?: () => BaseAudioContext;
   random?: () => number;
+  /** Passed to the SampleBank (base path, fetch, decoder). Injected in tests. */
+  samples?: SampleBankOptions;
+  /** True skips the recordings entirely and plays the synth patches. `?nosamples` sets it. */
+  synthOnly?: boolean;
 }
 
 export class GameAudio implements AudioSink {
   readonly store: AudioSettingsStore;
   readonly director: Director;
   engine: AudioEngine | null = null;
+  bank: SampleBank | null = null;
 
   private settings: AudioSettings;
+  private readonly synthOnly: boolean;
   private readonly options: GameAudioOptions;
   private readonly onVisibility: () => void;
   /** Reused every frame: building a frame object 60 times a second is exactly what we promised not to do. */
@@ -75,6 +85,7 @@ export class GameAudio implements AudioSink {
     this.store = options.settings ?? new AudioSettingsStore();
     const search = options.search ?? (typeof location !== 'undefined' ? location.search : '');
     this.settings = this.store.override(applyUrlFlags(this.store.get(), search));
+    this.synthOnly = options.synthOnly ?? search.includes('nosamples');
     this.director = new Director(this, options.random ? { random: options.random } : {});
 
     this.onVisibility = () => {
@@ -112,8 +123,22 @@ export class GameAudio implements AudioSink {
       this.engine = new AudioEngine(ctx, { settings: this.settings, reverb: this.options.reverb !== false });
       this.engine.start();
       this.director.resync();
+      this.loadSamples(ctx);
     }
     this.resume();
+  }
+
+  /**
+   * Fetches the recordings: the cues a player meets in the first five seconds first, the rest
+   * behind them. Nothing is awaited by anything that matters — every cue already has a synth
+   * patch, so the game is fully audible from the first frame and simply gets better as files land.
+   */
+  private loadSamples(ctx: BaseAudioContext): void {
+    if (this.synthOnly || !this.engine) return;
+    const bank = new SampleBank(ctx, this.options.samples);
+    this.bank = bank;
+    this.engine.attachBank(bank);
+    void bank.load(coreSampleNames()).then(() => bank.load(restSampleNames()));
   }
 
   /** Once a frame, after `game.step()`. `events` is exactly what that call returned. */

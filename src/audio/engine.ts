@@ -10,6 +10,8 @@
  * It works on any `BaseAudioContext`, which is what makes it testable: an `OfflineAudioContext`
  * renders the same graph to a buffer with no audio device in sight.
  */
+import { CUE_SAMPLES, LAYER_SAMPLES, type CueSample } from './manifest';
+import type { SampleBank } from './loader';
 import {
   BAR,
   buildAmbience,
@@ -29,6 +31,8 @@ import {
   playRiffNote,
   playTabla,
   playTick,
+  playBuffer,
+  loopBuffer,
   RIFF,
   SEND_LEVELS,
   type Layer,
@@ -88,6 +92,8 @@ export interface EngineOptions {
   settings?: AudioSettings;
   /** Off for a cheap render (tests, or a machine that cannot afford convolution). */
   reverb?: boolean;
+  /** The recordings. Anything it does not have is played from `voices.ts` instead. */
+  bank?: SampleBank | null;
 }
 
 export class AudioEngine implements AudioSink {
@@ -128,6 +134,14 @@ export class AudioEngine implements AudioSink {
   private started = false;
 
   // sequencer
+  /** The recordings, when there are any. Every read of it is guarded: a miss means synth. */
+  private bank: SampleBank | null = null;
+  /** The sampled station bed, once it has replaced the synthetic one. */
+  private ambienceLoop: AudioBufferSourceNode | null = null;
+  private ambienceSynth: GainNode | null = null;
+  private ambienceSample: GainNode | null = null;
+  private stepIndex = 0;
+
   private pulseBpm = 150;
   private running = false;
   private nextStep = 0;
@@ -190,17 +204,39 @@ export class AudioEngine implements AudioSink {
       this.level[c] = 0;
     }
 
+    // The station bed is the one layer that exists twice: a synthetic one that is there from the
+    // first frame, and a recording that replaces it the moment its file lands. They meet at
+    // `ambienceLevel`, which is what the mix automates, so the swap is a cross-fade under a level
+    // the director never has to know about.
+    //
+    //   synth sources → ambienceSynth ⟍
+    //                                   ambienceLevel (the mix) → ambience bus
+    //   sample loop   → ambienceSample ⟋
+    const ambienceLevel = ctx.createGain();
+    ambienceLevel.gain.value = 0;
+    ambienceLevel.connect(this.ambienceBus);
+    const ambienceSynth = ctx.createGain();
+    ambienceSynth.gain.value = 1;
+    ambienceSynth.connect(ambienceLevel);
+    const ambienceSample = ctx.createGain();
+    ambienceSample.gain.value = 0;
+    ambienceSample.connect(ambienceLevel);
+    this.ambienceSynth = ambienceSynth;
+    this.ambienceSample = ambienceSample;
+
     // Held layers, built once and left running: their level is the only thing that ever changes.
+    const bed = buildAmbience(ctx, ambienceSynth);
+    bed.gain.gain.value = 1; // its own gain is not the mix any more; `ambienceLevel` is.
     const held: [MixChannel, Layer][] = [
       ['drone', buildDrone(ctx, this.musicDuck)],
-      ['ambience', buildAmbience(ctx, this.ambienceBus)],
       ['wind', buildWind(ctx, this.sfxBus)],
       ['hover', buildHover(ctx, this.sfxBus)],
       ['rocket', buildRocket(ctx, this.sfxBus)],
       ['magnet', buildMagnet(ctx, this.sfxBus)],
     ];
-    this.heldLayers = held.map(([, l]) => l);
+    this.heldLayers = [bed, ...held.map(([, l]) => l)];
     for (const [c, l] of held) this.layers[c] = l.gain;
+    this.layers.ambience = ambienceLevel;
 
     // Scheduled layers: a gain node the notes land in, so a fade is one automation, not per-note maths.
     // The jog pulse and the heartbeat sit on the SFX bus on purpose — they are gameplay, not music,
@@ -229,6 +265,7 @@ export class AudioEngine implements AudioSink {
     this.vSteps = { ctx, out: this.layers.chaserSteps!, sends };
     this.vDrone = { ctx, out: this.layers.drone!, sends };
 
+    this.bank = options.bank ?? null;
     this.level.music = 1;
     this.musicDuck.gain.value = 1;
     this.applySettings(this.settings, true);
@@ -305,7 +342,36 @@ export class AudioEngine implements AudioSink {
     }
     if (++this.voicesInWindow > VOICE_BUDGET) return;
     const bus = CUE_BUS[name];
-    playCue(bus === 'music' ? this.vMusic : bus === 'ambience' ? this.vAmbience : this.vSfx, name, t, gain, rate);
+    const v = bus === 'music' ? this.vMusic : bus === 'ambience' ? this.vAmbience : this.vSfx;
+    const spec = CUE_SAMPLES[name];
+    // The recording if it has arrived, the synth patch if it has not. Every cue can do both, so a
+    // file that is still in flight (or never coming) costs quality and nothing else.
+    if (spec && this.playSample(v, spec, t, gain, rate)) return;
+    playCue(v, name, t, gain, rate);
+  }
+
+  /** @returns false when the body of the cue is not loaded, so the caller falls back. */
+  private playSample(v: VoiceCtx, spec: CueSample, t: number, gain: number, rate: number): boolean {
+    const bank = this.bank;
+    if (!bank) return false;
+    const body = bank.get(spec.layers[0].file);
+    if (!body) return false;
+    const a = Math.max(0, Math.min(2, gain)) * spec.gain;
+    for (let i = 0; i < spec.layers.length; i++) {
+      const l = spec.layers[i];
+      const buf = i === 0 ? body : bank.get(l.file);
+      if (!buf) continue; // A missing extra layer just thins the cue; the body still plays.
+      playBuffer(v, buf, t + (l.delay ?? 0), a * (l.gain ?? 1), l.fixedPitch ? 1 : rate, spec.send ?? 0);
+    }
+    return true;
+  }
+
+  /**
+   * Hands the engine the recordings. Safe to call before anything has loaded and safe to call
+   * again as more arrives — the station bed swaps itself in the first time its file is there.
+   */
+  attachBank(bank: SampleBank | null): void {
+    this.bank = bank;
   }
 
   // ---------------------------------------------------------------- the clock
@@ -328,6 +394,27 @@ export class AudioEngine implements AudioSink {
       }
     }
     this.scheduleHeartbeat(now);
+    if (this.ambienceSample) this.swapAmbience(now);
+  }
+
+  /** The decoded buffer for a name, or null. One map read; safe before anything has loaded. */
+  private sample(name: string): AudioBuffer | null {
+    return this.bank ? this.bank.get(name) : null;
+  }
+
+  /**
+   * Cross-fades the synthetic station bed out and the recorded one in, once. After it has run the
+   * per-frame cost is one null check — `ambienceSample` is cleared, which is also the latch.
+   */
+  private swapAmbience(now: number): void {
+    const buf = this.sample(LAYER_SAMPLES.ambience[0]);
+    if (!buf) return;
+    const wet = this.ambienceSample!;
+    this.ambienceSample = null;
+    const src = loopBuffer({ ctx: this.ctx, out: wet, sends: null }, buf, now);
+    this.ambienceLoop = src;
+    wet.gain.setTargetAtTime(1, now, 0.8);
+    this.ambienceSynth?.gain.setTargetAtTime(0, now, 0.8);
   }
 
   private scheduleStep(i: number, t: number): void {
@@ -337,7 +424,14 @@ export class AudioEngine implements AudioSink {
     if (this.level.bass > 0.01 && PATTERNS.bass[b] > 0) playBayan(this.vBass, t, PATTERNS.bass[b]);
     if (this.level.riff > 0.01) playRiffNote(this.vRiff, t, RIFF[i], 1);
     if (this.level.josh > 0.01) playJoshNote(this.vJosh, t, RIFF[i], 1);
-    if (this.level.chaserSteps > 0.01) playFootstep(this.vSteps, t, 1, PATTERNS.steps[b]);
+    if (this.level.chaserSteps > 0.01) {
+      // Four recordings walked round: the same slap four times in a row is the most obviously
+      // synthetic thing a footstep layer can do.
+      const step = this.sample(LAYER_SAMPLES.step[this.stepIndex % LAYER_SAMPLES.step.length]);
+      this.stepIndex++;
+      if (step) playBuffer(this.vSteps, step, t, 0.45 * PATTERNS.steps[b], 0.94 + 0.12 * Math.random(), 0.25);
+      else playFootstep(this.vSteps, t, 1, PATTERNS.steps[b]);
+    }
     // The tanpura cycle rides the drone's own level, so a thinned bed thins its plucks too.
     if (this.level.drone > 0.05 && PATTERNS.tanpura[b] >= 0) {
       playPluck(this.vDrone, t, PATTERNS.tanpura[b], 0.9);
@@ -354,8 +448,10 @@ export class AudioEngine implements AudioSink {
     const dur = 60 / bpm;
     if (this.heartbeatAt < now - RESYNC) this.heartbeatAt = now + 0.02;
     let guard = 0;
+    const beat = this.sample(LAYER_SAMPLES.heartbeat[0]);
     while (this.heartbeatAt < now + LOOKAHEAD && guard++ < 8) {
-      playHeartbeat(this.vHeart, this.heartbeatAt, 1);
+      if (beat) playBuffer(this.vHeart, beat, this.heartbeatAt, 0.45, 1, 0.2);
+      else playHeartbeat(this.vHeart, this.heartbeatAt, 1);
       this.heartbeatAt += dur;
     }
   }

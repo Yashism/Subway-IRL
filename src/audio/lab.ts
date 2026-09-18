@@ -9,6 +9,8 @@
  */
 import { Director, type DirectorFrame } from './director';
 import { AudioEngine } from './engine';
+import { SampleBank } from './loader';
+import { allSampleNames, CUE_SAMPLES } from './manifest';
 import { AudioSettingsStore } from './settings';
 import { CUES, MIX_CHANNELS, type AudioSettings, type CueName, type MixChannel } from './types';
 import type { ActivityStatus } from '../input/commands';
@@ -130,6 +132,31 @@ function drawWave(canvas: HTMLCanvasElement, data: Float32Array, hot = false): v
 
 const OFFLINE_RATE = 44100;
 
+/**
+ * The recordings, decoded once on their own context and reused by every offline render. An
+ * AudioBuffer is not bound to the context that decoded it, so one fetch-and-decode pass covers the
+ * whole page instead of one per card.
+ */
+let labBank: SampleBank | null = null;
+
+async function loadLabBank(): Promise<void> {
+  const Ctor = (globalThis as { OfflineAudioContext?: OfflineCtor }).OfflineAudioContext;
+  if (!Ctor) return;
+  const bank = new SampleBank(new Ctor(1, 128, OFFLINE_RATE));
+  await bank.load(allSampleNames());
+  labBank = bank;
+  const c = bank.counts;
+  $('bankState').textContent =
+    `samples: ${c.loaded} loaded` + (c.failed ? `, ${c.failed} FAILED (${[...bank.failed].join(', ')})` : '');
+  if (c.failed) $('bankState').style.color = '#ff6b5e';
+}
+
+/** True when this cue will play a recording rather than its synth patch. */
+function isSampled(cue: CueName): boolean {
+  const spec = CUE_SAMPLES[cue];
+  return !!(spec && labBank && labBank.has(spec.layers[0].file));
+}
+
 type OfflineCtor = new (channels: number, length: number, sampleRate: number) => OfflineAudioContext;
 
 /**
@@ -142,6 +169,7 @@ async function renderOffline(
   build: (engine: AudioEngine) => void,
   perFrame?: (engine: AudioEngine, t: number) => void,
   settings?: Partial<AudioSettings>,
+  synthOnly = false,
 ): Promise<Float32Array> {
   const Ctor = (globalThis as { OfflineAudioContext?: OfflineCtor }).OfflineAudioContext;
   if (!Ctor) return new Float32Array(1);
@@ -149,6 +177,7 @@ async function renderOffline(
   const engine = new AudioEngine(ctx, {
     reverb: true,
     settings: { master: 1, music: 1, sfx: 1, muted: false, ...settings },
+    bank: synthOnly ? null : labBank,
   });
   engine.start();
   build(engine);
@@ -269,6 +298,10 @@ function enable(): void {
   scopeData = new Float32Array(analyser.fftSize);
   engine.tap.connect(analyser);
   director.resync();
+  // The live half gets its own bank on the live context, so what you hear is what ships.
+  const live = new SampleBank(ctx);
+  engine.attachBank(live);
+  void live.load(allSampleNames());
   $('enable').textContent = '▶ Audio on';
   $('enable').classList.remove('primary');
 }
@@ -548,17 +581,34 @@ async function renderCues(): Promise<void> {
   const host = $('cues');
   for (const cue of CUES) {
     const seconds = cue === 'caught' || cue === 'trainPass' || cue === 'introWhistle' ? 3 : 2;
+    const sampled = isSampled(cue);
     await card(
       host,
       cue,
-      '',
+      sampled ? 'recorded' : 'synth',
       seconds,
       () => renderOffline(seconds, (e) => e.cue(cue, 1, 1)),
       () => {
         enable();
         director.fire(cue, 1, 1);
       },
+      sampled,
     );
+  }
+}
+
+/**
+ * The same cue rendered both ways: this is the check that a file going missing degrades the sound
+ * rather than removing it.
+ */
+async function renderFallbacks(): Promise<void> {
+  const host = $('fallbacks');
+  for (const cue of ['whistle', 'coin', 'land', 'caught', 'go', 'stumble'] as CueName[]) {
+    const seconds = cue === 'caught' ? 3 : 2;
+    await card(host, `${cue} — recorded`, 'file present', seconds,
+      () => renderOffline(seconds, (e) => e.cue(cue, 1, 1)), undefined, true);
+    await card(host, `${cue} — fallback`, 'file missing', seconds,
+      () => renderOffline(seconds, (e) => e.cue(cue, 1, 1), undefined, undefined, true));
   }
 }
 
@@ -567,8 +617,10 @@ async function renderCues(): Promise<void> {
 buildControls();
 requestAnimationFrame(tick);
 void (async () => {
+  await loadLabBank();
   await renderBeds();
   await renderLayers();
   await renderCues();
+  await renderFallbacks();
   document.body.dataset.ready = 'yes';
 })();
