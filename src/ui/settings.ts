@@ -19,12 +19,17 @@ import {
   MODE_BLURBS,
   MODE_CHOICES,
   MODE_NAMES,
+  OBSTACLE_AMOUNT_BLURBS,
+  OBSTACLE_AMOUNT_NAMES,
+  OBSTACLE_LEVEL_BLURBS,
+  OBSTACLE_LEVEL_NAMES,
   SENSITIVITY_MAX,
   SENSITIVITY_MIN,
   SENSITIVITY_STEP,
   sensitivityWords,
   type GameSettings,
 } from '../app/settings';
+import { OBSTACLE_AMOUNTS, obstacleLevel } from '../game/config';
 import type { CameraOption } from './poseScreens';
 
 // ---------------------------------------------------------------- DOM helpers (shared with workout.ts)
@@ -130,6 +135,10 @@ export class SettingsScreen {
   private modeChips!: Map<string, HTMLButtonElement>;
   private lineChips!: Map<string, HTMLButtonElement>;
   private diffChips!: Map<string, HTMLButtonElement>;
+  private obstacles!: HTMLInputElement;
+  private obstaclesValue!: HTMLElement;
+  private obstaclesWords!: HTMLElement;
+  private amountChips!: Map<string, HTMLButtonElement>;
   private camSelect!: HTMLSelectElement;
   private camKey = '';
   private mirrorBtn!: HTMLButtonElement;
@@ -224,8 +233,22 @@ export class SettingsScreen {
     // ---- game
     const game = this.group(grid, '🚂', 'THE RUN', 'Which line you run, and how hard it pushes');
     this.lineChips = this.chips(game, 'Line', LINES, LINE_NAMES, LINE_BLURBS, (v) => this.handlers.change({ line: v as GameSettings['line'] }));
-    this.diffChips = this.chips(game, 'Difficulty', DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_BLURBS, (v) =>
+    // Pace is the speed of the run; the obstacles below are their own setting.
+    this.diffChips = this.chips(game, 'Pace', DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_BLURBS, (v) =>
       this.handlers.change({ difficulty: v as GameSettings['difficulty'] }),
+    );
+    const obsRow = el('div', 'sw-row sw-row-slider', game);
+    const obsHead = el('div', 'sw-row-head', obsRow);
+    el('div', 'sw-row-label', obsHead, 'Obstacle difficulty');
+    this.obstaclesValue = el('div', 'sw-row-value', obsHead);
+    this.obstacles = this.slider(obsRow, 1, 5, 1, (v) => this.handlers.change({ obstacleLevel: v }));
+    this.obstacles.setAttribute('aria-label', 'Obstacle difficulty');
+    const obsScale = el('div', 'sw-scale', obsRow);
+    el('span', 'sw-scale-end', obsScale, 'Gentle');
+    el('span', 'sw-scale-end', obsScale, 'Brutal');
+    this.obstaclesWords = el('div', 'sw-note', obsRow);
+    this.amountChips = this.chips(game, 'Obstacle amount', OBSTACLE_AMOUNTS, OBSTACLE_AMOUNT_NAMES, OBSTACLE_AMOUNT_BLURBS, (v) =>
+      this.handlers.change({ obstacleAmount: v as GameSettings['obstacleAmount'] }),
     );
     this.reducedMotionBtn = this.toggle(game, 'Reduced motion', 'No screen shake or speed lines.', (on) => this.handlers.change({ reducedMotion: on }));
     this.reducedEffectsBtn = this.toggle(game, 'Reduced effects', 'No bloom. Kinder to a weaker laptop.', (on) =>
@@ -301,6 +324,12 @@ export class SettingsScreen {
     this.select(this.modeChips, s.mode);
     this.select(this.lineChips, s.line);
     this.select(this.diffChips, s.difficulty);
+    const level = obstacleLevel(s.obstacleLevel);
+    if (document.activeElement !== this.obstacles) this.obstacles.value = String(level);
+    this.text(this.obstaclesValue, `${level} · ${OBSTACLE_LEVEL_NAMES[level]}`);
+    // Obstacles are laid when a run starts, so say when a change lands.
+    this.text(this.obstaclesWords, `${OBSTACLE_LEVEL_BLURBS[level]}. Applies from your next run.`);
+    this.select(this.amountChips, s.obstacleAmount);
 
     this.setToggle(this.mirrorBtn, s.mirror);
     this.setToggle(this.reducedMotionBtn, s.reducedMotion);

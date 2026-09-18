@@ -54,6 +54,23 @@ describe('applyLiveSettings', () => {
     expect(t.mirrors).toEqual([false]);
   });
 
+  it('hands the obstacle settings to the game, for the next track it lays', () => {
+    const t = targets();
+    applyLiveSettings(t, { ...DEFAULT_SETTINGS, obstacleLevel: 1, obstacleAmount: 'few' });
+    expect(t.game.options.obstacles).toEqual({ level: 1, amount: 'few' });
+  });
+
+  it('leaves the track alone while a recorded session replays — its difficulty and obstacles are the recording\'s', () => {
+    const t = { ...targets(), ownsRun: false };
+    t.game.options.difficulty = 'beast';
+    t.game.options.obstacles = { level: 5, amount: 'lots' };
+    applyLiveSettings(t, { ...DEFAULT_SETTINGS, difficulty: 'chill', obstacleLevel: 1, obstacleAmount: 'few' });
+    expect(t.game.options.difficulty).toBe('beast');
+    expect(t.game.options.obstacles).toEqual({ level: 5, amount: 'lots' });
+    // What does not decide the track still follows the settings.
+    expect(t.lines.length).toBe(1);
+  });
+
   it('leaves the sensitivity alone while a recorded session is replaying', () => {
     const t = { ...targets(), ownsSensitivity: false };
     applyLiveSettings(t, { ...DEFAULT_SETTINGS, sensitivity: 1.25 });

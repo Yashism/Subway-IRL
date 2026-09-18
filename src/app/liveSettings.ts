@@ -11,7 +11,7 @@
  * the play mode goes through the session flow (it recalibrates and re-applies that mode's tuning),
  * and the camera goes through the flow's camera picker.
  */
-import type { Difficulty } from '../game/config';
+import type { Difficulty, ObstacleSettings } from '../game/config';
 import type { LineId } from '../world/stations';
 import type { GameSettings } from './settings';
 
@@ -20,7 +20,7 @@ export interface LiveTargets {
   /** The pose controller. Sensitivity is the same value the debug monitor sends. */
   controller: { sensitivity: number };
   /** The Game's options object, read at the start of every run and every frame. */
-  game: { options: { difficulty: Difficulty } };
+  game: { options: { difficulty: Difficulty; obstacles?: ObstacleSettings } };
   world: {
     setLine(line: LineId): void;
     setReduced(o: { motion?: boolean; effects?: boolean }): void;
@@ -32,12 +32,21 @@ export interface LiveTargets {
    * with, so the live slider must not reach into it. Defaults to true.
    */
   ownsSensitivity?: boolean;
+  /**
+   * False while a recorded session is replaying: the track is rebuilt from the seed, difficulty and
+   * obstacle settings it was recorded with, so the live settings must not change any of them — a
+   * replay on another difficulty would be a different track. Defaults to true.
+   */
+  ownsRun?: boolean;
 }
 
 /** Applies every live-applicable setting. Safe to call repeatedly with the same values. */
 export function applyLiveSettings(t: LiveTargets, s: GameSettings): void {
   if (t.ownsSensitivity !== false) t.controller.sensitivity = s.sensitivity;
-  t.game.options.difficulty = s.difficulty;
+  if (t.ownsRun !== false) {
+    t.game.options.difficulty = s.difficulty;
+    t.game.options.obstacles = { level: s.obstacleLevel, amount: s.obstacleAmount };
+  }
   t.world.setLine(s.line);
   t.world.setReduced({ motion: s.reducedMotion, effects: s.reducedEffects });
   t.pip.setMirror(s.mirror);

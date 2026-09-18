@@ -11,6 +11,7 @@ import {
   cleanWeight,
   sensitivityWords,
 } from '../../src/app/settings';
+import { DEFAULT_OBSTACLES } from '../../src/game/config';
 
 const memory = () => {
   const map = new Map<string, string>();
@@ -30,8 +31,28 @@ describe('cleaning', () => {
   });
 
   it('keeps a good record verbatim', () => {
-    const good = { sensitivity: 1.1, mode: 'small', mirror: false, line: 'harbour', difficulty: 'beast', reducedMotion: true, reducedEffects: true, weightKg: 82 };
+    const good = {
+      sensitivity: 1.1, mode: 'small', mirror: false, line: 'harbour', difficulty: 'beast',
+      obstacleLevel: 5, obstacleAmount: 'lots', reducedMotion: true, reducedEffects: true, weightKg: 82,
+    };
     expect(cleanSettings(good)).toEqual(good);
+  });
+
+  it('gives a record saved before the obstacle settings existed the game as designed', () => {
+    const old = { sensitivity: 1.1, mode: 'small', mirror: false, line: 'harbour', difficulty: 'beast', reducedMotion: true, reducedEffects: true, weightKg: 82 };
+    const s = cleanSettings(old);
+    expect(s.obstacleLevel).toBe(DEFAULT_OBSTACLES.level);
+    expect(s.obstacleAmount).toBe(DEFAULT_OBSTACLES.amount);
+    expect(s.difficulty).toBe('beast'); // and nothing else is lost
+  });
+
+  it('pulls a bad obstacle level into 1–5, and refuses an unknown amount', () => {
+    expect(cleanSettings({ obstacleLevel: 9 }).obstacleLevel).toBe(5);
+    expect(cleanSettings({ obstacleLevel: -3 }).obstacleLevel).toBe(1);
+    expect(cleanSettings({ obstacleLevel: 2.6 }).obstacleLevel).toBe(3);
+    expect(cleanSettings({ obstacleLevel: 'hard' }).obstacleLevel).toBe(DEFAULT_OBSTACLES.level);
+    expect(cleanSettings({ obstacleLevel: Number.NaN }).obstacleLevel).toBe(DEFAULT_OBSTACLES.level);
+    expect(cleanSettings({ obstacleAmount: 'tons' }).obstacleAmount).toBe(DEFAULT_OBSTACLES.amount);
   });
 
   it('drops only the field that is wrong', () => {
@@ -194,6 +215,15 @@ describe('url flags', () => {
     expect(s.line).toBe('central');
     expect(s.sensitivity).toBe(base.sensitivity);
     expect(s.difficulty).toBe(base.difficulty);
+  });
+
+  it('sets the obstacle level and amount for the session', () => {
+    const s = applyUrlFlags(DEFAULT_SETTINGS, '?obstacles=5&amount=lots');
+    expect(s.obstacleLevel).toBe(5);
+    expect(s.obstacleAmount).toBe('lots');
+    const bad = applyUrlFlags(DEFAULT_SETTINGS, '?obstacles=&amount=tons');
+    expect(bad.obstacleLevel).toBe(DEFAULT_SETTINGS.obstacleLevel);
+    expect(bad.obstacleAmount).toBe(DEFAULT_SETTINGS.obstacleAmount);
   });
 
   it('can be turned off explicitly', () => {

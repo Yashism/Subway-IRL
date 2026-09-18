@@ -135,6 +135,16 @@ describe('SessionRecording', () => {
     expect(back).toEqual(rec);
   });
 
+  it('keeps the obstacle settings a track was laid with, and drops a malformed entry rather than failing', () => {
+    const rec = JSON.parse(JSON.stringify(sample())) as { meta: Record<string, unknown> };
+    rec.meta.obstacles = { level: 5, amount: 'lots' };
+    expect(decodeSession(JSON.parse(JSON.stringify(rec))).meta?.obstacles).toEqual({ level: 5, amount: 'lots' });
+    rec.meta.obstacles = { level: 'hard' };
+    const back = decodeSession(JSON.parse(JSON.stringify(rec)));
+    expect(back.meta?.obstacles).toBeUndefined(); // the replay lays the designed track instead
+    expect(back.meta?.seed).toBe(sample().meta?.seed); // and nothing else was lost
+  });
+
   it('rejects malformed recordings with a reason', () => {
     const good = JSON.parse(JSON.stringify(sample())) as Record<string, unknown>;
     expect(() => decodeSession(null)).toThrow(/object/);

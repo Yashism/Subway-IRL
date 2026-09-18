@@ -24,6 +24,8 @@ export type WireStatus = Omit<PoseStatus, 'pose'>;
 export interface SessionMeta {
   seed: number;
   difficulty: string;
+  /** Obstacle difficulty and amount the track was laid with; absent in recordings made before them. */
+  obstacles?: { level: number; amount: string };
   input: string;
   mode: string | null;
   sensitivity: number;
@@ -405,6 +407,9 @@ const META_SHAPE: Record<string, Check> = {
 /** `syncControls` calls `meta.sensitivity.toFixed`, so a half-written meta must not load. */
 function checkMeta(x: unknown): void {
   const m = checkShape(x, 'meta', META_SHAPE);
+  // Optional and newer than most recordings: a malformed one is dropped, not fatal — the replay
+  // then lays the track at the designed settings.
+  if (m.obstacles !== undefined && !(isObj(m.obstacles) && isNum(m.obstacles.level) && isStr(m.obstacles.amount))) delete m.obstacles;
   if (m.thresholds === undefined) m.thresholds = {};
   else if (!isObj(m.thresholds)) fail('meta.thresholds must be an object');
 }

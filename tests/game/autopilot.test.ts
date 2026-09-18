@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ChunkDef } from '../../src/game/chunks';
-import { TUNING, type Difficulty } from '../../src/game/config';
+import { TUNING, type Difficulty, type ObstacleSettings } from '../../src/game/config';
 import { Autopilot, liveSpecs } from '../../src/game/autopilot';
 import { Game } from '../../src/game/game';
 import { closingRate, lengthOf, movingFrontAt, type ObstacleSpec } from '../../src/game/obstacles';
 
-function drive(seed: number, difficulty: Difficulty, seconds: number): Game {
-  const g = new Game({ seed, difficulty });
+function drive(seed: number, difficulty: Difficulty, seconds: number, obstacles?: ObstacleSettings): Game {
+  const g = new Game({ seed, difficulty, obstacles });
   const bot = new Autopilot(g);
   let tMs = 0;
   for (let i = 0; i < seconds * TUNING.stepHz; i++) {
@@ -107,6 +107,19 @@ describe('Autopilot', () => {
 
   it('survives three minutes on beast', () => {
     const g = drive(4, 'beast', 185);
+    expect(g.caughtReason, context(g)).toBeNull();
+    expect(g.state).toBe('playing');
+  }, 180_000);
+
+  // Obstacle settings only choose among patterns the solver has checked, so every combination must
+  // still be clearable: the bot plays the hardest and the busiest, and the gentlest and the sparsest.
+  it.each([
+    [5, 'lots'],
+    [5, 'few'],
+    [1, 'lots'],
+    [1, 'few'],
+  ] as const)('survives two minutes at obstacle level %i, amount %s', (level, amount) => {
+    const g = drive(7, 'beast', 125, { level, amount });
     expect(g.caughtReason, context(g)).toBeNull();
     expect(g.state).toBe('playing');
   }, 180_000);

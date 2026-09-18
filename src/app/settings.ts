@@ -10,7 +10,7 @@
  * three together; only one of them is stored here.
  */
 import type { ModeChoice } from './flow';
-import type { Difficulty } from '../game/config';
+import { DEFAULT_OBSTACLES, OBSTACLE_AMOUNTS, obstacleLevel, type Difficulty, type ObstacleAmount } from '../game/config';
 import type { LineId } from '../world/stations';
 
 export const SETTINGS_KEY = 'subway-irl.settings.v1';
@@ -36,7 +36,12 @@ export interface GameSettings {
   /** Mirror the camera preview. Display only — detection never sees this. */
   mirror: boolean;
   line: LineId;
+  /** The run's pace: speed and how fast it builds. */
   difficulty: Difficulty;
+  /** Obstacle difficulty 1–5: how hard the patterns get, and how soon (3 = as designed). */
+  obstacleLevel: number;
+  /** How busy the track is. */
+  obstacleAmount: ObstacleAmount;
   /** Cuts screen shake and speed lines: comfort, and a cheap win on a weak GPU. */
   reducedMotion: boolean;
   /** Cuts bloom and the heavier effects. */
@@ -54,6 +59,8 @@ export const DEFAULT_SETTINGS: GameSettings = Object.freeze({
   mirror: true,
   line: 'western',
   difficulty: 'cardio',
+  obstacleLevel: DEFAULT_OBSTACLES.level,
+  obstacleAmount: DEFAULT_OBSTACLES.amount,
   reducedMotion: false,
   reducedEffects: false,
   weightKg: null,
@@ -72,6 +79,31 @@ export const DIFFICULTY_BLURBS: Record<Difficulty, string> = {
   cardio: 'The normal run',
   beast: 'Faster from the first whistle',
 };
+export const OBSTACLE_LEVEL_NAMES: Record<1 | 2 | 3 | 4 | 5, string> = {
+  1: 'Gentle',
+  2: 'Easy',
+  3: 'Normal',
+  4: 'Hard',
+  5: 'Brutal',
+};
+export const OBSTACLE_LEVEL_BLURBS: Record<1 | 2 | 3 | 4 | 5, string> = {
+  1: 'Simple, one-at-a-time obstacles only',
+  2: 'Nothing harder than the early patterns',
+  3: 'The game as designed',
+  4: 'The hard patterns arrive sooner',
+  5: 'The hardest patterns, early and often',
+};
+export const OBSTACLE_AMOUNT_NAMES: Record<ObstacleAmount, string> = { few: 'Few', normal: 'Normal', lots: 'Lots' };
+export const OBSTACLE_AMOUNT_BLURBS: Record<ObstacleAmount, string> = {
+  few: 'Coin-only breathers between patterns',
+  normal: 'The game as designed',
+  lots: 'The busiest patterns more often',
+};
+
+/** Rounded into 1–5; anything that is not a number is the designed level. */
+export const cleanObstacleLevel = (v: unknown): number =>
+  typeof v === 'number' && Number.isFinite(v) ? obstacleLevel(v) : DEFAULT_OBSTACLES.level;
+
 export const MODE_NAMES: Record<ModeChoice, string> = { auto: 'Auto', full: 'Full body', small: 'Small room' };
 export const MODE_BLURBS: Record<ModeChoice, string> = {
   auto: 'Pick it from what the camera sees',
@@ -120,6 +152,8 @@ export function cleanSettings(raw: unknown): GameSettings {
     mirror: bool(o.mirror, DEFAULT_SETTINGS.mirror),
     line: pick(o.line, LINES, DEFAULT_SETTINGS.line),
     difficulty: pick(o.difficulty, DIFFICULTIES, DEFAULT_SETTINGS.difficulty),
+    obstacleLevel: cleanObstacleLevel(o.obstacleLevel),
+    obstacleAmount: pick(o.obstacleAmount, OBSTACLE_AMOUNTS, DEFAULT_SETTINGS.obstacleAmount),
     reducedMotion: bool(o.reducedMotion, DEFAULT_SETTINGS.reducedMotion),
     reducedEffects: bool(o.reducedEffects, DEFAULT_SETTINGS.reducedEffects),
     weightKg: cleanWeight(o.weightKg),
@@ -128,7 +162,7 @@ export function cleanSettings(raw: unknown): GameSettings {
 
 /**
  * URL overrides, for a demo machine or a screenshot run: `?line=`, `?difficulty=`, `?sens=`,
- * `?reduced`. They apply for the session and are never written back — a shared link must not
+ * `?obstacles=1..5`, `?amount=few|normal|lots`, `?reduced`. They apply for the session and are never written back — a shared link must not
  * quietly change someone's saved settings.
  */
 export function applyUrlFlags(settings: GameSettings, search: string): GameSettings {
@@ -143,6 +177,10 @@ export function applyUrlFlags(settings: GameSettings, search: string): GameSetti
   if (line !== null) out.line = pick(line, LINES, out.line);
   const diff = params.get('difficulty');
   if (diff !== null) out.difficulty = pick(diff, DIFFICULTIES, out.difficulty);
+  const lvl = params.get('obstacles');
+  if (lvl !== null && lvl !== '') out.obstacleLevel = cleanObstacleLevel(Number(lvl));
+  const amount = params.get('amount');
+  if (amount !== null) out.obstacleAmount = pick(amount, OBSTACLE_AMOUNTS, out.obstacleAmount);
   const sens = params.get('sens');
   if (sens !== null && sens !== '') {
     const n = Number(sens);

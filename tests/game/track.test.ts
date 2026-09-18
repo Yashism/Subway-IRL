@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { ChunkDef } from '../../src/game/chunks';
-import { TUNING } from '../../src/game/config';
-import { closingRate, meetOf, movingFrontAt } from '../../src/game/obstacles';
+import { CHUNKS, type ChunkDef } from '../../src/game/chunks';
+import { DEFAULT_OBSTACLES, TUNING, type ObstacleSettings } from '../../src/game/config';
+import { closingRate, meetOf, movingFrontAt, OBSTACLES } from '../../src/game/obstacles';
 import { Rng } from '../../src/game/rng';
-import { POWERUP_KINDS, Track, TRACK_AHEAD } from '../../src/game/track';
+import { BREATHER_ID, POWERUP_KINDS, Track, TRACK_AHEAD } from '../../src/game/track';
 
 describe('Track', () => {
   it('is deterministic for a seed', () => {
@@ -160,5 +160,62 @@ describe('Track', () => {
     t.obstacles.push({ id: 5, kind: 'barrierLow', lane: 0, length: 0.5, front: 40 });
     t.clearLane(0, 9, 31, 10);
     expect(t.obstacles.map((o) => o.id)).toEqual([3, 5]);
+  });
+});
+
+describe('Track: obstacle settings', () => {
+  /** Lays `metres` of track at a steady run and returns the chunks placed and obstacles per km. */
+  const lay = (obstacles: ObstacleSettings, metres = 12_000, seed = 11) => {
+    const t = new Track(new Rng(seed), 'cardio', CHUNKS, obstacles);
+    // `placed` keeps only recent history, so collect each chunk once by where it starts.
+    const bySpot = new Map<number, string>();
+    const seen = new Set<number>();
+    let obstaclesSeen = 0;
+    for (let s = 0; s <= metres; s += 20) {
+      t.update(s, 20, s / 20);
+      for (const p of t.placed) bySpot.set(p.s, p.id);
+      for (const o of t.obstacles) {
+        if (seen.has(o.id)) continue;
+        seen.add(o.id);
+        if (OBSTACLES[o.kind].action !== 'none') obstaclesSeen++;
+      }
+    }
+    const ids = [...bySpot.entries()].sort((a, b) => a[0] - b[0]).map(([, id]) => id);
+    return { ids, perKm: obstaclesSeen / (metres / 1000) };
+  };
+
+  it('keeps the game as designed at the default settings (same seed, same track)', () => {
+    const a = new Track(new Rng(3), 'cardio');
+    const b = new Track(new Rng(3), 'cardio', CHUNKS, DEFAULT_OBSTACLES);
+    for (let s = 0; s <= 6000; s += 100) {
+      a.update(s, 20, s / 20);
+      b.update(s, 20, s / 20);
+    }
+    expect(b.placed).toEqual(a.placed);
+  });
+
+  it('Few spaces patterns out with coin-only breathers — never two in a row, never in the warm-up', () => {
+    const { ids } = lay({ level: 3, amount: 'few' });
+    const breathers = ids.filter((id) => id === BREATHER_ID).length;
+    expect(breathers).toBeGreaterThan(10);
+    for (let i = 1; i < ids.length; i++) expect(ids[i] === BREATHER_ID && ids[i - 1] === BREATHER_ID).toBe(false);
+    const firstReal = ids.findIndex((id) => !id.startsWith('w-') && id !== BREATHER_ID);
+    expect(ids.slice(0, firstReal).includes(BREATHER_ID)).toBe(false);
+  });
+
+  it('Few means fewer obstacles and Lots more, per kilometre', () => {
+    const few = lay({ level: 3, amount: 'few' }).perKm;
+    const normal = lay({ level: 3, amount: 'normal' }).perKm;
+    const lots = lay({ level: 3, amount: 'lots' }).perKm;
+    expect(few).toBeLessThan(normal * 0.8);
+    expect(lots).toBeGreaterThan(normal * 1.05);
+  });
+
+  it('level 1 never goes past the second tier; level 5 reaches the hardest tier sooner than level 3', () => {
+    const tierOf = (id: string) => (id.startsWith('w-') || id === BREATHER_ID ? 0 : Number(id[1]));
+    expect(Math.max(...lay({ level: 1, amount: 'normal' }).ids.map(tierOf))).toBeLessThanOrEqual(1);
+    const firstTop = (level: number) => lay({ level, amount: 'normal' }).ids.findIndex((id) => tierOf(id) === 4);
+    expect(firstTop(5)).toBeGreaterThan(0);
+    expect(firstTop(5)).toBeLessThan(firstTop(3));
   });
 });

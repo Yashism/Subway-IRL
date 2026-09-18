@@ -12,7 +12,7 @@ import { RunSession, type RunBoosts } from './app/session';
 import { GestureUnlock, soundAllowed } from './app/sound';
 import { SettingsStore, applyUrlFlags, type GameSettings } from './app/settings';
 import { Autopilot } from './game/autopilot';
-import type { Difficulty } from './game/config';
+import { DEFAULT_OBSTACLES, OBSTACLE_AMOUNTS, obstacleLevel, type Difficulty, type ObstacleAmount, type ObstacleSettings } from './game/config';
 import { Game } from './game/game';
 import { FixedStepper } from './game/loop';
 import { KeyboardInput } from './input/keyboard';
@@ -40,7 +40,8 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?movecheck=skip|force    never / always run the guided move check after calibration
 //   ?intro=always|off        force / suppress the intro cinematic (default: once per session)
 //   ?mute ?vol=0.5 ?nosamples   the mixer; ?audio forces sound on for an autopilot/replay demo
-//   ?difficulty= ?seed= ?god ?tone= ?line= ?sens= ?reduced ?pip=0 ?perf ?saveAutopilot
+//   ?difficulty= ?obstacles=1..5 ?amount=few|normal|lots ?seed= ?god ?tone= ?line= ?sens= ?reduced
+//   ?pip=0 ?perf ?saveAutopilot
 //   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
 //                            webcam mode, because the keyboard then claims to track jogging.
 
@@ -88,7 +89,16 @@ const seed = sessionMeta ? sessionMeta.seed : Number.isFinite(seedParam) && para
 /** The seed normal runs use; the daily challenge borrows `game.options.seed` and hands it back. */
 const baseSeed = seed;
 
-const game = new Game({ seed, difficulty, god: params.has('god') });
+/** The player's obstacle settings, or a recorded session's, so its replay lays the same track. */
+const playerObstacles = (): ObstacleSettings => ({ level: settings.obstacleLevel, amount: settings.obstacleAmount });
+const sessionObstacles = sessionMeta?.obstacles;
+const obstacles: ObstacleSettings = sessionObstacles
+  ? { level: obstacleLevel(sessionObstacles.level), amount: OBSTACLE_AMOUNTS.includes(sessionObstacles.amount as ObstacleAmount) ? (sessionObstacles.amount as ObstacleAmount) : 'normal' }
+  : sessionMeta
+    ? { ...DEFAULT_OBSTACLES }
+    : playerObstacles();
+
+const game = new Game({ seed, difficulty, god: params.has('god'), obstacles });
 const keyboard = new KeyboardInput();
 keyboard.jogEnabled = params.has('jog');
 /** Detached while a full-screen overlay is up, so Enter cannot start a run behind it. */
@@ -356,8 +366,8 @@ function exportData(): void {
 function applySettings(next: GameSettings): void {
   settings = next;
   applyLiveSettings(
-    // A recorded session replays with the sensitivity it was played at.
-    { controller: runtime.ctrl, game, world, pip, ownsSensitivity: sessionMeta?.sensitivity === undefined },
+    // A recorded session replays with the sensitivity, and the track, it was played with.
+    { controller: runtime.ctrl, game, world, pip, ownsSensitivity: sessionMeta?.sensitivity === undefined, ownsRun: !sessionMeta },
     next,
   );
 }
@@ -409,6 +419,7 @@ function sendMeta(): void {
   telemetry.meta({
     seed,
     difficulty,
+    obstacles: game.options.obstacles ?? { ...DEFAULT_OBSTACLES },
     input: inputLabel(),
     mode: currentMode(),
     sensitivity: ctrl.sensitivity,
@@ -529,6 +540,7 @@ function abandonRun(): void {
   runs.abandonRun();
   runs.disarmDaily();
   game.options.seed = baseSeed;
+  if (!sessionMeta) game.options.obstacles = playerObstacles();
 }
 
 /**
@@ -558,8 +570,10 @@ function recordRun(): void {
   );
   hud.setProfile(profile.profile, result.record);
   showSummary(result.missions);
-  // The daily borrowed the seed; hand it back so the next ordinary run gets a fresh track.
+  // The daily borrowed the seed and the obstacle settings; hand them back so the next ordinary run
+  // gets a fresh track at the player's own settings.
   game.options.seed = baseSeed;
+  if (!sessionMeta) game.options.obstacles = playerObstacles();
 }
 
 // ---------------------------------------------------------------- the intro cinematic
@@ -625,6 +639,8 @@ const loop: AppLoop = new AppLoop({
 function startDaily(): void {
   if (!saveRuns) return;
   game.options.seed = runs.daily.challenge.seed - game.runsStarted;
+  // The same track for everyone today, whatever their own obstacle settings.
+  game.options.obstacles = { ...DEFAULT_OBSTACLES };
   runs.armDaily();
   setOverlay('none');
   loop.dispatch({ type: 'startPressed' });

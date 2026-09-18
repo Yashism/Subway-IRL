@@ -10,6 +10,44 @@ export const DIFFICULTY: Record<Difficulty, { speed: number; ramp: number }> = {
   beast: { speed: 1.2, ramp: 1.2 },
 };
 
+/**
+ * How busy the track is. `normal` is the game as designed; `few` spaces obstacle patterns out with
+ * coin-only breathers and favours sparse patterns; `lots` favours the busiest patterns. Both only
+ * choose among hand-made patterns the passability solver has already checked, so every track stays
+ * clearable.
+ */
+export type ObstacleAmount = 'few' | 'normal' | 'lots';
+export const OBSTACLE_AMOUNTS: readonly ObstacleAmount[] = ['few', 'normal', 'lots'];
+
+/** The player's obstacle settings (Settings › The run). */
+export interface ObstacleSettings {
+  /** 1–5: how hard the patterns may get and how soon (see OBSTACLE_LEVELS). */
+  level: number;
+  amount: ObstacleAmount;
+}
+
+/** The game as designed. The daily challenge always uses this, so it is the same track for everyone. */
+export const DEFAULT_OBSTACLES: Readonly<ObstacleSettings> = Object.freeze({ level: 3, amount: 'normal' });
+
+/**
+ * Obstacle difficulty, by level: the hardest pattern tier the track may use, and how fast it climbs
+ * through the tiers (a multiplier on run time). Level 3 is the game as designed. Independent of the
+ * run's speed, which is Chill / Cardio / Beast.
+ */
+export const OBSTACLE_LEVELS: Record<1 | 2 | 3 | 4 | 5, { maxTier: 1 | 2 | 3 | 4; rate: number }> = {
+  1: { maxTier: 1, rate: 0.6 },
+  2: { maxTier: 2, rate: 0.8 },
+  3: { maxTier: 4, rate: 1 },
+  4: { maxTier: 4, rate: 1.35 },
+  5: { maxTier: 4, rate: 1.8 },
+};
+
+/** A level from anything: rounded and clamped into 1–5 (3 when it is not a number). */
+export function obstacleLevel(level: number): 1 | 2 | 3 | 4 | 5 {
+  if (!Number.isFinite(level)) return 3;
+  return Math.min(5, Math.max(1, Math.round(level))) as 1 | 2 | 3 | 4 | 5;
+}
+
 /** Every gameplay constant. Distances in metres, times in seconds unless named *Ms. */
 export const TUNING = {
   stepHz: 60,

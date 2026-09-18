@@ -2,7 +2,7 @@ import type { ActivityStatus, GameCommand } from '../input/commands';
 import type { Lane } from '../pose/types';
 import type { ChunkDef } from './chunks';
 import { findHit, surfaceAt, type RunnerBox } from './collision';
-import { laneX, TUNING, type Difficulty } from './config';
+import { laneX, TUNING, type Difficulty, type ObstacleSettings } from './config';
 import { JoshMeter, Powerups } from './powerups';
 import { Rng } from './rng';
 import { Chaser, IdleClock, StumbleTracker, type IdleLevel } from './rules';
@@ -33,6 +33,8 @@ export interface GameOptions {
   god?: boolean;
   /** Override the chunk set (tests). */
   chunks?: readonly ChunkDef[];
+  /** Obstacle difficulty and amount, read when each run's track is laid; the game as designed if unset. */
+  obstacles?: ObstacleSettings;
 }
 
 export interface RunStats {
@@ -266,7 +268,7 @@ export class Game {
   }
 
   private newTrack(): Track {
-    return new Track(new Rng(this.options.seed + this.runs), this.options.difficulty, this.options.chunks);
+    return new Track(new Rng(this.options.seed + this.runs), this.options.difficulty, this.options.chunks, this.options.obstacles);
   }
 
   private play(dt: number, commands: readonly GameCommand[], activity: ActivityStatus, events: GameEvent[]): void {

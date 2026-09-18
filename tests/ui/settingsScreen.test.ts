@@ -107,7 +107,7 @@ describe('mounting', () => {
     ui.update(view());
     ui.update(view({ settings: { ...DEFAULT_SETTINGS, line: 'harbour' } }));
     expect(root.querySelectorAll('.sw-group')).toHaveLength(5);
-    expect(root.querySelectorAll('.sw-chip')).toHaveLength(9); // mode 3 + line 3 + difficulty 3
+    expect(root.querySelectorAll('.sw-chip')).toHaveLength(12); // mode 3 + line 3 + pace 3 + obstacle amount 3
   });
 
   it('takes everything back down on destroy', () => {
@@ -130,7 +130,7 @@ describe('the controls', () => {
     expect(chip(root, 'Western').dataset.on).toBe('off');
     expect(chip(root, 'Beast').dataset.on).toBe('on');
     expect(chip(root, 'Small room').dataset.on).toBe('on');
-    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(3);
+    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(4); // one per group: mode, line, pace, amount
   });
 
   it('asks for the change it was clicked for, and changes nothing itself', () => {
@@ -401,5 +401,37 @@ describe('a toggle changed from outside the screen', () => {
     const mirror = toggle(s.root, 'Mirror the preview');
     mirror.click();
     expect(s.calls.change.at(-1)).toEqual({ mirror: false });
+  });
+});
+
+describe('SettingsScreen: obstacles', () => {
+  const obstacleSlider = (root: Element) =>
+    root.querySelector<HTMLInputElement>('input[aria-label="Obstacle difficulty"]')!;
+
+  it('shows the obstacle level with its name, and says it lands on the next run', () => {
+    const { root, ui } = screen();
+    ui.update(view({ settings: { ...DEFAULT_SETTINGS, obstacleLevel: 5 } }));
+    expect(obstacleSlider(root).value).toBe('5');
+    const row = obstacleSlider(root).closest('.sw-row')!;
+    expect(row.querySelector('.sw-row-value')!.textContent).toBe('5 · Brutal');
+    expect(row.querySelector('.sw-note')!.textContent).toMatch(/next run/);
+  });
+
+  it('reports a moved slider and a picked amount as changes', () => {
+    const { root, ui, calls } = screen();
+    ui.update(view());
+    const slider = obstacleSlider(root);
+    slider.value = '2';
+    slider.dispatchEvent(new Event('input'));
+    expect(calls.change.at(-1)).toEqual({ obstacleLevel: 2 });
+    chip(root, 'Lots').click();
+    expect(calls.change.at(-1)).toEqual({ obstacleAmount: 'lots' });
+  });
+
+  it('marks the amount in force', () => {
+    const { root, ui } = screen();
+    ui.update(view({ settings: { ...DEFAULT_SETTINGS, obstacleAmount: 'few' } }));
+    expect(chip(root, 'Few').getAttribute('aria-pressed')).toBe('true');
+    expect(chip(root, 'Normal').getAttribute('aria-pressed')).toBe('false');
   });
 });

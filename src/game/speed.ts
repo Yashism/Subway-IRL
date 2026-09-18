@@ -1,4 +1,4 @@
-import { DIFFICULTY, TUNING, type Difficulty } from './config';
+import { DEFAULT_OBSTACLES, DIFFICULTY, OBSTACLE_LEVELS, obstacleLevel, TUNING, type Difficulty } from './config';
 
 export type Tier = 0 | 1 | 2 | 3 | 4;
 
@@ -28,8 +28,16 @@ export const speedFraction = (speed: number, d: Difficulty): number =>
 export const minGapAt = (speed: number, d: Difficulty): number =>
   TUNING.minGapStart + (TUNING.minGapFloor - TUNING.minGapStart) * speedFraction(speed, d);
 
-export function tierFor(tSec: number, d: Difficulty): Tier {
-  if (tSec < TUNING.warmupSeconds) return 0;
-  const f = speedFraction(speedAt(tSec, d), d);
-  return f < 0.25 ? 1 : f < 0.5 ? 2 : f < 0.75 ? 3 : 4;
+/**
+ * The pattern tier the track wants at run time tSec. The obstacle level scales how fast the run
+ * climbs through the tiers and caps the hardest one (OBSTACLE_LEVELS); level 3 is the game as
+ * designed.
+ */
+export function tierFor(tSec: number, d: Difficulty, level: number = DEFAULT_OBSTACLES.level): Tier {
+  const { maxTier, rate } = OBSTACLE_LEVELS[obstacleLevel(level)];
+  const t = tSec * rate;
+  if (t < TUNING.warmupSeconds) return 0;
+  const f = speedFraction(speedAt(t, d), d);
+  const tier: Tier = f < 0.25 ? 1 : f < 0.5 ? 2 : f < 0.75 ? 3 : 4;
+  return Math.min(tier, maxTier) as Tier;
 }

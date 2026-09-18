@@ -62,8 +62,10 @@ mode. The summary doubles as a controls cheat sheet, and is on the pause screen 
 
 - **Menu** — missions, the daily challenge, your level, the shop.
 - **Settings** (⚙, from the menu or pause) — sensitivity, play mode, camera, audio, line
-  (Western / Central / Harbour), difficulty (Chill / Cardio / Beast), reduced motion and effects,
-  export or clear your data.
+  (Western / Central / Harbour), pace (Chill / Cardio / Beast), obstacle difficulty (1 Gentle – 5
+  Brutal) and obstacle amount (Few / Normal / Lots), reduced motion and effects, export or clear
+  your data. Obstacle settings only ever choose among patterns the passability solver has checked,
+  so every track stays clearable; the daily challenge always uses the designed ones.
 - **Your runs** — today's active minutes and steps, a week chart with your streak, all-time totals,
   and your last 30 runs. Calories are a rough estimate and labelled as one.
 - **Live monitor** (`/monitor.html`, or press **M**) — open it in a **separate window**,
@@ -74,6 +76,7 @@ mode. The summary doubles as a controls cheat sheet, and is on the pause screen 
 ## URL options
 
 `?input=keyboard` · `?mode=full|small` · `?line=western|central|harbour` · `?difficulty=` ·
+`?obstacles=1..5` · `?amount=few|normal|lots` ·
 `?sens=` · `?intro=always|off` · `?movecheck=skip|force` · `?mute` · `?vol=0.5` · `?audio=0` ·
 `?posereplay=<fixture>` · `?session=<recording>` · `?autopilot` · `?perf` · `?god`
 

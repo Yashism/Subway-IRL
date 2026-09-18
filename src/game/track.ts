@@ -1,6 +1,6 @@
 import type { Lane } from '../pose/types';
 import { CHUNK_LENGTH, CHUNKS, type ChunkDef, type CoinRun } from './chunks';
-import { TUNING, type Difficulty } from './config';
+import { DEFAULT_OBSTACLES, TUNING, type Difficulty, type ObstacleAmount, type ObstacleSettings } from './config';
 import { blockLengthOf, closingRate, lengthOf, meetOf, movingFrontAt, OBSTACLES, type Obstacle } from './obstacles';
 import type { Rng } from './rng';
 import { NORMAL_JUMP } from './runner';
@@ -30,6 +30,9 @@ export const TRACK_AHEAD = 200;
 const TRACK_BEHIND = 30;
 const FIRST_CHUNK_S = 30;
 const PLACED_HISTORY = 20;
+/** With obstacle amount Few: the chance of a coin-only breather between two obstacle patterns. */
+export const BREATHER_CHANCE = 0.5;
+export const BREATHER_ID = 'breather';
 
 function removeWhere<T>(items: T[], drop: (item: T) => boolean): void {
   let w = 0;
@@ -65,11 +68,14 @@ export class Track {
   private nextId = 1;
   private lastChunk = '';
   private lastTier: Tier = 0;
+  private lastWasBreather = false;
 
   constructor(
     private readonly rng: Rng,
     private readonly difficulty: Difficulty,
     private readonly chunks: readonly ChunkDef[] = CHUNKS,
+    /** The player's obstacle difficulty and amount; the game as designed by default. */
+    private readonly settings: Readonly<ObstacleSettings> = DEFAULT_OBSTACLES,
   ) {}
 
   /**
@@ -118,15 +124,50 @@ export class Track {
   private placeChunk(runnerS: number, speed: number, tSec: number): void {
     const base = this.nextS;
     this.nextS += CHUNK_LENGTH;
+    const { amount, level } = this.settings;
+    // Few: half the time, a coin-only breather between two obstacle patterns (never two in a row,
+    // and never in the warm-up, which is gentle already). It is not a tier step.
+    if (amount === 'few' && this.lastTier > 0 && !this.lastWasBreather && this.rng.chance(BREATHER_CHANCE)) {
+      this.lastWasBreather = true;
+      const lane = (this.rng.int(3) - 1) as Lane;
+      this.lay({ id: BREATHER_ID, tier: 0, obstacles: [], coins: [{ lane, s0: 15, s1: 45, shape: 'line' }] }, base, runnerS, speed);
+      return;
+    }
+    this.lastWasBreather = false;
     const eta = tSec + Math.max(0, base - runnerS) / speed;
-    const wanted = tierFor(eta, this.difficulty);
+    const wanted = tierFor(eta, this.difficulty, level);
     const tier = Math.min(Math.max(wanted, this.lastTier), this.lastTier + 1) as Tier;
     let pool = this.chunks.filter((c) => c.tier === tier);
     if (pool.length > 1) pool = pool.filter((c) => c.id !== this.lastChunk);
     if (pool.length === 0) return;
     this.lastTier = tier;
-    const chunk = this.rng.pick(pool);
+    // Normal draws exactly as the game always has, so a seed still gives the same track.
+    const chunk = amount === 'normal' ? this.rng.pick(pool) : this.pickByAmount(pool, amount);
     this.lastChunk = chunk.id;
+    this.lay(chunk, base, runnerS, speed);
+  }
+
+  /**
+   * Few favours sparse patterns and Lots busy ones, by weighting each pattern by how many obstacles
+   * it asks the player to deal with (ramps do not count: they ask nothing).
+   */
+  private pickByAmount(pool: readonly ChunkDef[], amount: ObstacleAmount): ChunkDef {
+    const weight = (c: ChunkDef) => {
+      const n = c.obstacles.filter((o) => OBSTACLES[o.kind].action !== 'none').length;
+      return amount === 'few' ? 1 / (1 + n) : 1 + n;
+    };
+    let total = 0;
+    for (const c of pool) total += weight(c);
+    let r = this.rng.next() * total;
+    for (const c of pool) {
+      r -= weight(c);
+      if (r < 0) return c;
+    }
+    return pool[pool.length - 1];
+  }
+
+  /** Lays a chunk's obstacles, coins and pickup out from `base`. */
+  private lay(chunk: ChunkDef, base: number, runnerS: number, speed: number): void {
     this.placed.push({ id: chunk.id, s: base });
     if (this.placed.length > PLACED_HISTORY) this.placed.shift();
 
