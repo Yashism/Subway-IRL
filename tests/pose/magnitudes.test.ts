@@ -104,6 +104,7 @@ describe('PoseController.magnitudes', () => {
       headDrop: 0,
       jogPrimary: 0,
       bobAmp: 0,
+      bobGated: 0,
       jogSteps: 0,
     });
   });

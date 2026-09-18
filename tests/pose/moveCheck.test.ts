@@ -13,6 +13,10 @@ import { emptyMagnitudes } from '../../src/pose/moves';
 import { DEFAULT_THRESHOLDS, type Thresholds } from '../../src/pose/thresholds';
 import { REARM_OF, TUNE_MIN_FACTOR, tunedValue } from '../../src/pose/tuning';
 import type { MoveMagnitudes, PlayMode, PoseEvent } from '../../src/pose/types';
+import { PoseController } from '../../src/pose/controller';
+import { jogParams, jumpArc, Scenario, STAND } from '../helpers/synth';
+
+const T = STAND.torso;
 
 const FRAME_MS = 1000 / 30;
 
@@ -29,10 +33,15 @@ class Rig implements MoveCheckSource {
     this.check.update(this, [], 0);
   }
 
-  /** One frame: move the magnitudes, then deliver `events`. */
+  /**
+   * One frame: the magnitudes are whatever `set` says and nothing else. They are rebuilt rather
+   * than merged on purpose — a field left over from an earlier step used to persist silently, which
+   * let tests assert combinations the pose pipeline cannot produce. `jogSteps` carries, because that
+   * one really is a running count.
+   */
   frame(set: Partial<MoveMagnitudes> = {}, events: readonly PoseEvent[] = [], dtMs = FRAME_MS): MoveCheckModel {
     this.t += dtMs;
-    Object.assign(this.magnitudes, set);
+    Object.assign(this.magnitudes, emptyMagnitudes(), { jogSteps: this.magnitudes.jogSteps }, set);
     return this.check.update(this, events, this.t);
   }
 
@@ -166,6 +175,26 @@ describe('MoveCheck — near misses and skipping', () => {
     r.frame({ lane: -need * (NEAR_MISS_FRACTION + 0.1) });
     expect(r.step.hint).toBe('Almost — go a bit further');
     expect(r.step.progress).toBeCloseTo(NEAR_MISS_FRACTION + 0.1, 6);
+  });
+
+  it('asks the jog for another step, not a higher knee, once the lift is plenty', () => {
+    const r = new Rig('full');
+    r.frame({ jogPrimary: DEFAULT_THRESHOLDS.kneeLift * 3, jogSteps: 1 });
+    expect(r.step.progress).toBe(1);
+    // They are lifting plenty and the bar says so; what is missing is steps. "Go a bit further"
+    // would have them exaggerate, and kneeLift would then be tuned from a lift they cannot hold.
+    expect(r.step.hint).toBe('Keep going — 3 more steps');
+    r.frame({ jogSteps: 3 });
+    expect(r.step.hint).toBe('Keep going — 1 more step');
+  });
+
+  it('says nothing about a best attempt until the player has moved', () => {
+    const r = new Rig('full');
+    expect(r.step.peak).toBeNull();
+    r.frame({ jogPrimary: 0 });
+    expect(r.step.peak).toBeNull();
+    r.frame({ jogPrimary: 0.2 });
+    expect(r.step.peak).toBeCloseTo(0.2, 6);
   });
 
   it('counts one attempt per excursion and offers a skip after four', () => {
@@ -467,9 +496,11 @@ describe('MoveCheck — the jump\u2019s second gate', () => {
     r.skip();
     r.skip();
     expect(r.id).toBe('jump');
-    // Jogging hard: moves.ts makes the jump clear bobJumpFactor x the bounce, or every step is a jump.
+    // Jogging hard: moves.ts makes the jump clear bobJumpFactor x the bounce, or every step is a
+    // jump. It is the *gated* bounce that gets subtracted, not the raw excursion of the last second
+    // — which the jump's own rise inflates, and which would make the bar unreachable.
     const bob = 0.1;
-    r.frame({ rise: DEFAULT_THRESHOLDS.jumpRise * 1.1, bobAmp: bob });
+    r.frame({ rise: DEFAULT_THRESHOLDS.jumpRise * 1.1, bobGated: bob, bobAmp: bob * 2 });
     expect(r.step.progress).toBeLessThan(1);
     expect(r.step.progress).toBeCloseTo((DEFAULT_THRESHOLDS.jumpRise * 1.1) / (DEFAULT_THRESHOLDS.bobJumpFactor * bob), 6);
   });
@@ -486,17 +517,123 @@ describe('MoveCheck — the jump\u2019s second gate', () => {
     expect(r.step.hint).toBe('Almost — try a quicker hop');
   });
 
-  it('lowers the speed gate with the height, so an easier setting is actually easier', () => {
+  it.each([0.1, DEFAULT_THRESHOLDS.jumpRise * 2])(
+    'an easier setting is easier on every gate, even after a peak of %f',
+    (rise) => {
+      const r = new Rig('full');
+      r.passJog(0.3);
+      r.skip();
+      r.skip();
+      r.frame({ rise });
+      r.accept();
+      r.check.skipAll();
+      const tuned = r.check.model.summary!.tuned;
+      // The button says "use my best attempt", and the player's best attempt did not fire — their
+      // peak is big *because* the speed gate was the thing stopping them. Tuning up from it would
+      // answer "make this easier" by making every gate on the jump harder than never calibrating.
+      expect(tuned.jumpRise!).toBeLessThanOrEqual(DEFAULT_THRESHOLDS.jumpRise);
+      expect(tuned.jumpVel!).toBeLessThanOrEqual(DEFAULT_THRESHOLDS.jumpVel);
+      expect(tuned.jumpRearm!).toBeLessThanOrEqual(DEFAULT_THRESHOLDS.jumpRearm);
+    },
+  );
+
+  it('never raises a threshold for a move the player never actually made', () => {
+    const r = new Rig('small');
+    r.skip();
+    // A huge lean that the detector refused for some other reason, then "use my best attempt".
+    r.frame({ tiltDeg: -80, noseShift: -2 });
+    r.accept();
+    r.check.skipAll();
+    const tuned = r.check.model.summary!.tuned;
+    expect(tuned.leanDeg!).toBeLessThanOrEqual(DEFAULT_THRESHOLDS.leanDeg);
+    expect(tuned.noseShift!).toBeLessThanOrEqual(DEFAULT_THRESHOLDS.noseShift);
+  });
+
+  it('still raises a threshold for a move the player did make, big', () => {
     const r = new Rig('full');
     r.passJog(0.3);
     r.skip();
     r.skip();
-    r.frame({ rise: 0.1 });
-    r.accept();
+    r.succeed({ rise: DEFAULT_THRESHOLDS.jumpRise * 2 }, [JUMP]);
     r.check.skipAll();
-    const tuned = r.check.model.summary!.tuned;
-    expect(tuned.jumpRise!).toBeLessThan(DEFAULT_THRESHOLDS.jumpRise);
-    expect(tuned.jumpVel!).toBeLessThan(DEFAULT_THRESHOLDS.jumpVel);
+    // A ✓ means they really jumped that high, so the bar is theirs to raise.
+    expect(r.check.model.summary!.tuned.jumpRise!).toBeGreaterThan(DEFAULT_THRESHOLDS.jumpRise);
+  });
+});
+
+/**
+ * The unit rig can express magnitude combinations the pose pipeline never produces, which is how a
+ * jump bar that could only ever reach 80 % survived a review. These drive real pose frames through a
+ * real PoseController — a real BobTracker and a real JumpDetector — and check the bar against what
+ * the detector actually did on the same frame.
+ */
+describe('MoveCheck — the bar agrees with the detector', () => {
+  /** Calibrates, jogs, then jumps with the given arc. Returns the jump step and what it saw. */
+  function jumpRun(durMs: number, height: number, jogMs = 3000) {
+    const ctrl = new PoseController({ forcedMode: 'full' });
+    const check = new MoveCheck('full');
+    const sc = new Scenario(30).hold(2500);
+    const t0 = sc.t;
+    sc.add(jogMs, (t) => jogParams(t0 + t, { spm: 150 }));
+    const t1 = sc.t;
+    sc.add(durMs + 800, (t) => {
+      const j = jogParams(t1 + t, { spm: 150 });
+      return { ...j, hipY: j.hipY - jumpArc(t, durMs, height) * T };
+    });
+    let fired = false;
+    let barWhenFired = 0;
+    let maxBar = 0;
+    let lastHint: string | null = null;
+    const hints = new Set<string>();
+    for (const f of sc.frames) {
+      const events = ctrl.update(f);
+      if (!ctrl.baseline) continue;
+      // Skip straight past jog/left/right so the jump step is the one being measured.
+      while (check.model.index < 3 && !check.finished) {
+        check.model.steps[check.model.index].canSkip = true;
+        check.skipStep();
+      }
+      check.update(ctrl, events, f.t);
+      const step = check.model.steps[3];
+      maxBar = Math.max(maxBar, step.progress);
+      if (step.hint) {
+        hints.add(step.hint);
+        lastHint = step.hint;
+      }
+      if (!fired && events.some((e) => e.type === 'jump')) {
+        fired = true;
+        barWhenFired = step.progress;
+      }
+    }
+    return { fired, barWhenFired, maxBar, lastHint, hints: [...hints] };
+  }
+
+  it('shows a full bar on the frame a real jump fires', () => {
+    const run = jumpRun(500, 0.4);
+    expect(run.fired).toBe(true);
+    // The check must not ask for more than the detector does, or the card says "100 % is enough"
+    // over a bar that stops at 80 % and the player jumps harder than the game will ever need.
+    expect(run.barWhenFired).toBe(1);
+  });
+
+  it('a full bar means the move fires, or says which gate is left', () => {
+    for (const [dur, height] of [[500, 0.4], [1600, 0.3], [700, 0.1]] as const) {
+      const run = jumpRun(dur, height);
+      if (run.maxBar < 1) continue;
+      const explained = run.fired || run.hints.includes('Almost — try a quicker hop');
+      expect(explained, `${dur}ms / ${height}: full bar with no explanation`).toBe(true);
+    }
+  });
+
+  it('tells the slow jumper to hop quicker, never to go further', () => {
+    // Twice the rise the threshold asks for, taken far too slowly for the velocity gate.
+    const run = jumpRun(1600, 0.3);
+    expect(run.fired).toBe(false);
+    expect(run.maxBar).toBe(1);
+    // "Go a bit further" is honest on the way up, while they really are below the rise gate. What
+    // matters is where it lands: at the top of their hop the advice has to switch axis, because
+    // going further is something this player cannot do and would not help if they could.
+    expect(run.lastHint).toBe('Almost — try a quicker hop');
   });
 });
 
