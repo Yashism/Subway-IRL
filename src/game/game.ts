@@ -66,7 +66,23 @@ export class Game {
   time = 0;
   s = 0;
   speed = TUNING.startSpeed;
+  /**
+   * The idle level the catch rule acts on: always 'ok' while the player rests on a hoverboard.
+   * This drives the catch, the warning, the chaser and the heartbeat.
+   */
   idleLevel: IdleLevel = 'ok';
+  /**
+   * Whether the player is actually moving, board or no board. The same clock as `idleLevel` but
+   * never excused by a rest — so a mission for "keep jogging without stopping", or the workout's
+   * active minutes, cannot be earned by standing still on a hoverboard.
+   */
+  movingLevel: IdleLevel = 'ok';
+  /**
+   * Whether the jog rule is in force this run — true when the input can measure jogging (the
+   * webcam), false for the keyboard, which has no rule to rest from. Lets the HUD offer a rest
+   * only to a player who has one.
+   */
+  jogRule = false;
   caughtReason: CaughtReason | null = null;
   pausedByLoss = false;
   runner = new Runner();
@@ -85,6 +101,8 @@ export class Game {
   private stepsAtStart = 0;
   /** Lane the runner is sliding back to after a stumble; one clip gives one stumble. */
   private bounceLane: Lane | null = null;
+  /** Whether the last step was a rest, so the step a rest ends on can restart the idle clock. */
+  private restWas = false;
 
   constructor(readonly options: GameOptions) {
     this.track = this.newTrack();
@@ -99,9 +117,26 @@ export class Game {
     return this.runs;
   }
 
-  /** Ms since the player last moved (jog step, jump, roll, lane change); 0 outside play. For telemetry. */
+  /**
+   * Ms since the player last moved (jog step, jump, roll, lane change), as the catch rule sees it:
+   * 0 outside play and while resting on a hoverboard, since a rest never counts towards a catch.
+   * For telemetry and the heartbeat.
+   */
   get idleMs(): number {
-    return this.state === 'playing' ? Math.max(0, this.idle.idleMs(this.clockMs)) : 0;
+    return this.state === 'playing' && !this.resting ? Math.max(0, this.idle.idleMs(this.clockMs)) : 0;
+  }
+
+  /** On a hoverboard mid-run: the player may stop jogging and cannot be caught for it. */
+  get resting(): boolean {
+    return this.state === 'playing' && this.powerups.hoverboard > 0;
+  }
+
+  /**
+   * The last `restWarnSeconds` of a rest, while the player is not moving: time to start jogging,
+   * because the idle clock restarts the moment the board ends.
+   */
+  get restEnding(): boolean {
+    return this.resting && this.powerups.hoverboard <= TUNING.restWarnSeconds && this.movingLevel !== 'ok';
   }
 
   /**
@@ -115,6 +150,8 @@ export class Game {
     this.catchTimer = 0;
     this.caughtReason = null;
     this.idleLevel = 'ok';
+    this.movingLevel = 'ok';
+    this.restWas = false;
     this.setState('menu', events);
     return events;
   }
@@ -179,6 +216,8 @@ export class Game {
     this.s = 0;
     this.speed = TUNING.startSpeed;
     this.idleLevel = 'ok';
+    this.movingLevel = 'ok';
+    this.restWas = false;
     this.caughtReason = null;
     this.stats = emptyStats();
     this.stepsAtStart = activity.steps;
@@ -223,7 +262,16 @@ export class Game {
     this.collide(events);
     if (this.state !== 'playing') return;
 
-    this.idleLevel = this.idle.update(this.clockMs, activity);
+    // A rest ends when the board runs out *or* is spent saving the player from a crash. Either way,
+    // restart the idle clock on the step it ends: the player gets the full catch window from here,
+    // not a catch for the time they were allowed to rest.
+    const resting = p.hoverboard > 0;
+    if (this.restWas && !resting) this.idle.resume(this.clockMs);
+    this.restWas = resting;
+    this.jogRule = activity.tracksJogging;
+
+    this.movingLevel = this.idle.update(this.clockMs, activity);
+    this.idleLevel = resting ? 'ok' : this.movingLevel;
     if (this.idleLevel === 'caught' && !this.options.god) {
       this.catchPlayer('idle', events);
       return;

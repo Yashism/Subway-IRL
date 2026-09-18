@@ -168,6 +168,112 @@ describe('Jog rule', () => {
   });
 });
 
+describe('Hoverboard rest', () => {
+  const REST_FRAMES = Math.round(TUNING.hoverboardSeconds * TUNING.stepHz);
+  const CATCH_FRAMES = Math.round((TUNING.idleCaughtMs / 1000) * TUNING.stepHz);
+
+  /** Steps until the board runs out (a still player by default); returns how many frames that took. */
+  function restOut(g: Game, a: ActivityStatus = STILL): number {
+    let n = 0;
+    while (g.powerups.hoverboard > 0 && n < REST_FRAMES + 10) {
+      g.step(1 / 60, [], a);
+      n++;
+    }
+    return n;
+  }
+
+  it('lets the player stand still for the whole board without being caught, and holds the TT off', () => {
+    const g = playing({}, JOGGING);
+    const gap = g.chaser.gap;
+    steps(g, 1, [{ type: 'hoverboard' }], STILL);
+    expect(g.resting).toBe(true);
+    steps(g, REST_FRAMES - 30, [], STILL);
+    expect(g.state).toBe('playing');
+    expect(g.resting).toBe(true);
+    // The catch rule rests…
+    expect(g.idleLevel).toBe('ok');
+    expect(g.idleMs).toBe(0);
+    expect(g.chaser.gap).toBeGreaterThanOrEqual(gap);
+    // …but the honest signal knows they have not moved for ~30 s.
+    expect(g.movingLevel).toBe('caught');
+  });
+
+  it('restarts the idle clock when the rest ends, giving the full catch window to start jogging', () => {
+    const g = playing({}, JOGGING);
+    steps(g, 1, [{ type: 'hoverboard' }], STILL);
+    restOut(g);
+    expect(g.resting).toBe(false);
+    expect(g.state).toBe('playing');
+    // Not caught for the 30 s they rested: the clock starts now, so the usual window applies.
+    steps(g, CATCH_FRAMES - 5, [], STILL);
+    expect(g.state).toBe('playing');
+    expect(g.idleLevel).toBe('warn');
+    steps(g, 10, [], STILL);
+    expect(g.state).toBe('caught');
+    expect(g.caughtReason).toBe('idle');
+  });
+
+  it('a player who starts jogging as the board ends just carries on', () => {
+    const g = playing({}, JOGGING);
+    steps(g, 1, [{ type: 'hoverboard' }], STILL);
+    restOut(g);
+    steps(g, CATCH_FRAMES * 3, [], JOGGING);
+    expect(g.state).toBe('playing');
+    expect(g.idleLevel).toBe('ok');
+    expect(g.movingLevel).toBe('ok');
+  });
+
+  it('a rest cut short by a crash save also restarts the clock, rather than catching at once', () => {
+    const g = playing({}, JOGGING);
+    steps(g, 1, [{ type: 'hoverboard' }], STILL);
+    steps(g, 240, [], STILL); // four still seconds on the board: well past the usual catch
+    place(g, { kind: 'auto', lane: 0, s: g.s + 8 });
+    const ev: GameEvent[] = [];
+    for (let i = 0; i < 120 && g.powerups.hoverboard > 0; i++) ev.push(...g.step(1 / 60, [], STILL));
+    expect(ev).toContainEqual({ type: 'hoverboardSaved' });
+    expect(g.resting).toBe(false);
+    steps(g, CATCH_FRAMES - 5, [], STILL);
+    expect(g.state).toBe('playing');
+    steps(g, 10, [], STILL);
+    expect(g.caughtReason).toBe('idle');
+  });
+
+  it('rescues a player already in the idle warning', () => {
+    const g = playing({}, JOGGING);
+    steps(g, 90, [], STILL);
+    expect(g.idleLevel).toBe('warn');
+    steps(g, 1, [{ type: 'hoverboard' }], STILL);
+    expect(g.idleLevel).toBe('ok');
+    steps(g, 120, [], STILL);
+    expect(g.state).toBe('playing');
+  });
+
+  it('tells a still player to get ready only in the last seconds, and never one who is jogging', () => {
+    const warnFrames = Math.round(TUNING.restWarnSeconds * TUNING.stepHz);
+    const still = playing({}, JOGGING);
+    steps(still, 1, [{ type: 'hoverboard' }], STILL);
+    steps(still, REST_FRAMES - warnFrames - 30, [], STILL);
+    expect(still.restEnding).toBe(false);
+    steps(still, 60, [], STILL);
+    expect(still.restEnding).toBe(true);
+
+    const jogger = playing({}, JOGGING);
+    steps(jogger, 1, [{ type: 'hoverboard' }], JOGGING);
+    steps(jogger, REST_FRAMES - 30, [], JOGGING);
+    expect(jogger.resting).toBe(true);
+    expect(jogger.restEnding).toBe(false);
+  });
+
+  it('changes nothing for keyboard play, which has no jog rule to rest from', () => {
+    const g = playing();
+    steps(g, 1, [{ type: 'hoverboard' }]);
+    restOut(g, KEYBOARD);
+    steps(g, CATCH_FRAMES * 3);
+    expect(g.state).toBe('playing');
+    expect(g.movingLevel).toBe('ok');
+  });
+});
+
 describe('Collisions', () => {
   it('ends the run on a head-on crash and starts a fresh run afterwards', () => {
     const g = playing();

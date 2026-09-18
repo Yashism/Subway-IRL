@@ -61,7 +61,14 @@ export const TUNING = {
   countdownSeconds: 3,
   // power-ups
   hoverboardsPerRun: 3,
+  /**
+   * The hoverboard is a rest: while it lasts the player may stop jogging and the TT cannot catch
+   * them for it. When it ends, for any reason, the idle clock restarts, so they get the full
+   * `idleCaughtMs` to start jogging again rather than being caught for time spent resting.
+   */
   hoverboardSeconds: 30,
+  /** Seconds before a rest ends that a player who is not moving is told to get ready to jog. */
+  restWarnSeconds: 3,
   crashGraceSeconds: 1,
   /** Extra metres cleared around the grace stretch after a hoverboard save. */
   crashClearMargin: 1,
