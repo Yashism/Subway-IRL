@@ -58,7 +58,12 @@ class Recorder implements LoopTelemetry {
   }
 }
 
-function setup(flowOpts: FlowOptions, withPose = true, autopilot = false) {
+interface SetupExtras {
+  /** A cinematic that takes the flow's `startGame` (the intro). */
+  hold?: () => boolean;
+}
+
+function setup(flowOpts: FlowOptions, withPose = true, autopilot = false, extra: SetupExtras = {}) {
   const game = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY_TRACK });
   // Returning player by default: the move check between calibration and ready has its own tests.
   const flow = new SessionFlow({ moveCheckSeen: true, ...flowOpts });
@@ -74,7 +79,10 @@ function setup(flowOpts: FlowOptions, withPose = true, autopilot = false) {
     telemetry: tel,
     autopilot: autopilot ? new Autopilot(game) : null,
     onEffect: (fx) => effects.push(fx),
+    holdStart: extra.hold,
+    onSkip: () => skips.push(loop.holdingStart),
   });
+  const skips: boolean[] = [];
   let now = 0;
   const frame = (n = 1) => {
     for (let i = 0; i < n; i++) {
@@ -94,7 +102,7 @@ function setup(flowOpts: FlowOptions, withPose = true, autopilot = false) {
     expect(effects.at(-1)).toEqual({ type: 'openCamera', cameraId: null });
     loop.dispatch({ type: 'cameraOk' });
   };
-  return { game, flow, keyboard, pose: pose!, tel, effects, loop, frame, key, openCamera, now: () => now };
+  return { game, flow, keyboard, pose: pose!, tel, effects, loop, frame, key, openCamera, skips, now: () => now };
 }
 
 describe('AppLoop: keyboard mode', () => {
@@ -517,5 +525,68 @@ describe('AppLoop: Home', () => {
     r.loop.dispatch({ type: 'home' });
     expect(r.game.state).toBe('menu');
     expect(r.tel.log).toEqual([]);
+  });
+});
+
+describe('AppLoop: a cinematic holding the run back (the intro)', () => {
+  it('takes the flow\u2019s startGame instead of queueing the run', () => {
+    const r = setup({ input: 'keyboard' }, false, false, { hold: () => true });
+    r.key('Enter');
+    r.frame(3);
+    expect(r.flow.screen).toBe('playing');
+    // The flow has moved on, but nothing has started: the cinematic owes us a queueStart().
+    expect(r.game.state).toBe('menu');
+    expect(r.loop.holdingStart).toBe(true);
+  });
+
+  it('swallows every further start while it holds, and reports each as a skip', () => {
+    const r = setup({ input: 'keyboard' }, false, false, { hold: () => true });
+    r.key('Enter');
+    r.frame();
+    r.key('Enter');
+    r.key('Enter');
+    r.frame(2);
+    expect(r.game.state).toBe('menu');
+    expect(r.skips.length).toBe(2);
+    // The skip is reported while the hold is still on, so a handler can act on it.
+    expect(r.skips.every(Boolean)).toBe(true);
+  });
+
+  it('a raised hand under the cinematic skips it rather than starting a run', () => {
+    const r = setup({ input: 'webcam' }, true, false, { hold: () => true });
+    r.pose.st.calibrated = true;
+    r.pose.st.tracking = true;
+    r.openCamera();
+    r.frame();
+    r.pose.commands.queue.push({ type: 'start' });
+    r.frame();
+    expect(r.flow.screen).toBe('playing');
+    expect(r.game.state).toBe('menu');
+    r.pose.commands.queue.push({ type: 'start' });
+    r.frame();
+    expect(r.skips.length).toBe(1);
+    expect(r.game.state).toBe('menu');
+  });
+
+  it('queueStart releases exactly one run, and the hold is over', () => {
+    const r = setup({ input: 'keyboard' }, false, false, { hold: () => true });
+    r.key('Enter');
+    r.frame();
+    r.loop.queueStart();
+    expect(r.loop.holdingStart).toBe(false);
+    r.frame();
+    expect(r.game.state).toBe('countdown');
+    // The next Enter is an ordinary one again: it passes through to the running game.
+    r.key('Enter');
+    r.frame();
+    expect(r.skips.length).toBe(0);
+  });
+
+  it('holdStart returning false leaves the old behaviour untouched', () => {
+    const r = setup({ input: 'keyboard' }, false, false, { hold: () => false });
+    r.key('Enter');
+    r.frame();
+    expect(r.game.state).toBe('countdown');
+    expect(r.loop.holdingStart).toBe(false);
   });
 });

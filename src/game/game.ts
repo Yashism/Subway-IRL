@@ -90,6 +90,15 @@ export class Game {
     this.track = this.newTrack();
   }
 
+  /**
+   * Runs started since this Game was created. The track of the next run is seeded with
+   * `options.seed + runsStarted`, which is what lets the daily challenge pin an exact track:
+   * set `options.seed = challenge.seed - game.runsStarted` before starting it.
+   */
+  get runsStarted(): number {
+    return this.runs;
+  }
+
   /** Ms since the player last moved (jog step, jump, roll, lane change); 0 outside play. For telemetry. */
   get idleMs(): number {
     return this.state === 'playing' ? Math.max(0, this.idle.idleMs(this.clockMs)) : 0;

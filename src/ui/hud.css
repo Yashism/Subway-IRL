@@ -1123,3 +1123,164 @@ html[data-pose-screen='moveCheck'] .hud[data-state='menu'] .hud-menu {
 .hud-summary .hud-home {
   margin-top: 10px;
 }
+
+/* ------------------------------------------------------------ menu rail, toasts, intro */
+
+/*
+ * The menu's left rail: mission board, daily challenge, level strip. The idle runner is framed to
+ * the right of the logo, so the rail takes the empty half of the screen and never covers him.
+ * It scrolls on its own when three missions plus the daily run past the viewport.
+ */
+.hud-menu-rail {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  /* Between the top of the screen and the key legend: the whole left column, scrolling if it
+     outgrows it, so the third mission is never quietly below the fold. */
+  top: max(16px, env(safe-area-inset-top));
+  bottom: 132px;
+  width: min(360px, 34vw);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  animation: hud-rise 0.4s 0.35s ease-out both;
+}
+/*
+ * The board is the rail: it must not also try to be 470px wide inside a 360px column, and it is
+ * anchored to the top rather than centred — a centred flex child in a scroll container has its own
+ * top clipped away, which on a laptop screen is exactly where the level and the daily challenge are.
+ */
+.hud-menu-rail.ms-board {
+  width: auto;
+  justify-content: flex-start;
+}
+.hud-menu-rail:empty,
+.hud-menu-rail[data-on='off'] {
+  display: none;
+}
+/* Below the size where a rail, a logo and a runner all fit, the board steps out of the way. */
+@media (max-width: 980px), (max-height: 560px) {
+  .hud-menu-rail {
+    display: none;
+  }
+}
+
+/*
+ * The summary card's mission list. The card grew a whole panel, so the screen it sits on scrolls
+ * and the card centres itself with auto margins — the plain `justify-content: center` of a
+ * scroll container clips its own top, which would hide RUN OVER and the score.
+ */
+.hud-summary {
+  justify-content: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 0;
+  box-sizing: border-box;
+}
+.hud-summary > .hud-card {
+  margin: auto 0;
+  flex: 0 0 auto;
+}
+.hud-card-missions {
+  margin-top: 10px;
+  text-align: left;
+  /* Capped so PLAY AGAIN never ends up below the fold; three missions fit on a tall screen. */
+  max-height: min(300px, 30vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hud-card-missions:empty {
+  display: none;
+}
+/* Inside the card the list is a section, not a card of its own: no second border, no drop shadow. */
+.hud-card-missions .ms-card {
+  padding: 4px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.hud-card-missions .ms-row {
+  padding: 6px 9px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.hud-card-foot {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* Live mission progress: a single toast, top centre, under the score row. */
+.hud-toasts {
+  position: absolute;
+  top: 88px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.hud-toasts:empty {
+  display: none;
+}
+
+/*
+ * The intro cinematic: nothing of the game's own UI is allowed over it, because the whole point is
+ * that the player is watching a scene and not reading a menu. The one exception is the line that
+ * says it can be skipped, which the spec insists must be true from frame one.
+ */
+.hud[data-intro='on'] .hud-screen,
+.hud[data-intro='on'] .hud-play,
+.hud[data-intro='on'] .hud-warn,
+.hud[data-intro='on'] .hud-go,
+.hud[data-intro='on'] .hud-vignette {
+  display: none;
+}
+.hud-intro-hint {
+  display: none;
+  position: absolute;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: 700 14px/1.2 var(--font-ui);
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
+  animation: hud-rise 0.5s 0.6s ease-out both;
+}
+.hud[data-intro='on'] .hud-intro-hint {
+  display: block;
+}
+
+/*
+ * A full-screen overlay (settings, the workout screen, the shop) owns the screen: the menu's cards
+ * and rail are translucent behind its scrim and compete with it, so they step aside while it is up.
+ * The pause card is deliberately *not* hidden — reading "Paused" behind the settings is the point.
+ */
+html[data-overlay='settings'] .hud-screen:not(.hud-paused),
+html[data-overlay='workout'] .hud-screen:not(.hud-paused),
+html[data-overlay='shop'] .hud-screen:not(.hud-paused),
+html[data-overlay='settings'] .hud-menu-rail,
+html[data-overlay='workout'] .hud-menu-rail,
+html[data-overlay='shop'] .hud-menu-rail {
+  display: none;
+}
+
+/*
+ * The summary card carries a mission panel now, so it starts tightening well before the old
+ * 760px short-screen rules. Scoped to the summary: the pause and menu cards are unchanged.
+ */
+@media (max-height: 1040px) {
+  .hud-summary .hud-card { padding: 40px 24px 12px; }
+  .hud-summary .hud-card-score { font-size: 62px; margin: 2px 0 8px; }
+  .hud-summary .hud-newbest { margin: -6px auto 6px; }
+  .hud-summary .hud-card-best { margin-bottom: 8px; }
+  .hud-summary .hud-tile { padding: 7px 4px 6px; }
+  .hud-summary .hud-card-time { margin-top: 8px; }
+  .hud-summary .hud-card-life { margin-top: 8px; padding: 7px 10px; }
+  .hud-summary .hud-again { margin-top: 10px; padding: 12px 34px 8px; font-size: 26px; }
+  .hud-summary .hud-again-hint { margin-top: 6px; }
+  .hud-summary .hud-card-foot { margin-top: 8px; }
+}

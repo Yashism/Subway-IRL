@@ -866,7 +866,7 @@ const RUNNER_DIMS: HumanDims = {
   shin: 0.39,
 };
 
-const C = {
+const BASE_C = {
   skin: 0xb9774b,
   skinDark: 0x9a5d37,
   hair: 0x1d1512,
@@ -888,6 +888,11 @@ const C = {
   can: 0x3fb27f,
   canCap: 0xe8433a,
 };
+
+const C = BASE_C;
+
+/** A shop character's colour overrides: any subset of the runner's colour map. */
+export type RunnerPalette = Readonly<Partial<Record<keyof typeof BASE_C, number>>>;
 
 /** z of a point on the face sphere (front = -z). */
 function faceZ(r: number, x: number, y: number, flat = 1): number {
@@ -914,7 +919,10 @@ function addFace(
   b.add(torus(0.032, 0.007, Math.PI, 10), 0x5a2418, head, T(0, cy + o.mouthY + 0.012, faceZ(r, 0, o.mouthY) + 0.004, 0.25, 0, Math.PI, 1, 0.8, 1), { detail: true });
 }
 
-function runnerParts(b: PartBuilder): void {
+function runnerParts(b: PartBuilder, palette?: RunnerPalette): void {
+  // A shop skin is the same kid in different clothes: the colour map is swapped for the build and
+  // nothing else moves, so every hitbox, bone and pose is shared with the default runner.
+  const C = palette ? { ...BASE_C, ...palette } : BASE_C;
   // --- Hips: jeans seat + hoodie hem.
   b.add(rbox(0.34, 0.2, 0.24, 0.08, 2), C.jeans, H.hips, T(0, -0.05, 0));
   b.add(rbox(0.36, 0.05, 0.26, 0.025), C.jeansDark, H.hips, T(0, 0.04, 0));
@@ -1015,14 +1023,21 @@ const RUNNER_BONES = humanBones(RUNNER_DIMS);
 export interface CreateRunnerOptions {
   /** 'procedural' (default) or 'glb' (CC-BY Quaternius model, loaded async). */
   style?: 'procedural' | 'glb';
+  /**
+   * An equipped shop character (src/app/progression.ts): `id` keys the built-geometry cache, so
+   * every skin is merged once and re-equipping one afterwards costs nothing.
+   */
+  skin?: { id: string; palette?: RunnerPalette } | null;
 }
 
 export function createRunner(opts: CreateRunnerOptions = {}): CharacterRig {
   if (opts.style === 'glb') return createGlbRig('runner');
+  const skin = opts.skin ?? null;
+  const palette = skin?.palette;
   return makeHumanRig(
-    'runner',
+    palette ? `runner:${skin!.id}` : 'runner',
     RUNNER_BONES,
-    runnerParts,
+    (b) => runnerParts(b, palette),
     { heavy: 0, clipboard: false },
   );
 }

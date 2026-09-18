@@ -6,7 +6,8 @@ import { OBSTACLES, type ObstacleKind } from '../game/obstacles';
 import type { Track, PowerupKind } from '../game/track';
 import { CHAPPAL_JUMP, NORMAL_JUMP } from '../game/runner';
 import { Fx } from './fx';
-import { createDog, createInspector, createRunner, type CharacterRig } from './models/characters';
+import { createDog, createInspector, createRunner, type CharacterRig, type RunnerPalette } from './models/characters';
+import { createIntro, type IntroSequence } from './intro';
 import {
   buildAuto,
   buildBanner,
@@ -17,6 +18,7 @@ import {
   buildPickup,
   coinGeometry,
   coinMaterial,
+  type BoardPalette,
 } from './models/props';
 import { SKY_HORIZON, buildSkyDome, buildSkyline, createSideScenery, type SideScenery } from './models/scenery';
 import { createCatenary, createTrackBed, type Catenary, type TrackBed } from './models/trackKit';
@@ -251,11 +253,17 @@ export class WorldView {
   private readonly coins: THREE.InstancedMesh;
   private readonly coinOutlines: THREE.InstancedMesh;
 
-  private readonly runner: CharacterRig;
-  private readonly board: THREE.Group;
+  private runner: CharacterRig;
+  private board: THREE.Group;
   private readonly rocket: THREE.Group;
   private readonly tt: CharacterRig;
   private readonly dog: CharacterRig;
+
+  /** The equipped shop skins, so a re-equip of the same id is a no-op. */
+  private characterSkin = '';
+  private boardSkin = '';
+  /** The intro cinematic while it owns the camera; null the rest of the time. */
+  private intro: IntroSequence | null = null;
 
   private track: Track | null = null;
   private trackS = 0;
@@ -367,6 +375,122 @@ export class WorldView {
   /** The suburban line this run shows. */
   get line(): LineId {
     return this.side.line;
+  }
+
+  /** Switches the line whose station names the platforms show (a live settings change). */
+  setLine(line: LineId): void {
+    this.side.setLine(line);
+  }
+
+  /**
+   * The player's comfort settings: `motion` drops the camera shake, roll, FOV pulse and speed
+   * lines, `effects` stops the particle emitters. Both are also a cheap win on a weak GPU.
+   */
+  setReduced(o: { motion?: boolean; effects?: boolean }): void {
+    this.fx.setReduced(o);
+  }
+
+  /**
+   * The equipped character and hoverboard (src/app/progression.ts). Each is built once per id and
+   * swapped in place; passing the same ids again does nothing, so this is safe to call every frame.
+   */
+  setSkins(skins: { character?: { id: string; palette?: RunnerPalette } | null; board?: { id: string; palette?: BoardPalette } | null }): void {
+    const c = skins.character ?? null;
+    if (c && c.id !== this.characterSkin) {
+      this.characterSkin = c.id;
+      const next = createRunner({ skin: c });
+      next.root.position.copy(this.runner.root.position);
+      next.root.visible = this.runner.root.visible;
+      this.scene.remove(this.runner.root);
+      this.scene.add(next.root);
+      this.runner = next;
+    }
+    const b = skins.board ?? null;
+    if (b && b.id !== this.boardSkin) {
+      this.boardSkin = b.id;
+      const next = buildHoverboard(b);
+      next.position.copy(this.board.position);
+      next.rotation.copy(this.board.rotation);
+      next.visible = this.board.visible;
+      this.scene.remove(this.board);
+      this.scene.add(next);
+      this.board = next;
+    }
+  }
+
+  // ---------------------------------------------------------------- the intro cinematic
+
+  /** The intro is on screen and owns the camera. */
+  get introPlaying(): boolean {
+    return this.intro !== null;
+  }
+
+  /** The beat being shown, 1..4, or 0 when no intro is running. */
+  get introBeat(): number {
+    return this.intro?.beat ?? 0;
+  }
+
+  /**
+   * Starts the intro cinematic. The game's own characters are hidden for its duration — the
+   * cinematic brings its own kid and TT — and the camera track ends exactly at this view's
+   * running camera, so `endIntro` can swap one for the other inside a single frame.
+   */
+  startIntro(o: { seed?: number; variant?: number } = {}): void {
+    if (this.intro) return;
+    this.intro = createIntro({
+      scene: this.scene,
+      camera: this.camera,
+      seed: o.seed,
+      variant: o.variant,
+      handover: { height: CAMERA.height, back: CAMERA.back, lookAhead: CAMERA.lookAhead, lookHeight: CAMERA.lookHeight, fov: CAMERA.fov },
+    });
+    this.runner.root.visible = false;
+    this.board.visible = this.rocket.visible = this.tt.root.visible = this.dog.root.visible = false;
+    this.fx.reset();
+  }
+
+  /** Skip: jumps to the last frame. The next `advanceIntro` reports it done. */
+  skipIntro(): void {
+    this.intro?.skip();
+  }
+
+  /** Advances the intro by `dt`. False once it has played out (then call `endIntro`). */
+  advanceIntro(dt: number): boolean {
+    const intro = this.intro;
+    if (!intro) return false;
+    return intro.update(Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.1) : 0);
+  }
+
+  /** Draws the intro frame (the cinematic owns the camera; the game is not read at all). */
+  renderIntro(): void {
+    if (!this.intro) return;
+    const cam = this.camera;
+    // Belt and braces: the cinematic brings its own kid and TT, and the game's are never in shot.
+    this.runner.root.visible = false;
+    this.board.visible = this.rocket.visible = this.tt.root.visible = this.dog.root.visible = false;
+    this.sky.position.copy(cam.position);
+    this.skyline.position.copy(cam.position);
+    this.bed.update(0);
+    this.ohe.update(0);
+    this.side.update(0);
+    this.sun.target.position.set(0, 0, -2);
+    this.sun.position.copy(this.sun.target.position).add(SUN_OFFSET);
+    this.renderer.render(this.scene, cam);
+  }
+
+  /**
+   * Hands the run back the camera. The real runner and chaser are put exactly where the game
+   * wants them *before* the cinematic is torn down, so the handover costs no visible frame, and
+   * the camera is left un-damped so the first game frame snaps to the pose the intro ended on.
+   */
+  endIntro(g: Game): void {
+    const intro = this.intro;
+    if (!intro) return;
+    this.runner.root.visible = true;
+    this.updateCharacters(g, 0);
+    this.camReady = false;
+    this.intro = null;
+    intro.dispose();
   }
 
   /**

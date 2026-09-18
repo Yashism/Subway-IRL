@@ -648,9 +648,25 @@ function rocketTexture() {
   });
 }
 
-function carpetTexture() {
-  return tex('carpet', 256, 512, (ctx, w, h) => {
-    ctx.fillStyle = '#b3122e';
+/** The default carpet's three colours; a board skin overrides any of them. */
+export const BOARD_BASE: Required<BoardPalette> = { base: 0xb3122e, trim: 0xffc93c, glow: 0xe5399b };
+
+export interface BoardPalette {
+  /** The field of the rug. */
+  base?: number;
+  /** Border, medallion rays and tassels. */
+  trim?: number;
+  /** The magic glow under it, and every other tassel. */
+  glow?: number;
+}
+
+const hex = (n: number): string => `#${(n >>> 0).toString(16).padStart(6, '0')}`;
+/** A darker shade of a palette colour, as a CSS string, for the rug's own pattern. */
+const dim = (n: number, k: number): string => `#${shade(n, k).getHexString()}`;
+
+function carpetTexture(key = 'carpet', p: Required<BoardPalette> = BOARD_BASE) {
+  return tex(key, 256, 512, (ctx, w, h) => {
+    ctx.fillStyle = hex(p.base);
     ctx.fillRect(0, 0, w, h);
     // borders
     const border = (inset: number, width: number, color: string) => {
@@ -658,10 +674,10 @@ function carpetTexture() {
       ctx.lineWidth = width;
       ctx.strokeRect(inset, inset, w - inset * 2, h - inset * 2);
     };
-    border(10, 20, '#1d3f9a');
-    border(10, 4, '#FFC93C');
-    border(26, 4, '#FFC93C');
-    ctx.fillStyle = '#FFC93C';
+    border(10, 20, dim(p.glow, 0.7));
+    border(10, 4, hex(p.trim));
+    border(26, 4, hex(p.trim));
+    ctx.fillStyle = hex(p.trim);
     for (let y = 14; y < h; y += 24) {
       ctx.beginPath();
       ctx.arc(10, y, 4, 0, Math.PI * 2);
@@ -669,7 +685,7 @@ function carpetTexture() {
       ctx.fill();
     }
     // field pattern
-    ctx.fillStyle = '#8c0c22';
+    ctx.fillStyle = dim(p.base, 0.62);
     for (let y = 60; y < h - 40; y += 40) {
       for (let x = 50; x < w - 40; x += 40) {
         ctx.beginPath();
@@ -683,26 +699,26 @@ function carpetTexture() {
     // central medallion
     ctx.save();
     ctx.translate(w / 2, h / 2);
-    ctx.fillStyle = '#1d3f9a';
+    ctx.fillStyle = dim(p.glow, 0.7);
     ctx.beginPath();
     ctx.ellipse(0, 0, 80, 130, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#FFC93C';
+    ctx.strokeStyle = hex(p.trim);
     ctx.lineWidth = 6;
     ctx.stroke();
-    ctx.fillStyle = '#FFC93C';
+    ctx.fillStyle = hex(p.trim);
     for (let i = 0; i < 8; i++) {
       ctx.rotate(Math.PI / 4);
       ctx.beginPath();
       ctx.ellipse(0, -52, 12, 34, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.fillStyle = '#29C7E0';
+    ctx.fillStyle = hex(p.glow);
     ctx.beginPath();
     ctx.arc(0, 0, 22, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    ctx.fillStyle = '#FFC93C';
+    ctx.fillStyle = hex(p.trim);
     for (const y of [70, h - 70]) {
       ctx.save();
       ctx.translate(w / 2, y);
@@ -1434,8 +1450,15 @@ export function buildPickup(kind: PickupKind): THREE.Group {
 
 const carpetWave = (z: number) => 0.035 * Math.sin(z * 4.2) + (z < -0.7 ? (z + 0.7) * (z + 0.7) * 0.9 : 0);
 
-export function buildHoverboard(): THREE.Group {
-  const baked = bake('hoverboard', () => {
+/**
+ * The flying carpet, optionally in a shop skin (src/app/progression.ts). A skin is a recolour:
+ * `id` keys the baked geometry, the rug texture and the two materials that are not vertex-coloured,
+ * so a board is built once and equipping it again later costs nothing.
+ */
+export function buildHoverboard(skin?: { id: string; palette?: BoardPalette } | null): THREE.Group {
+  const p: Required<BoardPalette> = { ...BOARD_BASE, ...(skin?.palette ?? {}) };
+  const key = skin?.palette ? `hoverboard:${skin.id}` : 'hoverboard';
+  const baked = bake(key, () => {
     const kit = new Kit();
     const W = 0.9;
     const L = 1.8;
@@ -1451,8 +1474,8 @@ export function buildHoverboard(): THREE.Group {
         const x = -W / 2 + 0.075 + i * ((W - 0.15) / 5);
         const zz = z + dir * 0.03;
         const y = carpetWave(z);
-        kit.add('detail', ball(0.022, 5, 4), { p: [x, y, zz] }, 0xffc93c);
-        kit.add('detail', new THREE.ConeGeometry(0.03, 0.1, 5), { p: [x, y - 0.02, zz + dir * 0.06], r: [-dir * 1.25, 0, 0] }, i % 2 ? 0xffc93c : 0xe5399b);
+        kit.add('detail', ball(0.022, 5, 4), { p: [x, y, zz] }, p.trim);
+        kit.add('detail', new THREE.ConeGeometry(0.03, 0.1, 5), { p: [x, y - 0.02, zz + dir * 0.06], r: [-dir * 1.25, 0, 0] }, i % 2 ? p.trim : p.glow);
       }
     }
     // magic glow under the carpet
@@ -1467,7 +1490,35 @@ export function buildHoverboard(): THREE.Group {
     for (const b of baked) b.geometry.userData.centred = true;
   }
   const group = instantiate(baked, 'hoverboard', false);
+  if (skin?.palette) {
+    // The rug and the glow are the two parts whose colour is not in the vertex stream: give this
+    // skin its own materials rather than tinting the shared ones out from under the default board.
+    for (const child of group.children) {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh || mesh.userData.isOutline) continue;
+      if (mesh.name.endsWith('-carpet')) mesh.material = carpetMaterial(key, p);
+      else if (mesh.name.endsWith('-glow')) mesh.material = boardGlowMaterial(key, p);
+    }
+  }
   return group;
+}
+
+function carpetMaterial(key: string, p: Required<BoardPalette>): THREE.Material {
+  return material(`${key}:carpet`, () => lift(toonMaterial({ vertexColors: true, map: carpetTexture(key, p) }), 0.08));
+}
+
+function boardGlowMaterial(key: string, p: Required<BoardPalette>): THREE.Material {
+  return material(`${key}:glow`, () =>
+    basicMaterial({
+      map: glowTexture(),
+      color: p.glow,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------

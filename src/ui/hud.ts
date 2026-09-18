@@ -251,6 +251,10 @@ function hudButton(parent: HTMLElement, cls: string, label: string, onClick: () 
 export interface HudHandlers {
   /** The Home button: back to the main menu, abandoning the run on screen. */
   onHome?(): void;
+  /** The ⚙ on the menu and the pause card. */
+  onSettings?(): void;
+  /** "Your runs": the workout screen, from the menu and from the summary card. */
+  onWorkout?(): void;
 }
 
 /** "Live monitor (M)": opens monitor.html in its own popup window. */
@@ -316,6 +320,7 @@ export class Hud {
   private readonly pauseControls: HTMLElement;
   private readonly handlers: HudHandlers;
   private controlsCard: HTMLElement | null = null;
+  private toastEl: HTMLElement | null = null;
   private readonly sum: Record<keyof HudSummary, HTMLElement>;
   private readonly best: HTMLElement;
   private readonly menuStats: HTMLElement;
@@ -327,6 +332,12 @@ export class Hud {
   private readonly lifeVals: Record<keyof HudProfileModel['lifetime'], HTMLElement>;
   private readonly view: HudProfileView = { profile: null, last: null };
   private readonly menuFoot: HTMLElement;
+  /** The menu's left rail: the mission board, the daily challenge and the level strip live here. */
+  readonly menuPanel: HTMLElement;
+  /** The summary card's mission list, between the lifetime totals and PLAY AGAIN. */
+  readonly summaryPanel: HTMLElement;
+  private readonly toastHost: HTMLElement;
+  private readonly introHint: HTMLElement;
 
   private readonly lastText = new Map<HTMLElement, string>();
   private readonly lastStyle = new Map<string, string>();
@@ -392,9 +403,12 @@ export class Hud {
     el('span', 'hud-menu-pill-unit', coinPill, 'coins');
     const cta = el('div', 'hud-cta', menu);
     el('span', 'hud-cta-text', cta, 'PRESS ENTER');
+    this.menuPanel = el('div', 'hud-menu-rail', menu);
     const bottom = el('div', 'hud-menu-bottom', menu);
     const foot = el('div', 'hud-menu-foot', bottom);
     this.menuFoot = el('span', 'hud-menu-foot-text', foot, 'Press Enter to start');
+    hudButton(foot, 'hud-btn hud-gear', '\u2699 Settings', () => this.handlers.onSettings?.());
+    hudButton(foot, 'hud-btn hud-workout', '\u{1F4CA} Your runs', () => this.handlers.onWorkout?.());
     monitorLink(foot);
     const controls = el('div', 'hud-controls', bottom);
     const control = (keys: string[], label: string) => {
@@ -453,10 +467,13 @@ export class Hud {
       return v;
     };
     this.lifeVals = { runs: lifeItem('Runs'), coins: lifeItem('Coins ₹'), distance: lifeItem('Distance') };
+    this.summaryPanel = el('div', 'hud-card-missions', card);
     const again = el('div', 'hud-again', card);
     el('span', 'hud-again-text', again, 'PLAY AGAIN');
     el('div', 'hud-again-hint', card, 'Press Enter to run again');
-    hudButton(card, 'hud-btn hud-home', '\u2302 Main menu', () => this.handlers.onHome?.());
+    const cardFoot = el('div', 'hud-card-foot', card);
+    hudButton(cardFoot, 'hud-btn hud-workout', '\u{1F4CA} Your runs', () => this.handlers.onWorkout?.());
+    hudButton(cardFoot, 'hud-btn hud-home', '\u2302 Main menu', () => this.handlers.onHome?.());
     this.sum = { score: sumScore, coins: sumCoins, distance: sumDist, jumps: sumJumps, rolls: sumRolls, time: sumTime };
 
     // Paused.
@@ -466,8 +483,33 @@ export class Hud {
     this.pauseSub = el('div', 'hud-pause-sub', paused);
     this.pauseControls = el('div', 'hud-pause-controls', paused);
     const pauseFoot = el('div', 'hud-pause-foot', paused);
+    hudButton(pauseFoot, 'hud-btn hud-gear', '\u2699 Settings', () => this.handlers.onSettings?.());
     monitorLink(pauseFoot);
     hudButton(pauseFoot, 'hud-btn hud-home', '\u2302 Main menu', () => this.handlers.onHome?.());
+
+    // Live mission toasts, and the intro's skip line. Both sit above every card.
+    this.toastHost = el('div', 'hud-toasts', root);
+    this.introHint = el('div', 'hud-intro-hint', root, 'Any key to skip');
+  }
+
+  /**
+   * The intro cinematic owns the screen: every card, the play HUD and the notices step aside, and
+   * the only thing left is the line telling the player they can cut it short.
+   */
+  setIntro(on: boolean): void {
+    if (on) this.root.dataset.intro = 'on';
+    else delete this.root.dataset.intro;
+  }
+
+  /**
+   * The live mission toast. A node shows it, null clears it — the caller owns the timing, because
+   * the HUD has no clock of its own.
+   */
+  setMissionToast(node: HTMLElement | null): void {
+    if (node === this.toastEl) return;
+    this.toastEl = node;
+    if (node) this.toastHost.replaceChildren(node);
+    else this.toastHost.replaceChildren();
   }
 
   /**

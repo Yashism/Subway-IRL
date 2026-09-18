@@ -2332,7 +2332,9 @@ export interface SideScenery {
   plan: CorridorPlan;
   meshes: THREE.InstancedMesh[];
   /** The suburban line whose station names the platforms show. */
-  line: LineId;
+  readonly line: LineId;
+  /** Switches which line's station names the boards show; the next update() picks it up. */
+  setLine(line: LineId): void;
   update(runnerS: number): void;
   isStation(s: number): boolean;
   /** The station of the platform at, or next ahead of, track position s. */
@@ -2402,7 +2404,7 @@ export function createSideScenery(seed = 1, o: SideSceneryOptions = {}): SideSce
   const behind = o.behind ?? VIEW_BEHIND;
   const ahead = o.ahead ?? VIEW_AHEAD;
   const lodFar = o.lodFar ?? Infinity;
-  const line = o.line ?? lineForSeed(seed);
+  let line = o.line ?? lineForSeed(seed);
   const plan = planCorridor(seed);
   const root = new THREE.Group();
   root.name = 'sideScenery';
@@ -2487,7 +2489,12 @@ export function createSideScenery(seed = 1, o: SideSceneryOptions = {}): SideSce
         show(set.minor, set.nearCount);
       }
     },
-    line,
+    get line() {
+      return line;
+    },
+    setLine(next: LineId) {
+      line = next;
+    },
     isStation: (s: number) => isStationAt(plan, s),
     stationAt: (s: number) => stationForPlatform(line, platformNumberAt(plan, s)),
   };

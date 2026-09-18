@@ -208,7 +208,91 @@ describe('Hud: the Home button', () => {
     const h = hud();
     const card = h.root.querySelector('.hud-summary .hud-card')!;
     const kids = [...card.children];
-    expect(kids.at(-1)!.classList.contains('hud-home')).toBe(true);
+    // The card ends with the quiet button row, and Home is the last thing in it.
+    const foot = kids.at(-1)!;
+    expect(foot.classList.contains('hud-card-foot')).toBe(true);
+    expect([...foot.children].at(-1)!.classList.contains('hud-home')).toBe(true);
     expect(kids.indexOf(card.querySelector('.hud-again')!)).toBeLessThan(kids.length - 2);
+  });
+});
+
+describe('Hud: settings, the workout screen and the mission slots', () => {
+  function hud() {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const log: string[] = [];
+    const h = new Hud(root, {
+      onHome: () => log.push('home'),
+      onSettings: () => log.push('settings'),
+      onWorkout: () => log.push('workout'),
+    });
+    return { root, h, log };
+  }
+
+  it('offers ⚙ Settings from the menu and from the pause card, and nowhere a run can be started by reflex', () => {
+    const h = hud();
+    const gears = [...h.root.querySelectorAll<HTMLButtonElement>('.hud-gear')];
+    expect(gears).toHaveLength(2);
+    expect(h.root.querySelector('.hud-menu .hud-gear')).not.toBeNull();
+    expect(h.root.querySelector('.hud-paused .hud-gear')).not.toBeNull();
+    expect(h.root.querySelector('.hud-summary .hud-gear')).toBeNull();
+    for (const g of gears) {
+      g.focus();
+      g.click();
+      expect(document.activeElement).not.toBe(g);
+    }
+    expect(h.log).toEqual(['settings', 'settings']);
+  });
+
+  it('offers "Your runs" from the menu and from the summary card', () => {
+    const h = hud();
+    expect(h.root.querySelector('.hud-menu .hud-workout')).not.toBeNull();
+    expect(h.root.querySelector('.hud-summary .hud-workout')).not.toBeNull();
+    h.root.querySelector<HTMLButtonElement>('.hud-summary .hud-workout')!.click();
+    expect(h.log).toEqual(['workout']);
+  });
+
+  it('is inert rather than broken when the page wired no handlers', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    new Hud(root);
+    for (const sel of ['.hud-gear', '.hud-workout']) {
+      expect(() => root.querySelector<HTMLButtonElement>(sel)!.click()).not.toThrow();
+    }
+  });
+
+  it('gives the mission board a home on the menu and the mission list one on the summary card', () => {
+    const h = hud();
+    expect(h.h.menuPanel.closest('.hud-menu')).not.toBeNull();
+    expect(h.h.summaryPanel.closest('.hud-summary .hud-card')).not.toBeNull();
+    // The summary list sits above PLAY AGAIN, not between it and the quiet button row.
+    const card = h.root.querySelector('.hud-summary .hud-card')!;
+    const kids = [...card.children];
+    expect(kids.indexOf(h.h.summaryPanel)).toBeLessThan(kids.indexOf(card.querySelector('.hud-again')!));
+  });
+
+  it('shows one mission toast at a time and clears it on null', () => {
+    const h = hud();
+    const host = h.root.querySelector('.hud-toasts')!;
+    const a = document.createElement('div');
+    a.className = 'one';
+    const b = document.createElement('div');
+    b.className = 'two';
+    h.h.setMissionToast(a);
+    expect([...host.children]).toEqual([a]);
+    h.h.setMissionToast(b);
+    expect([...host.children]).toEqual([b]);
+    h.h.setMissionToast(null);
+    expect(host.children).toHaveLength(0);
+  });
+
+  it('the intro takes the screen: every card steps aside, the skip line does not', () => {
+    const h = hud();
+    expect(h.root.dataset.intro).toBeUndefined();
+    h.h.setIntro(true);
+    expect(h.root.dataset.intro).toBe('on');
+    expect(h.root.querySelector('.hud-intro-hint')!.textContent).toMatch(/skip/i);
+    h.h.setIntro(false);
+    expect(h.root.dataset.intro).toBeUndefined();
   });
 });

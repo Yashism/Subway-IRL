@@ -136,6 +136,14 @@ export class PosePip {
     return this.shown;
   }
 
+  /**
+   * Mirror the preview (settings). Display only: the landmarks are detected and drawn in mirrored
+   * coordinates either way, so un-mirroring flips the picture back and the skeleton with it.
+   */
+  setMirror(on: boolean): void {
+    this.root.dataset.mirror = on ? 'on' : 'off';
+  }
+
   /** The player's choice (V key / ?pip=0). Only hides the corner card; the calibration stage always shows. */
   setVisible(v: boolean): void {
     if (v === this.shown) return;

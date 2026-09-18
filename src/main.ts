@@ -1,9 +1,15 @@
 import './ui/hud.css';
+import { AudioPrefs } from './app/audioPrefs';
 import { SessionFlow, type FlowEffect, type InputMode, type ModeChoice, type MoveCheckPolicy } from './app/flow';
+import { IntroRunner, introMode, shouldPlayIntro } from './app/intro';
+import { applyLiveSettings } from './app/liveSettings';
 import { AppLoop } from './app/loop';
 import { MoveCheckSession } from './app/moveCheckSession';
 import { fixtureReplay, loadSession, PoseRuntime, sessionReplay } from './app/poseRuntime';
-import { ProfileStore, type RunRecord } from './app/profile';
+import { ProfileStore } from './app/profile';
+import { ProgressionStore, dailyView, fmtCoins, levelProgress, shopItem, shopModel } from './app/progression';
+import { RunSession } from './app/session';
+import { SettingsStore, applyUrlFlags, type GameSettings } from './app/settings';
 import { Autopilot } from './game/autopilot';
 import type { Difficulty } from './game/config';
 import { Game } from './game/game';
@@ -15,10 +21,13 @@ import type { PlayMode } from './pose/types';
 import type { SessionRecording } from './telemetry/messages';
 import { TelemetryPublisher } from './telemetry/publisher';
 import { Hud, menuNotice, openMonitorWindow } from './ui/hud';
+import { MissionBoard, renderMissionList, renderMissionToast } from './ui/missionCard';
 import { MoveCheckScreen, renderSummaryCard } from './ui/moveCheckScreen';
 import { PosePip, pipVisibleFromUrl } from './ui/pip';
-import { PoseScreens } from './ui/poseScreens';
-import { isLineId } from './world/stations';
+import { PoseScreens, cameraOptions } from './ui/poseScreens';
+import { SettingsScreen, type SettingsView } from './ui/settings';
+import { ShopScreen } from './ui/shop';
+import { WorkoutScreen } from './ui/workout';
 import { WorldView, type ToneChoice } from './world/worldView';
 
 // ---------------------------------------------------------------- URL options
@@ -28,7 +37,8 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?session=<file>          replay a monitor recording from tests/fixtures/sessions/
 //   ?mode=full|small         force the play mode; ?monitor opens the live monitor
 //   ?movecheck=skip|force    never / always run the guided move check after calibration
-//   ?difficulty= ?seed= ?god ?tone= ?line= ?pip=0 ?perf ?saveAutopilot
+//   ?intro=always|off        force / suppress the intro cinematic (default: once per session)
+//   ?difficulty= ?seed= ?god ?tone= ?line= ?sens= ?reduced ?pip=0 ?perf ?saveAutopilot
 //   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
 //                            webcam mode, because the keyboard then claims to track jogging.
 
@@ -52,16 +62,30 @@ if (sessionFile) {
 
 const sessionMeta = session?.meta ?? null;
 
+// ---------------------------------------------------------------- the player's settings
+//
+// The saved settings are the baseline for everything below (difficulty, line, sensitivity, play
+// mode, comfort). URL flags win over them for this session only and are never written back, so a
+// shared link cannot change someone's saved game; a recorded session wins over both, because a
+// replay must show what the player actually experienced.
+
+const settingsStore = new SettingsStore();
+let settings: GameSettings = settingsStore.override(applyUrlFlags(settingsStore.get(), location.search));
+const audioPrefs = new AudioPrefs();
+
 const DIFFICULTIES: Difficulty[] = ['chill', 'cardio', 'beast'];
-const requested = (sessionMeta?.difficulty ?? params.get('difficulty')) as Difficulty | null;
-const difficulty: Difficulty = requested && DIFFICULTIES.includes(requested) ? requested : 'cardio';
+const requested = (sessionMeta?.difficulty ?? null) as Difficulty | null;
+const difficulty: Difficulty = requested && DIFFICULTIES.includes(requested) ? requested : settings.difficulty;
 const seedParam = Number(params.get('seed'));
 const seed = sessionMeta ? sessionMeta.seed : Number.isFinite(seedParam) && params.has('seed') ? seedParam : Math.floor(Math.random() * 1e6);
+/** The seed normal runs use; the daily challenge borrows `game.options.seed` and hands it back. */
+const baseSeed = seed;
 
 const game = new Game({ seed, difficulty, god: params.has('god') });
 const keyboard = new KeyboardInput();
 keyboard.jogEnabled = params.has('jog');
-keyboard.attach(window);
+/** Detached while a full-screen overlay is up, so Enter cannot start a run behind it. */
+let detachKeyboard: (() => void) | null = keyboard.attach(window);
 const autopilotOn = flagOn('autopilot');
 const autopilot = autopilotOn ? new Autopilot(game) : null;
 
@@ -75,12 +99,14 @@ const forcedMode: PlayMode | null = sessionMeta
   : modeParam === 'full' || modeParam === 'small'
     ? modeParam
     : null;
+/** The play mode in force: a recorded session, then `?mode=`, then the saved setting. */
+const initialMode: PlayMode | null = forcedMode ?? (settings.mode === 'auto' ? null : settings.mode);
 const runtime = new PoseRuntime({
   replay,
   replayName,
   controller: {
-    forcedMode,
-    sensitivity: sessionMeta?.sensitivity,
+    forcedMode: initialMode,
+    sensitivity: sessionMeta?.sensitivity ?? settings.sensitivity,
     thresholds: sessionMeta?.thresholds as Partial<Thresholds> | undefined,
   },
 });
@@ -109,7 +135,7 @@ const moveCheck = new MoveCheckSession({
 const flow = new SessionFlow({
   input: initialInput,
   cameraId: runtime.savedCameraId(),
-  modeChoice: (forcedMode ?? 'auto') as ModeChoice,
+  modeChoice: (forcedMode ?? settings.mode) as ModeChoice,
   moveCheck: replayingSession && movecheckPolicy !== 'force' ? 'skip' : movecheckPolicy,
   moveCheckSeen: moveCheck.seen,
 });
@@ -119,13 +145,16 @@ const flow = new SessionFlow({
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const TONES: ToneChoice[] = ['neutral', 'agx', 'aces'];
 const toneParam = params.get('tone') as ToneChoice | null;
-const lineParam = params.get('line');
 const world = new WorldView(canvas, {
   seed,
   tone: toneParam && TONES.includes(toneParam) ? toneParam : undefined,
-  line: isLineId(lineParam) ? lineParam : undefined,
+  line: settings.line,
 });
-const hud = new Hud(document.getElementById('hud')!, { onHome: () => loop.dispatch({ type: 'home' }) });
+const hud = new Hud(document.getElementById('hud')!, {
+  onHome: () => loop.dispatch({ type: 'home' }),
+  onSettings: () => setOverlay('settings'),
+  onWorkout: () => setOverlay('workout'),
+});
 const stepper = new FixedStepper();
 
 // The pose UI stacks above the HUD, so it goes after #hud in the DOM.
@@ -143,6 +172,169 @@ const moveCheckLayer = new MoveCheckScreen(moveCheckRoot, moveCheck.handlers, {
 const pip = new PosePip(pipRoot, { visible: pipVisibleFromUrl(location.search) });
 pip.attachToggleKey(window);
 runtime.sampleLuma = (t) => pip.sampleLuma(t);
+applySettings(settings);
+
+// ---------------------------------------------------------------- progression, missions, the shop
+
+// Autopilot and pose-replay runs are demos: not saved unless ?saveAutopilot is set. The same flag
+// governs the profile, the wallet and the mission board — a bot must never bank a single coin.
+const profile = new ProfileStore();
+const progression = new ProgressionStore();
+const saveRuns = !(autopilotOn || runtime.isReplay) || params.has('saveAutopilot');
+const runs = new RunSession({ progression, profile, saveRuns });
+
+const missionBoard = new MissionBoard(hud.menuPanel, {
+  onPlayDaily: () => startDaily(),
+  onShop: () => setOverlay('shop'),
+});
+
+// ---------------------------------------------------------------- full-screen overlays
+//
+// Settings, the workout screen and the shop each own the whole screen while they are up. They sit
+// above every other layer, the keyboard is detached under them (so Enter cannot start a run behind
+// one) and a live run is pinned down first, exactly as the flow does for its own screens.
+
+type Overlay = 'none' | 'settings' | 'workout' | 'shop';
+let overlay: Overlay = 'none';
+
+const settingsRoot = document.body.appendChild(document.createElement('div'));
+const workoutRoot = document.body.appendChild(document.createElement('div'));
+const shopRoot = document.body.appendChild(document.createElement('div'));
+
+const settingsScreen = new SettingsScreen(settingsRoot, {
+  change: (patch) => {
+    // The mode is the one setting the flow owns: it re-calibrates and re-applies that mode's
+    // tuning, so it goes through the flow rather than straight onto the controller.
+    if (patch.mode !== undefined && patch.mode !== settings.mode) loop.dispatch({ type: 'chooseMode', mode: patch.mode });
+    applySettings(settingsStore.set(patch));
+    syncOverlays();
+  },
+  audioChange: (patch) => {
+    audioPrefs.set(patch);
+    syncOverlays();
+  },
+  chooseCamera: (id) => {
+    runtime.saveCameraId(id);
+    loop.dispatch({ type: 'chooseCamera', id });
+    syncOverlays();
+  },
+  redoMoveCheck: () => {
+    setOverlay('none');
+    // From the ready screen the check runs on the spot; from anywhere else the calibration that
+    // precedes it has to happen first, and the flow queues the check behind it.
+    loop.dispatch(flow.screen === 'ready' ? { type: 'checkMoves' } : { type: 'recalibrate' });
+  },
+  resetTuning: () => {
+    moveCheck.store.clear(currentMode() ?? undefined);
+    moveCheck.lastSummary = null;
+    moveCheck.applyFor(null);
+    flow.setMoveCheckSeen(moveCheck.seen);
+    controlsFrom = null;
+    sendMeta();
+    syncOverlays();
+  },
+  exportData: () => exportData(),
+  clearHistory: () => {
+    profile.reset();
+    hud.setProfile(profile.profile, null);
+    syncOverlays();
+  },
+  openWorkout: () => setOverlay('workout'),
+  close: () => setOverlay('none'),
+});
+
+const workoutScreen = new WorkoutScreen(workoutRoot, {
+  startRun: () => {
+    setOverlay('none');
+    loop.dispatch({ type: 'startPressed' });
+  },
+  openSettings: () => setOverlay('settings'),
+  close: () => setOverlay('none'),
+});
+
+const shopScreen = new ShopScreen(shopRoot, {
+  buy: (id) => {
+    const bought = progression.buy(id);
+    if (bought.ok && (bought.item.kind === 'character' || bought.item.kind === 'board')) progression.equip(id);
+    applySkins();
+    syncOverlays();
+  },
+  equip: (id) => {
+    progression.equip(id);
+    applySkins();
+    syncOverlays();
+  },
+  close: () => setOverlay('none'),
+});
+
+/** What the settings screen renders: the three stores it shows, plus what the camera can do. */
+function settingsView(): SettingsView {
+  return {
+    open: true,
+    settings: settingsStore.get(),
+    audio: audioPrefs.get(),
+    cameras: cameraOptions(runtime.cameras, runtime.activeCameraId ?? flow.model.cameraId),
+    webcam: flow.input === 'webcam',
+    hasTuning: !moveCheck.store.empty,
+  };
+}
+
+function syncOverlays(): void {
+  settingsScreen.update(overlay === 'settings' ? settingsView() : null);
+  workoutScreen.update(overlay === 'workout' ? { open: true, profile: profile.profile, weightKg: settings.weightKg } : null);
+  shopScreen.update(overlay === 'shop' ? shopModel(progression.state) : null);
+  document.documentElement.dataset.overlay = overlay;
+}
+
+function setOverlay(next: Overlay): void {
+  if (next === overlay) return;
+  // Nothing covers a live run: pin it down first, the same ruling the flow's own screens follow.
+  // A run paused by a lost pose counts — it resumes the moment tracking is back, which would
+  // restart it behind the settings screen.
+  const live = game.state === 'playing' || game.state === 'countdown' || (game.state === 'paused' && game.pausedByLoss);
+  if (next !== 'none' && live) loop.pauseGame();
+  overlay = next;
+  if (next === 'none') detachKeyboard ??= keyboard.attach(window);
+  else {
+    detachKeyboard?.();
+    detachKeyboard = null;
+  }
+  syncOverlays();
+}
+
+/** "Export my data": the profile and the progression, as one JSON file. */
+function exportData(): void {
+  const body = JSON.stringify(
+    { exportedAt: new Date().toISOString(), profile: JSON.parse(profile.exportJson()), progression: progression.state },
+    null,
+    2,
+  );
+  const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `subway-irl-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Puts a settings change in force, live. Called for the saved values at boot and on every change. */
+function applySettings(next: GameSettings): void {
+  settings = next;
+  applyLiveSettings(
+    // A recorded session replays with the sensitivity it was played at.
+    { controller: runtime.ctrl, game, world, pip, ownsSensitivity: sessionMeta?.sensitivity === undefined },
+    next,
+  );
+}
+
+/** The equipped runner and hoverboard, from the shop. Cheap to call: the world ignores a repeat. */
+function applySkins(): void {
+  const { character, board } = progression.state.unlocks;
+  world.setSkins({
+    character: { id: character, palette: shopItem(character)?.palette },
+    board: { id: board, palette: shopItem(board)?.palette },
+  });
+}
 
 /**
  * The pause screen's "Controls" cheat sheet: the card this session's check ended on, or one built
@@ -174,7 +366,7 @@ function syncPipVideo(show: boolean): void {
 const telemetry = new TelemetryPublisher();
 const inputLabel = (): string =>
   autopilotOn ? 'autopilot' : runtime.isReplay ? `replay:${runtime.replayName}` : flow.input;
-const currentMode = (): string | null => runtime.ctrl.baseline?.mode ?? runtime.ctrl.forcedMode ?? null;
+const currentMode = (): PlayMode | null => runtime.ctrl.baseline?.mode ?? runtime.ctrl.forcedMode ?? null;
 let metaKey = '';
 function sendMeta(): void {
   const ctrl = runtime.ctrl;
@@ -274,38 +466,56 @@ function onEffect(fx: FlowEffect): void {
   }
 }
 
-// ---------------------------------------------------------------- saved profile
+// ---------------------------------------------------------------- the run ledger
 
-// Autopilot and pose-replay runs are demos: not saved unless ?saveAutopilot is set.
-const profile = new ProfileStore();
-const saveRuns = !(autopilot || runtime.isReplay) || params.has('saveAutopilot');
 hud.setProfile(profile.profile, null);
+applySkins();
 
-/** Records the run that just ended; called once per run, on entering the summary. */
+/** The mission list on the summary card, rebuilt only when a run actually ends. */
+function showSummary(missions: ReturnType<typeof runs.endRun>['missions']): void {
+  if (missions.length) hud.summaryPanel.replaceChildren(renderMissionList(missions, { title: 'Missions' }));
+  else hud.summaryPanel.replaceChildren();
+}
+
+/**
+ * The run that just ended, banked exactly once — profile, wallet, missions and the daily, all
+ * through the one hook the game gives us for "this run is over". A run abandoned with Home goes
+ * to `menu` instead and never arrives here; a demo run arrives and is deliberately worth nothing.
+ */
 function recordRun(): void {
-  if (!saveRuns) {
-    hud.setProfile(profile.profile, null);
-    return;
-  }
-  const s = game.stats;
-  const run: RunRecord = {
-    at: Date.now(),
-    score: s.score,
-    coins: s.coins,
-    distance: s.distance,
-    timeSec: s.timeSec,
-    jumps: s.jumps,
-    rolls: s.rolls,
-    laneChanges: s.laneChanges,
-    steps: s.steps,
-    hoverboardsUsed: s.hoverboardsUsed,
-    caughtReason: game.caughtReason,
-    difficulty,
-    seed,
-    input: autopilot ? 'autopilot' : flow.input,
-  };
-  const result = profile.recordRun(run);
-  hud.setProfile(profile.profile, result);
+  const result = runs.endRun(
+    { difficulty: game.options.difficulty, seed: game.options.seed, input: autopilot ? 'autopilot' : flow.input },
+    game.caughtReason,
+  );
+  hud.setProfile(profile.profile, result.record);
+  showSummary(result.missions);
+  // The daily borrowed the seed; hand it back so the next ordinary run gets a fresh track.
+  game.options.seed = baseSeed;
+}
+
+// ---------------------------------------------------------------- the intro cinematic
+
+const intro = new IntroRunner({
+  stage: world,
+  seed,
+  onEnd: () => {
+    hud.setIntro(false);
+    // Released here, so the countdown's first frame is the one right after the handover: the
+    // camera never passes through the menu shot and nothing pops.
+    loop.queueStart();
+  },
+});
+const introPolicy = introMode(location.search);
+
+/** The spec's rule, asked once per `startGame`: first run of a session, never in front of a bot. */
+function wantsIntro(): boolean {
+  return shouldPlayIntro({
+    mode: introPolicy,
+    autopilot: autopilotOn,
+    replay: runtime.isReplay,
+    keyboardTest: params.get('input') === 'keyboard',
+    played: intro.played,
+  });
 }
 
 const loop: AppLoop = new AppLoop({
@@ -316,21 +526,65 @@ const loop: AppLoop = new AppLoop({
   pose: runtime,
   telemetry,
   onEffect,
+  holdStart: () => {
+    if (!wantsIntro()) return false;
+    hud.setIntro(true);
+    intro.begin();
+    return true;
+  },
+  onSkip: () => intro.skip(),
   onGameEvent: (e) => {
-    if (e.type === 'state' && e.state === 'summary') recordRun();
+    if (e.type !== 'state') return;
+    if (e.state === 'countdown') runs.beginRun();
+    else if (e.state === 'summary') recordRun();
+    else if (e.state === 'menu') runs.abandonRun();
+    runs.event(e);
   },
   stallMs: runtime.ctrl.th.lostMs,
+});
+
+/**
+ * "Run it" on the daily card. The challenge's own seed becomes this run's track — the seed the
+ * Game adds its run counter to, so every player gets the same Bandra-to-Andheri today — and the
+ * run is marked so the summary knows to score it against the goal.
+ */
+function startDaily(): void {
+  if (!saveRuns) return;
+  game.options.seed = runs.daily.challenge.seed - game.runsStarted;
+  runs.armDaily();
+  setOverlay('none');
+  loop.dispatch({ type: 'startPressed' });
+}
+
+// Any key and any click skip the cinematic, from frame one. (A raised hand goes through the
+// loop's own `onSkip`, because a pose start never reaches the DOM.)
+const skipIntro = (): void => intro.skip();
+window.addEventListener('keydown', skipIntro, true);
+window.addEventListener('pointerdown', skipIntro, true);
+
+// Esc closes an overlay. The keyboard is detached under one, so this is the only way out by key.
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape' || overlay === 'none') return;
+  e.preventDefault();
+  setOverlay('none');
 });
 
 Object.assign(window as unknown as Record<string, unknown>, {
   __game: game,
   __world: world,
   __profile: profile,
+  __progression: progression,
+  __runs: runs,
+  __settings: settingsStore,
+  __audio: audioPrefs,
+  __intro: intro,
   __flow: flow,
   __runtime: runtime,
   __moveCheck: moveCheck,
   __loop: loop,
   __telemetry: telemetry,
+  __overlay: (name: Overlay) => setOverlay(name),
+  __daily: () => startDaily(),
 });
 
 // ---------------------------------------------------------------- live monitor shortcut
@@ -425,12 +679,71 @@ async function boot(): Promise<void> {
 }
 void boot();
 
+// ---------------------------------------------------------------- missions, per frame
+
+/** A mission toast is worth two and a half seconds of the corner of the screen, and no more. */
+const TOAST_MS = 2600;
+let toastUntil = 0;
+let boardKey = '';
+
+function updateProgressionUi(now: number, dt: number): void {
+  // The run feeds the tracker every frame; the board and the wallet only move at the summary.
+  runs.frame(game, dt);
+  const toast = runs.takeToast();
+  if (toast) {
+    hud.setMissionToast(renderMissionToast(toast));
+    toastUntil = now + TOAST_MS;
+  } else if (toastUntil && now > toastUntil) {
+    hud.setMissionToast(null);
+    toastUntil = 0;
+  }
+
+  // A demo (autopilot, replay) banks nothing, so it has no board to show: an empty mission panel
+  // over someone else's recorded session would only be confusing.
+  if (game.state !== 'menu' || !saveRuns) return;
+  // The menu board: what this player can actually be asked to do, then what they are being asked.
+  runs.setCapabilities({
+    mode: currentMode(),
+    tracksJogging: flow.input === 'webcam' ? flow.cameraReady : keyboard.jogEnabled,
+    skipped: skippedMoves(),
+  });
+  const lvl = levelProgress(progression.state.lifetimeScore);
+  const daily = saveRuns ? runs.daily : null;
+  const key = `${JSON.stringify(runs.liveMissions())}|${lvl.level}|${lvl.frac}|${progression.balance}|${daily?.view.progressText ?? ''}|${daily?.view.done ?? ''}`;
+  if (key === boardKey) return;
+  boardKey = key;
+  missionBoard.update({
+    missions: runs.liveMissions(),
+    daily: daily ? daily.view : null,
+    level: { text: `LEVEL ${lvl.level}`, sub: `${fmtCoins(lvl.into)} / ${fmtCoins(lvl.span)} to level ${lvl.level + 1}`, frac: lvl.frac },
+    coins: fmtCoins(progression.balance),
+  });
+}
+
+/**
+ * Moves the player gave up on in the check and never managed once, so the board never asks for a
+ * jump from someone whose ceiling will not allow one. A move they *accepted at their best attempt*
+ * has a peak and still counts as something they can do.
+ */
+function skippedMoves(): string[] {
+  const mode = currentMode();
+  if (!mode) return [];
+  return moveCheck
+    .controls(mode)
+    .steps.filter((step) => step.status === 'skipped' && step.peak === null)
+    .map((step) => step.id);
+}
+
 // ---------------------------------------------------------------- frame loop
 
 let last = performance.now();
 function frame(now: number): void {
   const dt = Math.max(0, (now - last) / 1000);
   last = now;
+  // The cinematic is advanced *before* the game steps, so the frame it hands over on is the same
+  // frame the countdown starts in — the camera goes straight from the intro's last pose to the
+  // running pose with no menu shot in between.
+  intro.advance(dt, game);
   const steps = stepper.advance(dt);
   loop.beginFrame();
   for (let i = 0; i < steps; i++) loop.step(stepper.stepSec, now);
@@ -462,7 +775,15 @@ function frame(now: number): void {
   }
   if (`${inputLabel()}|${currentMode()}` !== metaKey) sendMeta();
 
-  if (!contextLost) world.render(game, dt, loop.frameEvents);
+  updateProgressionUi(now, dt);
+
+  if (!contextLost) {
+    // Asked *after* the step, not before it: the step is where a held `startGame` begins the
+    // cinematic, and drawing the world on that one frame would put the game's own runner back on
+    // screen beside the cinematic's kid for the rest of it.
+    if (intro.playing) intro.draw();
+    else world.render(game, dt, loop.frameEvents);
+  }
   hud.update(game);
   if (perf && dt > 0) {
     fps += (1 / dt - fps) * 0.05;

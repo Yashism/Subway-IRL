@@ -174,6 +174,8 @@ class ParticlePool {
   private readonly attrs: THREE.BufferAttribute[];
   private cursor = 0;
   alive = 0;
+  /** False drops every emit on the floor ("reduced effects"); the pool keeps running down. */
+  enabled = true;
 
   constructor(cap: number, additive: boolean) {
     this.cap = cap;
@@ -230,6 +232,7 @@ class ParticlePool {
   }
 
   emit(s: EmitSpec): void {
+    if (!this.enabled) return;
     const i = this.cursor;
     this.cursor = (this.cursor + 1) % this.cap;
     if (this.life[i] <= 0) this.alive++;
@@ -465,6 +468,9 @@ export class Fx {
   private readonly magnetB = new THREE.Color(0x3fb8ff);
   private readonly cyan = new THREE.Color(0x29e0f0);
 
+  /** Comfort/perf settings (see WorldView.setReduced). */
+  private reducedMotion = false;
+
   private time = 0;
   private speed = 0;
   private speedK = 0;
@@ -553,6 +559,22 @@ export class Fx {
 
   get speedLineIntensity(): number {
     return this.speedMat.uniforms.uIntensity.value as number;
+  }
+
+  /**
+   * The player's comfort settings. `motion` drops the camera shake, the roll, the FOV pulse and
+   * the speed lines; `effects` stops emitting particles (the live ones still run down).
+   * Both are also a cheap win on a weak GPU.
+   */
+  setReduced(o: { motion?: boolean; effects?: boolean }): void {
+    if (o.motion !== undefined) this.reducedMotion = o.motion;
+    if (o.effects !== undefined) {
+      this.glow.enabled = this.dust.enabled = !o.effects;
+      if (o.effects) {
+        this.glow.clear();
+        this.dust.clear();
+      }
+    }
   }
 
   /** Clears every particle and shake (e.g. on a new run). */
@@ -695,8 +717,8 @@ export class Fx {
 
     // Speed lines.
     const over = (s.speed - FX.speedLinesFrom) / (FX.speedLinesFull - FX.speedLinesFrom);
-    const target = s.flying ? 1 : Math.max(0, Math.min(1, over)) * 0.6;
-    this.speedK = ease(this.speedK, target, dt, 0.2);
+    const target = this.reducedMotion ? 0 : s.flying ? 1 : Math.max(0, Math.min(1, over)) * 0.6;
+    this.speedK = this.reducedMotion ? 0 : ease(this.speedK, target, dt, 0.2);
     const u = this.speedMat.uniforms;
     u.uIntensity.value = this.speedK;
     u.uTime.value = this.time;
@@ -705,12 +727,14 @@ export class Fx {
 
     // FOV pulse (eased: ~0.25 s in, ~0.4 s out).
     const fovTarget = s.flying ? FX.flyFov : 0;
-    this.fov = ease(this.fov, fovTarget, dt, fovTarget > this.fov ? FX.fovRiseTau : FX.fovFallTau);
+    // Reduced motion drops the pulse outright rather than easing it away: a comfort setting that
+    // leaves a tenth of a degree of FOV drift on screen has not really been honoured.
+    this.fov = this.reducedMotion ? 0 : ease(this.fov, fovTarget, dt, fovTarget > this.fov ? FX.fovRiseTau : FX.fovFallTau);
 
     // Shake.
     const sh = this.shake;
     sh.age += dt;
-    const k = sh.k();
+    const k = this.reducedMotion ? 0 : sh.k();
     const o = this.out;
     if (k > 0) {
       const t = this.time;

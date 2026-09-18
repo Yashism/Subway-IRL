@@ -38,6 +38,15 @@ export interface AppLoopOptions {
   onEffect?: (fx: FlowEffect) => void;
   /** Every game event, after the flow has seen it. */
   onGameEvent?: (e: GameEvent) => void;
+  /**
+   * Offers the flow's `startGame` to a cinematic (the intro) before the run is queued. Returning
+   * true holds the run back: from then until `queueStart()`, every `start` from every source is
+   * swallowed and reported to `onSkip` instead — pressing the key that would have started the run
+   * skips the cinematic rather than starting a run under it.
+   */
+  holdStart?: () => boolean;
+  /** A `start` that arrived while the run is held: the player is skipping the cinematic. */
+  onSkip?: () => void;
   /** No pose frame for this long reads as a stalled camera (default 1000 ms, the lost threshold). */
   stallMs?: number;
 }
@@ -74,12 +83,16 @@ export class AppLoop {
   private readonly telemetry: LoopTelemetry | null;
   private readonly onEffect: (fx: FlowEffect) => void;
   private readonly onGameEvent: ((e: GameEvent) => void) | null;
+  private readonly holdStart: (() => boolean) | null;
+  private readonly onSkip: (() => void) | null;
   private readonly stallMs: number;
   /** Activity without the camera (keyboard, bot) and with it. */
   private readonly hubOff: InputHub;
   private readonly hubOn: InputHub;
   private readonly merged: GameCommand[] = [];
   private startQueued = false;
+  /** A cinematic took the flow's `startGame` and owes the loop a `queueStart()`. */
+  private held = false;
   private lastNow = 0;
 
   constructor(o: AppLoopOptions) {
@@ -91,6 +104,8 @@ export class AppLoop {
     this.telemetry = o.telemetry ?? null;
     this.onEffect = o.onEffect ?? (() => {});
     this.onGameEvent = o.onGameEvent ?? null;
+    this.holdStart = o.holdStart ?? null;
+    this.onSkip = o.onSkip ?? null;
     this.stallMs = o.stallMs ?? 1000;
     const base: CommandSource[] = this.autopilot ? [this.keyboard, this.autopilot] : [this.keyboard];
     this.hubOff = new InputHub(base);
@@ -103,6 +118,17 @@ export class AppLoop {
    */
   get poseActive(): boolean {
     return this.pose !== null && this.flow.input === 'webcam' && this.flow.cameraReady;
+  }
+
+  /** A cinematic is holding the run back (see `holdStart`). */
+  get holdingStart(): boolean {
+    return this.held;
+  }
+
+  /** Releases a held run: one `start` is queued for the next step. */
+  queueStart(): void {
+    this.held = false;
+    this.startQueued = true;
   }
 
   /** Feeds one input to the session flow and runs its effects. */
@@ -161,6 +187,11 @@ export class AppLoop {
     for (let k = 0; k < pc.length; k++) {
       const c = pc[k];
       if (c.type === 'start') {
+        // A raised hand under the intro skips it, like any other start.
+        if (this.held) {
+          this.onSkip?.();
+          continue;
+        }
         // Dropped only while the game is *currently* paused by a lost pose (it resumes by itself).
         // `pausedByLoss` is not cleared on resume, so the state has to be checked with it.
         if (usePose && !(game.state === 'paused' && game.pausedByLoss)) this.dispatch({ type: 'startGesture' });
@@ -201,6 +232,11 @@ export class AppLoop {
   private routeButtons(cmds: readonly GameCommand[], out: GameCommand[]): void {
     for (let k = 0; k < cmds.length; k++) {
       const c = cmds[k];
+      // While a cinematic holds the run, a start press skips it instead of starting a run under it.
+      if (this.held && c.type === 'start') {
+        this.onSkip?.();
+        continue;
+      }
       const screen = this.flow.screen;
       if (screen !== 'playing') {
         if (c.type === 'start') {
@@ -229,7 +265,8 @@ export class AppLoop {
   private run(fx: FlowEffect): void {
     switch (fx.type) {
       case 'startGame':
-        this.startQueued = true;
+        if (this.holdStart?.() === true) this.held = true;
+        else this.startQueued = true;
         break;
       case 'pauseGame':
         this.pauseGame();

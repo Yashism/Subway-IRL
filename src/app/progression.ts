@@ -146,8 +146,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = Object.freeze([
     blurb: 'The original. Red, gold-fringed, faintly smug.',
     price: 0,
     icon: '🧿',
-    swatch: ['#b3312a', '#ffc93c', '#8a1f1a'],
-    palette: { base: 0xb3312a, trim: 0xffc93c, glow: 0xff7a29 },
+    // No palette: this one *is* the carpet the world already builds, exactly as it is. The swatch
+    // is the rug's own three colours, so the card shows what is under the runner and not a recolour.
+    swatch: ['#b3122e', '#ffc93c', '#e5399b'],
   }),
   item({
     id: 'board-neon',

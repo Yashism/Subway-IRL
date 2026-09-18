@@ -18,7 +18,7 @@
   user-select: none;
   font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
   background: radial-gradient(ellipse at 50% 40%, rgba(20, 12, 45, 0.62), rgba(20, 12, 45, 0.94));
-  z-index: 4;
+  z-index: 6;
 }
 .shop[data-on='on'] {
   display: flex;

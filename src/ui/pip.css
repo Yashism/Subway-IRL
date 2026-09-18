@@ -227,3 +227,15 @@
     transition: none !important;
   }
 }
+
+/*
+ * "Mirror preview: off" (settings). The camera picture and the skeleton are both drawn selfie-way
+ * round by default; flipping the pair together shows the camera's own view instead, and changes
+ * nothing about detection.
+ */
+.pip-root[data-mirror='off'] .pip-video {
+  transform: none;
+}
+.pip-root[data-mirror='off'] .pip-canvas {
+  transform: scaleX(-1);
+}
