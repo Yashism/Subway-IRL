@@ -13,6 +13,7 @@ export const emptyMagnitudes = (): MoveMagnitudes => ({
   headDrop: 0,
   jogPrimary: 0,
   bobAmp: 0,
+  bobGated: 0,
   jogSteps: 0,
 });
 
@@ -26,6 +27,7 @@ export function clearMagnitudes(m: MoveMagnitudes): void {
   m.headDrop = 0;
   m.jogPrimary = 0;
   m.bobAmp = 0;
+  m.bobGated = 0;
 }
 
 export interface MoveContext {

@@ -31,6 +31,7 @@ export class JogDetector {
     if (this.mag) {
       this.mag.jogPrimary = 0;
       this.mag.bobAmp = 0;
+      this.mag.bobGated = 0;
       this.mag.jogSteps = 0;
     }
     this.stepTimes = [];
@@ -50,8 +51,10 @@ export class JogDetector {
     const primary = full ? this.kneeStep(body, base, sens) : this.wristStep(body, base, t, sens);
     if (this.mag) {
       this.mag.jogPrimary = this.primaryMag;
-      // The raw excursion, not the gated one: a bob under the threshold must still read as a near miss.
+      // The raw excursion, so a bob under the threshold still reads as a near miss...
       this.mag.bobAmp = this.bob.rawAmplitude;
+      // ...and the gated one beside it, because that is the number the jump gate subtracts.
+      this.mag.bobGated = this.bob.amplitudeAt(t);
     }
     if (primary) {
       this.lastPrimaryT = t;

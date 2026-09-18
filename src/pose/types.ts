@@ -59,10 +59,17 @@ export interface MoveMagnitudes {
   /** The primary jog signal: knee lift (`kneeLift`) or |wrist offset| (`wristPump`). */
   jogPrimary: number;
   /**
-   * Half the peak-to-trough bounce of the last second (`bobMinAmp`). Ungated, unlike the value the
-   * jump gate uses, so a bounce that is too small to count as a step still reads as a real number.
+   * Half the peak-to-trough bounce of the last second (`bobMinAmp`). Ungated, so a bounce too small
+   * to count as a step still reads as a real number — that is the one the small-room jog is tuned
+   * from, and a player bobbing just under the threshold has to be told "almost".
    */
   bobAmp: number;
+  /**
+   * The bounce the jump gate actually subtracts (`moves.ts`): the mean of *recorded* swings, and so
+   * 0 for anyone who is not jogging. A separate field because one number cannot serve both — this
+   * one must not count the jump's own rise as a bounce, and `bobAmp` must not be gated.
+   */
+  bobGated: number;
   /** Jog steps counted since calibration. Not a magnitude; the jog step of the check counts these. */
   jogSteps: number;
 }
