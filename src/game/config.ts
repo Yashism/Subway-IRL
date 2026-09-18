@@ -81,6 +81,19 @@ export const TUNING = {
   hoverboardSeconds: 30,
   /** Seconds before a rest ends that a player who is not moving is told to get ready to jog. */
   restWarnSeconds: 3,
+  /**
+   * A board that bursts on an obstacle ends a rest without warning — no "get ready" — so the player,
+   * possibly standing still and tired, gets this long before the jog rule applies again, on top of
+   * the rule's own `idleCaughtMs` (added 2026-09-18 at the user's request).
+   */
+  burstRecoverSeconds: 2,
+  /**
+   * …and the run slows to this fraction of its speed at the burst, then eases back up to the full
+   * speed of the run over `burstSpeedEaseSeconds`, so a tired player is not thrown straight back in
+   * at full pace. Never below `startSpeed`, where every chunk is known to be passable.
+   */
+  burstSpeedDip: 0.75,
+  burstSpeedEaseSeconds: 5,
   crashGraceSeconds: 1,
   /** Extra metres cleared around the grace stretch after a hoverboard save. */
   crashClearMargin: 1,

@@ -101,8 +101,12 @@ export class Game {
   private stepsAtStart = 0;
   /** Lane the runner is sliding back to after a stumble; one clip gives one stumble. */
   private bounceLane: Lane | null = null;
-  /** Whether the last step was a rest, so the step a rest ends on can restart the idle clock. */
-  private restWas = false;
+  /** Whether the jog rule was excused last step, so the step it ends on can restart the idle clock. */
+  private excusedWas = false;
+  /** Seconds left of the recovery after a hoverboard burst (see TUNING.burstRecoverSeconds). */
+  private recoverLeft = 0;
+  /** Run time of the last hoverboard burst, while the run is still easing back to full speed. */
+  private burstAt: number | null = null;
 
   constructor(readonly options: GameOptions) {
     this.track = this.newTrack();
@@ -119,16 +123,29 @@ export class Game {
 
   /**
    * Ms since the player last moved (jog step, jump, roll, lane change), as the catch rule sees it:
-   * 0 outside play and while resting on a hoverboard, since a rest never counts towards a catch.
-   * For telemetry and the heartbeat.
+   * 0 outside play and while the rule is excused (a rest, or the recovery after a burst), since
+   * neither counts towards a catch. For telemetry and the heartbeat.
    */
   get idleMs(): number {
-    return this.state === 'playing' && !this.resting ? Math.max(0, this.idle.idleMs(this.clockMs)) : 0;
+    return this.state === 'playing' && !this.excused ? Math.max(0, this.idle.idleMs(this.clockMs)) : 0;
   }
 
   /** On a hoverboard mid-run: the player may stop jogging and cannot be caught for it. */
   get resting(): boolean {
     return this.state === 'playing' && this.powerups.hoverboard > 0;
+  }
+
+  /**
+   * The seconds after a hoverboard burst: the board is gone, but the jog rule stays off for
+   * `burstRecoverSeconds` so the player can get going again (see TUNING.burstRecoverSeconds).
+   */
+  get recovering(): boolean {
+    return this.state === 'playing' && this.recoverLeft > 0;
+  }
+
+  /** The jog rule is off: resting on a board, or recovering from a burst one. */
+  get excused(): boolean {
+    return this.resting || this.recovering;
   }
 
   /**
@@ -151,7 +168,9 @@ export class Game {
     this.caughtReason = null;
     this.idleLevel = 'ok';
     this.movingLevel = 'ok';
-    this.restWas = false;
+    this.excusedWas = false;
+    this.recoverLeft = 0;
+    this.burstAt = null;
     this.setState('menu', events);
     return events;
   }
@@ -217,12 +236,33 @@ export class Game {
     this.speed = TUNING.startSpeed;
     this.idleLevel = 'ok';
     this.movingLevel = 'ok';
-    this.restWas = false;
+    this.excusedWas = false;
+    this.recoverLeft = 0;
+    this.burstAt = null;
     this.caughtReason = null;
     this.stats = emptyStats();
     this.stepsAtStart = activity.steps;
     this.countdown = TUNING.countdownSeconds;
     this.setState('countdown', events);
+  }
+
+  /**
+   * The run's speed: the difficulty curve, except while easing back after a hoverboard burst —
+   * dropped to `burstSpeedDip` of the curve at the burst, then smoothly back up to the full curve
+   * over `burstSpeedEaseSeconds`, never below the start speed. Oncoming trains keep their meeting
+   * points through the change (see Obstacle.closing), so the slowdown cannot make the track unfair.
+   */
+  private speedNow(): number {
+    const curve = speedAt(this.time, this.options.difficulty);
+    if (this.burstAt === null) return curve;
+    const u = (this.time - this.burstAt) / TUNING.burstSpeedEaseSeconds;
+    if (u >= 1) {
+      this.burstAt = null;
+      return curve;
+    }
+    const ease = u * u * (3 - 2 * u); // smoothstep: leaves the dip gently and settles gently
+    const f = TUNING.burstSpeedDip + (1 - TUNING.burstSpeedDip) * ease;
+    return Math.max(TUNING.startSpeed, curve * f);
   }
 
   private newTrack(): Track {
@@ -243,7 +283,7 @@ export class Game {
     for (const c of commands) this.apply(c, events);
 
     this.time += dt;
-    this.speed = speedAt(this.time, this.options.difficulty);
+    this.speed = this.speedNow();
     this.s += this.speed * dt;
     this.track.update(this.s, this.speed, this.time);
 
@@ -262,16 +302,18 @@ export class Game {
     this.collide(events);
     if (this.state !== 'playing') return;
 
-    // A rest ends when the board runs out *or* is spent saving the player from a crash. Either way,
-    // restart the idle clock on the step it ends: the player gets the full catch window from here,
-    // not a catch for the time they were allowed to rest.
-    const resting = p.hoverboard > 0;
-    if (this.restWas && !resting) this.idle.resume(this.clockMs);
-    this.restWas = resting;
+    // The jog rule is excused while the player rests on a board, and for `burstRecoverSeconds` after
+    // one bursts (a burst gives no "get ready" warning). When the excuse ends, however it ends,
+    // restart the idle clock on that step: the player gets the full catch window from there, not a
+    // catch for the time they were allowed to stop.
+    this.recoverLeft = Math.max(0, this.recoverLeft - dt);
+    const excused = p.hoverboard > 0 || this.recoverLeft > 0;
+    if (this.excusedWas && !excused) this.idle.resume(this.clockMs);
+    this.excusedWas = excused;
     this.jogRule = activity.tracksJogging;
 
     this.movingLevel = this.idle.update(this.clockMs, activity);
-    this.idleLevel = resting ? 'ok' : this.movingLevel;
+    this.idleLevel = excused ? 'ok' : this.movingLevel;
     if (this.idleLevel === 'caught' && !this.options.god) {
       this.catchPlayer('idle', events);
       return;
@@ -378,6 +420,10 @@ export class Game {
       // Whatever follows in this lane would be hit the moment the grace runs out.
       const reach = TUNING.crashClearMargin;
       this.track.clearLane(r.lane, this.s - reach, this.s + this.speed * TUNING.crashGraceSeconds + reach, this.s);
+      // The board burst mid-rest with no warning: time to get going again, and a slower pace to
+      // pick up from (see TUNING.burstRecoverSeconds / burstSpeedDip).
+      this.recoverLeft = TUNING.burstRecoverSeconds;
+      this.burstAt = this.time;
       events.push({ type: 'hoverboardSaved' });
       return;
     }

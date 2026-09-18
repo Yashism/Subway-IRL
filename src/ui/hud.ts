@@ -99,6 +99,8 @@ function centerText(g: Game): string {
     case 'summary':
       return `Score ${g.stats.score}`;
     default:
+      // A burst board ends a rest with no warning, so say so for the whole recovery window.
+      if (g.recovering && g.jogRule) return 'Board broke — start jogging!';
       if (g.restEnding) return 'Get ready to jog!';
       if (g.idleLevel === 'warn') return 'Bhaago!';
       // Say it as the board arrives: the rest is only worth anything if the player knows they have it.
@@ -197,7 +199,7 @@ export function hudModel(g: Game, view?: HudProfileView): HudModel {
     multiplier: g.josh.active ? '×2' : '',
     go: g.state === 'playing' && g.time < 0.7,
     danger: g.state === 'playing' && g.idleLevel === 'warn',
-    tone: g.restEnding ? 'ready' : g.resting ? 'rest' : 'danger',
+    tone: g.restEnding || g.recovering ? 'ready' : g.resting ? 'rest' : 'danger',
     summary: {
       score: String(s.score),
       coins: String(s.coins),

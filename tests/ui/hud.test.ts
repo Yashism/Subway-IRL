@@ -79,6 +79,25 @@ describe('hudModel', () => {
     expect(m.danger).toBe(false);
   });
 
+  it('says so when the board bursts, for the whole recovery, in the heads-up tone', () => {
+    const JOGGING: ActivityStatus = { ...STILL, msSinceStep: 0, cadenceSpm: 150 };
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.step(1 / 60, [{ type: 'start' }], JOGGING);
+    for (let i = 0; i < 200; i++) g.step(1 / 60, [], JOGGING);
+    g.step(1 / 60, [{ type: 'hoverboard' }], STILL);
+    g.track.obstacles.push({ id: 999, kind: 'auto', lane: 0, length: 3, front: g.s + 6 });
+    for (let i = 0; i < 120 && g.powerups.hoverboard > 0; i++) g.step(1 / 60, [], STILL);
+    expect(g.recovering).toBe(true);
+    let m = hudModel(g);
+    expect(m.center).toBe('Board broke — start jogging!');
+    expect(m.tone).toBe('ready');
+    expect(m.danger).toBe(false);
+    // Once the recovery is over it is the ordinary jog rule again.
+    while (g.recovering) g.step(1 / 60, [], JOGGING);
+    m = hudModel(g);
+    expect(m.center).toBe('');
+  });
+
   it('keeps the plain hoverboard for a keyboard player, who has no jog rule to rest from', () => {
     const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
     g.step(1 / 60, [{ type: 'start' }], KB);

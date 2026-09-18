@@ -4,6 +4,7 @@ import type { ChunkDef } from '../../src/game/chunks';
 import { TUNING } from '../../src/game/config';
 import { Game, type GameEvent, type GameOptions } from '../../src/game/game';
 import { lengthOf, movingFrontAt, type ObstacleSpec } from '../../src/game/obstacles';
+import { speedAt } from '../../src/game/speed';
 import type { ActivityStatus, GameCommand } from '../../src/input/commands';
 
 const EMPTY: ChunkDef[] = [{ id: 'empty', tier: 0, obstacles: [], coins: [] }];
@@ -223,7 +224,8 @@ describe('Hoverboard rest', () => {
     expect(g.movingLevel).toBe('ok');
   });
 
-  it('a rest cut short by a crash save also restarts the clock, rather than catching at once', () => {
+  /** A still player resting on a board that then bursts on an auto; steps to the burst. */
+  function burstMidRest(): Game {
     const g = playing({}, JOGGING);
     steps(g, 1, [{ type: 'hoverboard' }], STILL);
     steps(g, 240, [], STILL); // four still seconds on the board: well past the usual catch
@@ -232,10 +234,70 @@ describe('Hoverboard rest', () => {
     for (let i = 0; i < 120 && g.powerups.hoverboard > 0; i++) ev.push(...g.step(1 / 60, [], STILL));
     expect(ev).toContainEqual({ type: 'hoverboardSaved' });
     expect(g.resting).toBe(false);
+    return g;
+  }
+
+  it('a board that bursts gives the recovery time on top of the usual catch window', () => {
+    const g = burstMidRest();
+    const RECOVER_FRAMES = Math.round(TUNING.burstRecoverSeconds * TUNING.stepHz);
+    // The recovery: the board is gone, but the rule stays off — no warning, no heartbeat.
+    expect(g.recovering).toBe(true);
+    steps(g, RECOVER_FRAMES - 5, [], STILL);
+    expect(g.state).toBe('playing');
+    expect(g.recovering).toBe(true);
+    expect(g.idleLevel).toBe('ok');
+    expect(g.idleMs).toBe(0);
+    // Then the jog rule as usual, from a fresh clock: warned after a second, caught after two.
+    steps(g, 5, [], STILL);
+    expect(g.recovering).toBe(false);
     steps(g, CATCH_FRAMES - 5, [], STILL);
     expect(g.state).toBe('playing');
+    expect(g.idleLevel).toBe('warn');
     steps(g, 10, [], STILL);
     expect(g.caughtReason).toBe('idle');
+  });
+
+  it('a player who starts jogging during the recovery just carries on', () => {
+    const g = burstMidRest();
+    steps(g, CATCH_FRAMES * 4, [], JOGGING);
+    expect(g.state).toBe('playing');
+    expect(g.idleLevel).toBe('ok');
+  });
+
+  it('slows the run at a burst, then eases it back up to full speed', () => {
+    // Late enough in a run that the dip is not lost to the start-speed floor.
+    const g = playing({}, JOGGING);
+    steps(g, 60 * 90, [], JOGGING);
+    const before = g.speed;
+    steps(g, 1, [{ type: 'hoverboard' }], JOGGING);
+    place(g, { kind: 'auto', lane: 0, s: g.s + 8 });
+    const ev: GameEvent[] = [];
+    for (let i = 0; i < 120 && g.powerups.hoverboard > 0; i++) ev.push(...g.step(1 / 60, [], JOGGING));
+    expect(ev).toContainEqual({ type: 'hoverboardSaved' });
+    g.step(1 / 60, [], JOGGING);
+    const curve = () => speedAt(g.time, g.options.difficulty);
+    // Dropped to the dip…
+    expect(g.speed / curve()).toBeCloseTo(TUNING.burstSpeedDip, 2);
+    expect(g.speed).toBeLessThan(before);
+    // …then climbing without ever going backwards…
+    let last = g.speed;
+    const EASE_FRAMES = Math.round(TUNING.burstSpeedEaseSeconds * TUNING.stepHz);
+    for (let i = 0; i < EASE_FRAMES; i++) {
+      g.step(1 / 60, [], JOGGING);
+      expect(g.speed).toBeGreaterThanOrEqual(last - 1e-9);
+      last = g.speed;
+    }
+    // …and back on the curve once the ease is over.
+    g.step(1 / 60, [], JOGGING);
+    expect(g.speed).toBeCloseTo(curve(), 9);
+  });
+
+  it('never slows a burst below the start speed', () => {
+    const g = burstMidRest(); // early in the run, near the start speed
+    for (let i = 0; i < 60 * 3; i++) {
+      g.step(1 / 60, [], JOGGING);
+      expect(g.speed).toBeGreaterThanOrEqual(TUNING.startSpeed - 1e-9);
+    }
   });
 
   it('rescues a player already in the idle warning', () => {

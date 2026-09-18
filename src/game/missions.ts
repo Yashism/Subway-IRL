@@ -44,8 +44,8 @@ export interface RunCounters {
   /** Seconds spent actually riding a hoverboard. */
   hoverboardSec: number;
   /**
-   * Seconds spent resting on a hoverboard — riding it without moving. Not exercise, so the
-   * workout's active minutes leave it out.
+   * Seconds spent resting while the jog rule was excused — on a hoverboard, or in the recovery after
+   * one bursts — without moving. Not exercise, so the workout's active minutes leave it out.
    */
   restSec: number;
   /** Most coins pulled in during a single magnet. */
@@ -97,7 +97,7 @@ export interface RunSample {
   idleLevel: IdleLevel;
   /** Whether the player is actually moving, never excused by a rest. Drives the jog streak. */
   movingLevel: IdleLevel;
-  /** On a hoverboard, where stopping is allowed. */
+  /** The jog rule is excused: resting on a board, or recovering from a burst one. Stopping is allowed. */
   resting: boolean;
   joshActive: boolean;
   /** Seconds left on the magnet (0 = off). */
@@ -116,7 +116,8 @@ export function runSample(g: Game, dt: number): RunSample {
     stats: g.stats,
     idleLevel: g.idleLevel,
     movingLevel: g.movingLevel,
-    resting: g.resting,
+    // The recovery after a burst board is excused like the rest itself, and no more exercise.
+    resting: g.excused,
     joshActive: g.josh.active,
     magnetSec: g.powerups.magnet,
     hoverboardSec: g.powerups.hoverboard,

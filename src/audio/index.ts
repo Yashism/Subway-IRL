@@ -186,7 +186,8 @@ export class GameAudio implements AudioSink {
     f.hoverboard = game.powerups.hoverboard > 0;
     // A rest is the board plus actually stopping: a player jogging through a board is not resting.
     f.resting = game.resting && game.movingLevel !== 'ok';
-    f.restEnding = game.restEnding;
+    // The end of a rest and the recovery after a burst board both need the tick at its strongest.
+    f.restEnding = game.restEnding || game.recovering;
     f.rocket = game.powerups.rocket > 0;
     f.magnet = game.powerups.magnet > 0;
     f.activity = activity;
