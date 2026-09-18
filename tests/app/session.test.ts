@@ -3,6 +3,7 @@ import { ProfileStore } from '../../src/app/profile';
 import { ProgressionStore, DEFAULT_CHARACTER } from '../../src/app/progression';
 import { RunSession } from '../../src/app/session';
 import type { ChunkDef } from '../../src/game/chunks';
+import { TUNING } from '../../src/game/config';
 import { Game } from '../../src/game/game';
 import type { ActivityStatus } from '../../src/input/commands';
 
@@ -24,8 +25,10 @@ function setup(o: { saveRuns?: boolean } = {}) {
     steps++;
     const events = game.step(DT, commands as never, { ...activity, steps: Math.floor(steps / 20) });
     for (const e of events) {
-      if (e.type === 'state' && e.state === 'countdown') runs.beginRun();
-      else if (e.type === 'state' && e.state === 'menu') runs.abandonRun();
+      if (e.type === 'state' && e.state === 'countdown') {
+        // main.ts's own hook, verbatim: the boosts are spent here and applied to this run.
+        if (runs.beginRun().magnet) game.powerups.activate('magnet');
+      } else if (e.type === 'state' && e.state === 'menu') runs.abandonRun();
       runs.event(e);
     }
     runs.frame(game, DT);
@@ -168,5 +171,46 @@ describe('RunSession: the board and the toasts', () => {
   it('starts every player on the free character and board', () => {
     const s = setup();
     expect(s.progression.state.unlocks.character).toBe(DEFAULT_CHARACTER);
+  });
+});
+
+describe('RunSession: the boosts a run was bought', () => {
+  it('a magnet boost is spent once and is already running when play begins', () => {
+    const s = setup();
+    s.progression.award(500);
+    expect(s.progression.buy('magnet-boost').ok).toBe(true);
+    expect(s.progression.held('magnet-boost')).toBe(1);
+
+    s.frame(JOGGING, [{ type: 'start' }]);
+    // Spent on the run that is counting down, and the magnet is on before the first playing frame.
+    expect(s.progression.held('magnet-boost')).toBe(0);
+    expect(s.game.state).toBe('countdown');
+    expect(s.game.powerups.magnet).toBeGreaterThan(0);
+    const atCountdown = s.game.powerups.magnet;
+    s.play(TUNING.countdownSeconds + 0.1);
+    expect(s.game.state).toBe('playing');
+    // The countdown does not tick power-ups, so none of the boost was spent waiting for GO.
+    expect(s.game.powerups.magnet).toBeGreaterThan(atCountdown - 0.3);
+
+    // The next run has none left, so it starts without one.
+    for (let i = 0; i < 60 * 40 && s.game.state !== 'summary'; i++) s.frame(STILL);
+    s.end();
+    s.frame(JOGGING, [{ type: 'start' }]);
+    expect(s.game.powerups.magnet).toBe(0);
+  });
+
+  it('a demo run pays for nothing, so it is given nothing', () => {
+    const s = setup({ saveRuns: false });
+    s.progression.award(500);
+    s.progression.buy('magnet-boost');
+    s.frame(JOGGING, [{ type: 'start' }]);
+    expect(s.progression.held('magnet-boost')).toBe(1);
+    expect(s.game.powerups.magnet).toBe(0);
+  });
+
+  it('a run with nothing bought starts clean', () => {
+    const s = setup();
+    s.frame(JOGGING, [{ type: 'start' }]);
+    expect(s.game.powerups.magnet).toBe(0);
   });
 });

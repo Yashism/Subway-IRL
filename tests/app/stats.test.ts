@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ProfileStore, dayKey, emptyProfile, shiftDay, type Profile, type RunInput } from '../../src/app/profile';
+import { DAYS_MAX, ProfileStore, dayKey, emptyProfile, shiftDay, type DayStat, type Profile, type RunInput } from '../../src/app/profile';
+import { streakWords } from '../../src/ui/workout';
 import {
   ASSUMED_WEIGHT_KG,
   JOG_MET,
@@ -15,6 +16,7 @@ import {
   recentRuns,
   relativeDay,
   streak,
+  streakRun,
   weekDays,
   workoutStats,
 } from '../../src/app/stats';
@@ -329,5 +331,48 @@ describe('formatting', () => {
     expect(formatCount(-4)).toBe('0');
     expect(formatCount(1234)).toContain('1');
     expect(formatCount(1234).replace(/\D/g, '')).toBe('1234');
+  });
+});
+
+describe('a streak longer than the history we keep', () => {
+  /** A profile with `n` consecutive active days ending today, capped the way the store caps it. */
+  const daily = (n: number, todayKey: string): Profile => {
+    const p = emptyProfile();
+    const days: Record<string, DayStat> = {};
+    for (let i = 0; i < n; i++) days[shiftDay(todayKey, -i)] = { activeSeconds: 600, steps: 900, distance: 800, coins: 10, runs: 1 };
+    return { ...p, totalRuns: n, days: Object.fromEntries(Object.entries(days).sort().slice(-DAYS_MAX)) };
+  };
+
+  it('counts a normal streak exactly, and does not claim it is a floor', () => {
+    const r = streakRun(daily(9, '2026-09-18'), '2026-09-18');
+    expect(r).toEqual({ days: 9, capped: false });
+    expect(streakWords(r.days, true, r.capped)).toBe('9 days in a row');
+  });
+
+  it('says "180+" rather than telling a player of 400 days that they managed 180', () => {
+    const r = streakRun(daily(400, '2026-09-18'), '2026-09-18');
+    expect(r.days).toBe(DAYS_MAX);
+    expect(r.capped).toBe(true);
+    expect(streakWords(r.days, true, r.capped)).toBe('180+ days in a row');
+  });
+
+  it('marks the days-moved total as a floor too, and only when it really is one', () => {
+    const long = workoutStats(daily(400, '2026-09-18'), new Date(2026, 8, 18));
+    expect(long.activeDaysCapped).toBe(true);
+    expect(long.allTime.activeDays).toBe(DAYS_MAX);
+    const short = workoutStats(daily(9, '2026-09-18'), new Date(2026, 8, 18));
+    expect(short.activeDaysCapped).toBe(false);
+    expect(short.streakCapped).toBe(false);
+  });
+
+  it('a gap inside the kept window is a real end, not a cap', () => {
+    const p = daily(20, '2026-09-18');
+    delete p.days[shiftDay('2026-09-18', -4)];
+    const r = streakRun(p, '2026-09-18');
+    expect(r).toEqual({ days: 4, capped: false });
+  });
+
+  it('an empty profile has no streak and nothing to qualify', () => {
+    expect(streakRun(emptyProfile(), '2026-09-18')).toEqual({ days: 0, capped: false });
   });
 });

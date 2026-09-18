@@ -572,18 +572,23 @@ export function pickMissions(ctx: MissionContext, seed: number, count: number, t
   const rest = shuffled(pool.filter((d) => d.group !== 'movement'), rng);
   const chosen: MissionDef[] = [];
 
-  const fill = (used: Set<string>): void => {
+  /** `spread` also keeps the missions chosen here from sharing a tag with each other. */
+  const fill = (used: Set<string>, spread: boolean): void => {
     for (const d of [...movement, ...rest]) {
       if (chosen.length >= count) return;
+      if (chosen.includes(d)) continue;
       if (d.tags.some((t) => used.has(t))) continue;
       chosen.push(d);
-      for (const t of d.tags) used.add(t);
+      if (spread) for (const t of d.tags) used.add(t);
     }
   };
 
-  fill(new Set(taken));
-  // A player with almost nothing eligible gets a repeat rather than an empty board.
-  if (chosen.length < count) fill(new Set(chosen.map((d) => d.id)));
+  fill(new Set(taken), true);
+  // A player with almost nothing eligible gets two missions that share a tag rather than an empty
+  // board. What the relaxed pass must not do is undo the rules that are not about spread: it still
+  // starts from `taken`, so nothing it picks can clash with a mission the board is already keeping,
+  // and it still skips anything already chosen, so the same mission cannot appear twice.
+  if (chosen.length < count) fill(new Set(taken), false);
   return chosen;
 }
 

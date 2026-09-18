@@ -8,7 +8,7 @@ import { MoveCheckSession } from './app/moveCheckSession';
 import { fixtureReplay, loadSession, PoseRuntime, sessionReplay } from './app/poseRuntime';
 import { ProfileStore } from './app/profile';
 import { ProgressionStore, dailyView, fmtCoins, levelProgress, shopItem, shopModel } from './app/progression';
-import { RunSession } from './app/session';
+import { RunSession, type RunBoosts } from './app/session';
 import { GestureUnlock, soundAllowed } from './app/sound';
 import { SettingsStore, applyUrlFlags, type GameSettings } from './app/settings';
 import { Autopilot } from './game/autopilot';
@@ -498,6 +498,15 @@ function onEffect(fx: FlowEffect): void {
 hud.setProfile(profile.profile, null);
 applySkins();
 
+/**
+ * The boosts the run that is counting down was bought. `startRun` has already reset the power-ups
+ * and the countdown does not tick them, so a magnet set here is running the moment play begins —
+ * which is exactly what the shop card promises.
+ */
+function startBoosts(boosts: RunBoosts): void {
+  if (boosts.magnet) game.powerups.activate('magnet');
+}
+
 /** The mission list on the summary card, rebuilt only when a run actually ends. */
 function showSummary(missions: ReturnType<typeof runs.endRun>['missions']): void {
   if (missions.length) hud.summaryPanel.replaceChildren(renderMissionList(missions, { title: 'Missions' }));
@@ -565,7 +574,7 @@ const loop: AppLoop = new AppLoop({
   onSkip: () => intro.skip(),
   onGameEvent: (e) => {
     if (e.type !== 'state') return;
-    if (e.state === 'countdown') runs.beginRun();
+    if (e.state === 'countdown') startBoosts(runs.beginRun());
     else if (e.state === 'summary') recordRun();
     else if (e.state === 'menu') runs.abandonRun();
     runs.event(e);

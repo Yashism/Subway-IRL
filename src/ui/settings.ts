@@ -64,6 +64,9 @@ export const onOff = (on: boolean): string => (on ? 'ON' : 'OFF');
 /** The weight the calorie estimate will use, as a label: their own, or the assumed one. */
 export const weightLabel = (kg: number | null): string => (kg === null ? 'Not set' : `${kg} kg`);
 
+/** The rungs the weight picker offers, inside the model's own 30–200 kg band. */
+export const WEIGHT_CHOICES: readonly number[] = [40, 50, 60, 70, 80, 90, 100, 110, 125];
+
 // ---------------------------------------------------------------- the screen
 
 export interface SettingsView {
@@ -92,7 +95,7 @@ export interface SettingsHandlers {
   resetTuning(): void;
   /** Hand the player their data as a JSON file. */
   exportData(): void;
-  /** Erase every run, the streak and the lifetime totals. Already confirmed by the screen. */
+  /** Erase every run, the day streak and the lifetime totals — not the wallet. Already confirmed. */
   clearHistory(): void;
   /** Open the workout screen. */
   openWorkout(): void;
@@ -236,7 +239,10 @@ export class SettingsScreen {
     el('div', 'sw-row-sub', weightRow, 'Optional, and only used to sharpen the rough calorie estimate. Leave it unset and the game assumes 70 kg.');
     this.weightBtns = el('div', 'sw-weights', weightRow);
     button(this.weightBtns, 'sw-weight', 'Not set', () => this.handlers.change({ weightKg: null }));
-    for (const kg of [50, 60, 70, 80, 90, 100]) {
+    // The model accepts 30–200 kg. These are the rungs the picker offers, widened so that a player
+    // at either end is not forced to describe themselves as 50 or 100 and read a calorie estimate
+    // that is a tenth out on the one screen that promises what they actually did.
+    for (const kg of WEIGHT_CHOICES) {
       button(this.weightBtns, 'sw-weight', `${kg}`, () => this.handlers.change({ weightKg: kg }));
     }
 
@@ -245,7 +251,7 @@ export class SettingsScreen {
     button(dataActions, 'sw-btn sw-btn-danger', 'Clear my history', () =>
       this.ask({
         title: 'Clear everything?',
-        body: 'This erases every run, your streak, your best score and your lifetime totals. It cannot be undone. Export your data first if you want to keep it.',
+        body: 'This erases every run, your day streak, your best score and your lifetime totals. Your coins, level, missions and shop are not touched. It cannot be undone — export your data first if you want to keep it.',
         yes: 'Yes, erase it all',
         danger: true,
         onYes: () => this.handlers.clearHistory(),

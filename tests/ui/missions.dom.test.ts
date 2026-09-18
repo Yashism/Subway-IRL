@@ -146,6 +146,19 @@ describe('renderDailyCard', () => {
     expect(card.querySelector('.ms-daily-count')!.textContent).toBe('Done today!');
   });
 
+  it('advertises the coins while they are still there to win', () => {
+    const chip = renderDailyCard(daily({ coins: 220 })).querySelector('.ms-row-reward') as HTMLElement;
+    expect(chip.dataset.claimed).toBe('no');
+    expect(chip.textContent).toContain('220');
+  });
+
+  it('stops advertising them once they are paid, because a repeat run pays nothing', () => {
+    const chip = renderDailyCard(daily({ coins: 220, done: true, frac: 1 })).querySelector('.ms-row-reward') as HTMLElement;
+    expect(chip.dataset.claimed).toBe('yes');
+    expect(chip.textContent).not.toContain('220');
+    expect(chip.textContent).toContain('Claimed');
+  });
+
   it('offers the run button only when there is something to do with it', () => {
     expect(renderDailyCard(daily()).querySelector('.ms-btn-go')).toBeNull();
     const onPlay = vi.fn();
@@ -312,11 +325,19 @@ describe('ShopScreen', () => {
     const shop = new ShopScreen(root, { buy: vi.fn(), equip: vi.fn() });
     shop.update(model((s) => {
       s.award(400);
-      s.buy('head-start');
-      s.buy('head-start');
+      s.buy('magnet-boost');
+      s.buy('magnet-boost');
     }));
-    const boost = [...root.querySelectorAll('.sh-item')].find((e) => e.querySelector('.sh-name')!.textContent === 'Head start')!;
+    const boost = [...root.querySelectorAll('.sh-item')].find((e) => e.querySelector('.sh-name')!.textContent === 'Magnet boost')!;
     expect(boost.querySelector('.sh-held')!.textContent).toBe('×2');
+  });
+
+  it('does not put an item the game cannot spend on the shelf', () => {
+    const shop = new ShopScreen(root, { buy: vi.fn(), equip: vi.fn() });
+    shop.update(model((s) => s.award(2000)));
+    const names = [...root.querySelectorAll('.sh-name')].map((e) => e.textContent);
+    expect(names).toContain('Magnet boost');
+    expect(names).not.toContain('Head start');
   });
 
   it('offers a way back only when there is somewhere to go', () => {

@@ -637,8 +637,11 @@ function adFilm(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     ctx.lineTo(x + 70 * s, h);
     ctx.fill();
   }
-  label(ctx, 'DHOOM', 300, 110, 130, 520, '#FFD400', { stroke: '#141414', strokeW: 14 });
-  label(ctx, 'DHADAKA', 300, 225, 110, 540, '#FF7A29', { stroke: '#141414', strokeW: 14 });
+  // Invented, like every other sign in this world. "Dhoom" and "Dhadak" are both real films, and a
+  // cinema hoarding is the one place where putting two ordinary Hindi words together reads as a
+  // title rather than as language; "Dhinchak Gully" is nobody's.
+  label(ctx, 'DHINCHAK', 300, 110, 130, 520, '#FFD400', { stroke: '#141414', strokeW: 14 });
+  label(ctx, 'GULLY', 300, 225, 110, 540, '#FF7A29', { stroke: '#141414', strokeW: 14 });
   label(ctx, 'IN CINEMAS THIS FRIDAY', 300, 320, 40, 520, '#FFFFFF', { family: FONT_SANS, weight: 'bold' });
   for (let i = 0; i < 5; i++) star(ctx, 60 + i * 30, 30, 11, '#FFD400');
 }

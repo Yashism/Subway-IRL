@@ -133,9 +133,13 @@ export function renderDailyCard(d: DailyView, opts: DailyCardOptions = {}): HTML
 
   const foot = el('div', 'ms-daily-foot', card);
   el('div', 'ms-daily-count', foot, d.progressText);
+  // Today's coins are paid once. Once they have been, the chip says so instead of advertising a
+  // reward the next run will not pay — a player who runs 1,200 m again for nothing cannot tell
+  // that apart from the game losing their coins.
   const chip = el('div', 'ms-row-reward', foot);
+  chip.dataset.claimed = d.done ? 'yes' : 'no';
   el('span', 'ms-coin', chip, '🪙');
-  el('span', 'ms-row-reward-n', chip, String(d.coins));
+  el('span', 'ms-row-reward-n', chip, d.done ? 'Claimed' : String(d.coins));
   if (opts.onPlay) missionButton(foot, 'ms-btn ms-btn-go', opts.playLabel ?? (d.done ? 'Run it again' : 'Run it'), opts.onPlay);
   return card;
 }

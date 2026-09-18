@@ -30,6 +30,8 @@ const SECTIONS: readonly { kind: ShopKind; title: string; note: string }[] = [
   { kind: 'board', title: 'Hoverboards', note: 'Recolours of the flying carpet' },
   { kind: 'consumable', title: 'Boosts', note: 'One run each' },
 ];
+// A section with nothing in it is skipped below, so an item held back (ShopItem.unreleased) takes
+// its whole group off the storefront without anything here needing to know about it.
 
 /** What the item's button says and whether it does anything. */
 export function buttonFor(it: ShopItemView): { label: string; action: 'buy' | 'equip' | 'none'; cls: string } {

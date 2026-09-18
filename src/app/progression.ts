@@ -46,6 +46,12 @@ export interface ShopItem {
   prop?: 'bag' | 'tiffin' | 'bat';
   /** Consumables are bought over and over and held as a count. */
   repeatable?: boolean;
+  /**
+   * In the catalogue, not on sale. A consumable the game cannot actually spend yet is a coin sink,
+   * so it is kept out of the storefront (and refunded if it was ever bought) until the run has
+   * somewhere to apply it. The item, its price and its tests stay, so releasing it is one flag.
+   */
+  unreleased?: boolean;
 }
 
 const item = (i: ShopItem): ShopItem => Object.freeze(i);
@@ -189,6 +195,12 @@ export const SHOP_ITEMS: readonly ShopItem[] = Object.freeze([
     icon: '🚀',
     swatch: ['#ff7a29', '#ffd400', '#e8433a'],
     repeatable: true,
+    // Not on sale: starting at s = 200 would hand the player 200 m of distance and 200 points of
+    // score they never ran — on the one screen that promises "everything you have actually moved"
+    // — and it would consume a different number of track draws, so two players on the same daily
+    // seed would no longer be running the same track. Both are decisions for `src/game`, not for a
+    // shop item to make behind its back.
+    unreleased: true,
   }),
   item({
     id: 'magnet-boost',
@@ -208,6 +220,9 @@ export const shopItem = (id: string): ShopItem | undefined => SHOP_BY_ID.get(id)
 
 /** Consumable ids, in the order they are held. */
 export const CONSUMABLE_IDS: readonly string[] = SHOP_ITEMS.filter((i) => i.repeatable).map((i) => i.id);
+
+/** What the shop actually offers today. An unreleased item is in the catalogue and not for sale. */
+export const ON_SALE: readonly ShopItem[] = SHOP_ITEMS.filter((i) => !i.unreleased);
 
 // ---------------------------------------------------------------- level
 
@@ -460,7 +475,7 @@ export function parseProgression(raw: string | null): Progression {
     return emptyProgression();
   }
   if (!isObj(data)) return emptyProgression();
-  return {
+  return refundUnreleased({
     version: 1,
     wallet: parseWallet(data.wallet),
     unlocks: parseUnlocks(data.unlocks),
@@ -468,7 +483,27 @@ export function parseProgression(raw: string | null): Progression {
     missions: parseMissions(data.missions),
     daily: parseDaily(data.daily),
     lifetimeScore: int(data.lifetimeScore),
-  };
+  });
+}
+
+/**
+ * Gives back what was paid for an item that turned out to be unsellable. Anyone who bought a head
+ * start before it was pulled spent coins on something the game never did — the one thing the money
+ * rules forbid — so the coins come back and the holding is cleared. Idempotent: once the count is
+ * zero there is nothing left to refund.
+ */
+export function refundUnreleased(p: Progression): Progression {
+  let refund = 0;
+  let consumables = p.consumables;
+  for (const it of SHOP_ITEMS) {
+    if (!it.unreleased) continue;
+    const held = Math.max(0, Math.floor(consumables[it.id] ?? 0));
+    if (held <= 0) continue;
+    refund += held * it.price;
+    consumables = { ...consumables, [it.id]: 0 };
+  }
+  if (refund <= 0) return p;
+  return { ...p, consumables, wallet: { ...p.wallet, spent: Math.max(0, p.wallet.spent - refund) } };
 }
 
 // ---------------------------------------------------------------- the store
@@ -724,7 +759,7 @@ export function shopModel(p: Readonly<Progression>): ShopModel {
     levelText: `LEVEL ${lvl.level}`,
     levelFrac: lvl.frac,
     levelSub: `${fmtCoins(lvl.into)} / ${fmtCoins(lvl.span)} to level ${lvl.level + 1}`,
-    items: SHOP_ITEMS.map((it): ShopItemView => {
+    items: ON_SALE.map((it): ShopItemView => {
       const held = it.repeatable ? Math.max(0, Math.floor(p.consumables[it.id] ?? 0)) : null;
       const isOwned = !it.repeatable && owned.has(it.id);
       const equipped = isOwned && (p.unlocks.character === it.id || p.unlocks.board === it.id);

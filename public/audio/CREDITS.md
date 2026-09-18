@@ -7,6 +7,7 @@ with `ffmpeg`; the sound itself is unaltered.
 
 Anything the game plays that is **not** listed here is synthesised in code by `src/audio/voices.ts` —
 see the header of `src/audio/manifest.ts` for which cues those are and why no recording was used.
+Every file listed below is played from disk; if one fails to arrive, its synth patch plays instead.
 
 ## Kenney (CC0 1.0) — https://kenney.nl
 
@@ -68,8 +69,8 @@ texture.
 | File(s) | Source | Author | License |
 |---|---|---|---|
 | `whistle.*` | "218318 splicesound referee-whistle-blow-gymnasium.wav", https://commons.wikimedia.org/wiki/File:218318_splicesound_referee-whistle-blow-gymnasium.wav | splicesound | CC0 1.0 |
-| `heartbeat.*` | "Heartbeat mitral valve 150 bpm.ogg", https://commons.wikimedia.org/wiki/File:Heartbeat_mitral_valve_150_bpm.ogg | Wikimedia Commons contributor | Public domain |
-| `ambience-crowd.*` | "1 minute at the alexa mall in berlin.ogg", https://commons.wikimedia.org/wiki/File:1_minute_at_the_alexa_mall_in_berlin.ogg | Wikimedia Commons contributor | Public domain |
+| `heartbeat.*` | "Heartbeat mitral valve 150 bpm.ogg", https://commons.wikimedia.org/wiki/File:Heartbeat_mitral_valve_150_bpm.ogg — originally from pdsounds.org | **ezwa** | Public domain (released by its author) |
+| `ambience-crowd.*` | "1 minute at the alexa mall in berlin.ogg", https://commons.wikimedia.org/wiki/File:1_minute_at_the_alexa_mall_in_berlin.ogg — originally from pdsounds.org | **thore** | Public domain (released by its author) |
 
 ## Rejected, and why
 

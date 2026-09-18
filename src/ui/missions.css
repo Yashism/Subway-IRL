@@ -187,6 +187,18 @@
 .ms-coin {
   font-size: 0.95em;
 }
+/*
+ * Today's daily pays once. A gold chip still reading "220" on a finished challenge is an advert
+ * for a reward the next run will not pay, so once it is claimed the chip goes quiet and says so.
+ */
+.ms-row-reward[data-claimed='yes'] {
+  background: rgba(27, 16, 53, 0.08);
+  border-color: rgba(27, 16, 53, 0.28);
+  color: var(--ms-brown);
+}
+.ms-row-reward[data-claimed='yes'] .ms-coin {
+  opacity: 0.45;
+}
 
 .ms-empty {
   padding: 14px 6px;

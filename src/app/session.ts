@@ -45,6 +45,12 @@ export interface RunSessionOptions {
   now?: () => number;
 }
 
+/** The boosts a run starts with, already paid for and spent. */
+export interface RunBoosts {
+  /** A magnet is already running when the countdown ends. */
+  magnet: boolean;
+}
+
 /** What main.ts knows about a finished run that the session cannot read off the Game. */
 export interface RunFacts {
   difficulty: string;
@@ -144,8 +150,11 @@ export class RunSession {
     this.armedDaily = false;
   }
 
-  /** The game reached `countdown`: a new run. */
-  beginRun(): void {
+  /**
+   * The game reached `countdown`: a new run. Returns the boosts it starts with — spent here, once,
+   * on the run they apply to, and never on a demo, which pays for nothing and so is given nothing.
+   */
+  beginRun(): RunBoosts {
     this.tracker.reset();
     this.toast = null;
     this.live = true;
@@ -156,6 +165,7 @@ export class RunSession {
     // is true until it is broken ("finish without stumbling") would toast "complete" on frame one.
     this.announced.clear();
     for (const m of this.liveMissions()) this.announced.set(m.id, Math.floor(m.frac / TOAST_STEP) * TOAST_STEP);
+    return { magnet: this.saveRuns && this.o.progression.consume('magnet-boost') };
   }
 
   /** The run left without reaching the summary (Home, or back to the menu): nothing is banked. */

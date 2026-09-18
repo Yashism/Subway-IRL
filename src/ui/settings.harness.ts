@@ -106,8 +106,10 @@ function populatedProfile(): Profile {
           timeSec: Math.round((150 + i * 14) * wobble),
           activeSeconds: Math.round((138 + i * 12) * wobble),
           steps: Math.round((240 + i * 22) * wobble),
-          mode: i % 4 === 0 ? 'small' : 'full',
-          input: i % 7 === 0 ? 'keyboard' : 'webcam',
+          // A keyboard run has no play mode: nothing measured one, and `RunSession` records ''
+          // rather than claiming otherwise. The harness is the oracle for this screen, so it must
+          // not show a row the game cannot produce.
+          ...(i % 7 === 0 ? { mode: '', input: 'keyboard' } : { mode: i % 4 === 0 ? 'small' : 'full', input: 'webcam' }),
         }),
       );
     }

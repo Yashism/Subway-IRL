@@ -17,12 +17,13 @@ import {
   levelThreshold,
   parseProgression,
   previousDay,
+  refundUnreleased,
   rollDaily,
   shopItem,
   shopModel,
   emptyDaily,
 } from '../../src/app/progression';
-import { ALL_CAPABILITIES, emptyCounters, type MissionContext, type RunCounters } from '../../src/game/missions';
+import { ALL_CAPABILITIES, emptyCounters, pickMissions, type MissionContext, type RunCounters } from '../../src/game/missions';
 
 class FakeStorage {
   readonly data = new Map<string, string>();
@@ -406,8 +407,16 @@ describe('shopModel', () => {
     expect(by.get('runner-college')!.state).toBe('equipped');
     expect(by.get(DEFAULT_CHARACTER)!.state).toBe('owned');
     expect(by.get('board-neon')!.state).toBe('locked'); // 50 left, costs 200
-    expect(by.get('head-start')!.state).toBe('locked');
+    expect(by.get('magnet-boost')!.state).toBe('locked');
     expect(by.get('board-neon')!.short).toBe(150);
+  });
+
+  it('does not offer an item the game cannot spend yet', () => {
+    const m = shopModel(new ProgressionStore(new FakeStorage()).state);
+    expect(m.items.some((i) => i.id === 'head-start')).toBe(false);
+    // It is held back, not deleted: the catalogue, its price and `consume` are all still there.
+    expect(shopItem('head-start')?.unreleased).toBe(true);
+    expect(SHOP_ITEMS.some((i) => i.id === 'head-start')).toBe(true);
   });
 
   it('shows how many boosts are held', () => {
@@ -426,5 +435,89 @@ describe('shopModel', () => {
     expect(m.level).toBe(3);
     expect(m.levelFrac).toBeGreaterThan(0);
     expect(m.levelFrac).toBeLessThan(1);
+  });
+});
+
+describe('an item the game cannot spend', () => {
+  it('is kept off the storefront but keeps working underneath', () => {
+    const s = new ProgressionStore(new FakeStorage());
+    // The store itself still sells it — only the *storefront* holds it back — so the day the run
+    // learns to apply one, flipping `unreleased` is the whole change.
+    s.award(500);
+    expect(s.buy('head-start').ok).toBe(true);
+    expect(s.held('head-start')).toBe(1);
+    expect(s.consume('head-start')).toBe(true);
+    expect(s.held('head-start')).toBe(0);
+  });
+
+  it('refunds anyone who already bought one, and does it only once', () => {
+    const storage = new FakeStorage();
+    storage.setItem(
+      PROGRESSION_KEY,
+      JSON.stringify({ ...emptyProgression(), wallet: { earned: 1000, spent: 240 }, consumables: { 'head-start': 2 } }),
+    );
+    const s = new ProgressionStore(storage);
+    expect(s.held('head-start')).toBe(0);
+    expect(s.balance).toBe(1000); // 240 spent on two head starts, both given back
+    // Reloading the refunded profile changes nothing further.
+    const again = new ProgressionStore(storage);
+    expect(again.balance).toBe(1000);
+    expect(again.held('head-start')).toBe(0);
+  });
+
+  it('never gives back more than was spent, whatever the stored numbers say', () => {
+    const p = refundUnreleased({
+      ...emptyProgression(),
+      wallet: { earned: 50, spent: 10 },
+      consumables: { 'head-start': 99 },
+    });
+    expect(p.wallet.spent).toBe(0);
+    expect(Math.max(0, p.wallet.earned - p.wallet.spent)).toBe(50);
+  });
+});
+
+describe('the daily card once today is already paid', () => {
+  it('stops advertising coins the next run will not pay', () => {
+    const challenge = dailyChallenge('2026-09-18');
+    const open = dailyView(challenge, { ...emptyDaily('2026-09-18'), best: 300 });
+    expect(open.done).toBe(false);
+    expect(open.coins).toBeGreaterThan(0);
+    // Done: the view still carries the amount (the card decides how to show it), but `done` is the
+    // flag the card must read, and it is the same flag `recordRun` pays on.
+    const paid = dailyView(challenge, { ...emptyDaily('2026-09-18'), best: challenge.goalMeters, done: true });
+    expect(paid.done).toBe(true);
+  });
+
+  it('a second completion of the same day really does pay nothing', () => {
+    const s = new ProgressionStore(new FakeStorage());
+    const today = '2026-09-18';
+    const challenge = dailyChallenge(today);
+    const run = { day: today, sessionRun: 1, previousDistance: null };
+    const ctx: MissionContext = { mode: 'full', capabilities: [...ALL_CAPABILITIES] };
+    const counters: RunCounters = { ...emptyCounters(), distance: challenge.goalMeters + 10 };
+    const first = s.recordRun({ counters, run, ctx, daily: true, today });
+    expect(first.dailyCompleted).toBe(true);
+    const second = s.recordRun({ counters, run: { ...run, sessionRun: 2 }, ctx, daily: true, today });
+    expect(second.dailyCompleted).toBe(false);
+    expect(second.missionCoins).toBe(second.missions.coins); // no daily coins folded in
+  });
+});
+
+describe('pickMissions never puts the same mission on the board twice', () => {
+  const ctx: MissionContext = { mode: 'full', capabilities: [...ALL_CAPABILITIES] };
+
+  it('asked for more than the pool holds, it repeats a tag but never a mission', () => {
+    const picked = pickMissions(ctx, 7, 30);
+    const ids = picked.map((d) => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('and never picks one that clashes with a mission the board is keeping', () => {
+    for (const taken of [['jog'], ['distance'], ['jog', 'coins']]) {
+      const picked = pickMissions(ctx, 11, 30, taken);
+      for (const d of picked) {
+        for (const t of d.tags) expect(taken, `${d.id} carries ${t}`).not.toContain(t);
+      }
+    }
   });
 });

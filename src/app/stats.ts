@@ -7,7 +7,7 @@
  * A day is 23 or 25 hours long twice a year, and a streak that breaks on the clocks changing is a
  * bug the player would read as the game calling them lazy.
  */
-import { dayKey, shiftDay, type DayStat, type Profile, type StoredRun } from './profile';
+import { DAYS_MAX, dayKey, shiftDay, type DayStat, type Profile, type StoredRun } from './profile';
 
 export const WEEK_DAYS = 7;
 
@@ -58,6 +58,10 @@ export interface WorkoutStats {
   weekRuns: number;
   /** Consecutive days with at least one run, counting back from today (or yesterday). */
   streak: number;
+  /** The streak ran off the end of the kept day map, so `streak` is a floor: show it as "N+". */
+  streakCapped: boolean;
+  /** `allTime.activeDays` is at the storage cap, so it too is a floor rather than a total. */
+  activeDaysCapped: boolean;
   /** The longest streak anywhere in the kept day map. */
   bestStreak: number;
   allTime: AllTime;
@@ -118,10 +122,14 @@ export function weekDays(profile: Profile, todayKey: string): WeekDay[] {
 }
 
 /**
- * Days in a row ending today. Today not being run *yet* does not break a streak — it is still
- * early — so a streak that reaches yesterday counts, and only a gap before that ends it.
+ * Days in a row ending today, and whether the count ran out of history rather than out of days.
+ *
+ * The day map keeps `DAYS_MAX` days, so a player who has shown up every day for longer than that
+ * walks off the end of what was stored. The number is then a floor, not a total, and saying so is
+ * the difference between "180 days in a row" and "180+ days in a row" — one of which calls a
+ * player who has run for a year and a half less consistent than they are.
  */
-export function streak(profile: Profile, todayKey: string): number {
+export function streakRun(profile: Profile, todayKey: string): { days: number; capped: boolean } {
   const ran = (key: string) => dayStat(profile, key).runs > 0;
   let cursor = ran(todayKey) ? todayKey : shiftDay(todayKey, -1);
   let n = 0;
@@ -129,7 +137,27 @@ export function streak(profile: Profile, todayKey: string): number {
     n++;
     cursor = shiftDay(cursor, -1);
   }
-  return n;
+  // The walk stopped on a day with no runs. That is only a *missing* day rather than a real gap if
+  // it is older than anything kept AND the map is full — a player nine days in has no tenth day
+  // because there was no tenth day, not because the cap threw one away.
+  const kept = Object.keys(profile.days).length;
+  const oldest = oldestDay(profile);
+  return { days: n, capped: n > 0 && kept >= DAYS_MAX && oldest !== '' && cursor < oldest };
+}
+
+/**
+ * Days in a row ending today. Today not being run *yet* does not break a streak — it is still
+ * early — so a streak that reaches yesterday counts, and only a gap before that ends it.
+ */
+export function streak(profile: Profile, todayKey: string): number {
+  return streakRun(profile, todayKey).days;
+}
+
+/** The oldest day key the profile still keeps, or '' when it keeps none. */
+function oldestDay(profile: Profile): string {
+  let oldest = '';
+  for (const k in profile.days) if (oldest === '' || k < oldest) oldest = k;
+  return oldest;
 }
 
 /** The longest run of consecutive active days anywhere in the kept history. */
@@ -195,6 +223,8 @@ export function calories(activeSeconds: number, weightKg: number = ASSUMED_WEIGH
 /** Everything the workout screen shows, from a profile and the instant it is being looked at. */
 export function workoutStats(profile: Profile, now: number | Date = Date.now()): WorkoutStats {
   const todayKey = dayKey(now);
+  const run = streakRun(profile, todayKey);
+  const all = allTime(profile);
   const week = weekDays(profile, todayKey);
   let weekPeak = 0;
   let weekActiveSeconds = 0;
@@ -211,9 +241,11 @@ export function workoutStats(profile: Profile, now: number | Date = Date.now()):
     weekPeak,
     weekActiveSeconds,
     weekRuns,
-    streak: streak(profile, todayKey),
+    streak: run.days,
+    streakCapped: run.capped,
+    activeDaysCapped: all.activeDays >= DAYS_MAX,
     bestStreak: bestStreak(profile),
-    allTime: allTime(profile),
+    allTime: all,
     recent: recentRuns(profile),
     empty: profile.totalRuns === 0 && profile.history.length === 0,
   };

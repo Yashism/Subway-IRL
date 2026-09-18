@@ -9,16 +9,16 @@
  *
  * What stayed synthesised, and why (all of it was looked for first):
  *   lane        no free whoosh worth having; the synth swish is a cleaner one anyway
- *   crow        every free crow recording reachable is CC BY-SA, which we do not take
  *   tannoy      the one CC0 "station arrival" recording turned out to be platform noise with no
  *               chime in it — the spectrogram is flat broadband hiss
- *   trainPass   likewise: the CC0 "train passing by" recording renders as featureless noise at a
- *               constant level, with no approach, no recede and no wheel clacks, so the Doppler
- *               has to be built rather than recorded
  *   idleWarn    it is the heartbeat swell, which is assembled from the heartbeat sample plus a sub
  *   the bed     tabla, bayan, tanpura, riff and the jog tick: no CC0 Indian percussion or drone
  *               exists at a usable quality on any source open to us, and a half-right tabla would
  *               be worse than an honest synthetic one
+ *
+ * `crow` and `trainPass` were on that list until a second search pass found usable recordings for
+ * both — a CC0 caw and a public-domain level crossing with its own Doppler — so they are now
+ * played from file like everything else in `CUE_SAMPLES`, and credited in `CREDITS.md`.
  *
  * Every file's source, author and licence is in `public/audio/CREDITS.md`.
  */

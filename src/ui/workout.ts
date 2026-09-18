@@ -22,11 +22,14 @@ export function barPercent(activeSeconds: number, peak: number): number {
   return Math.max(6, Math.round((activeSeconds / peak) * 100));
 }
 
-/** "3 days in a row" / "Run today to start a streak". Never scolds. */
-export function streakWords(streak: number, ranToday: boolean): string {
+/**
+ * "3 days in a row" / "Run today to start a streak". Never scolds, and never rounds a player down:
+ * `capped` means the count ran off the end of the kept history, so it is a floor and says so.
+ */
+export function streakWords(streak: number, ranToday: boolean, capped = false): string {
   if (streak === 0) return 'Run today to start a streak';
   if (streak === 1) return ranToday ? 'Day one. Again tomorrow.' : 'One day so far — keep it going today';
-  return `${streak} days in a row`;
+  return `${streak}${capped ? '+' : ''} days in a row`;
 }
 
 /** The kcal line, with the caveat and the weight baked in — the two are never separated. */
@@ -235,7 +238,7 @@ export class WorkoutScreen {
 
   private renderWeek(s: WorkoutStats, weightKg: number | null): void {
     this.text(this.streakNum, String(s.streak));
-    this.text(this.streakLine, streakWords(s.streak, s.today.runs > 0));
+    this.text(this.streakLine, streakWords(s.streak, s.today.runs > 0, s.streakCapped));
     // Only worth saying when they have already beaten what they are on now.
     this.text(this.bestStreak, s.bestStreak > s.streak ? `Your best run of days: ${s.bestStreak}` : '');
     this.attr(this.streakNum.parentElement as Element, 'data-on', s.streak > 0 ? 'on' : 'off');
@@ -265,7 +268,9 @@ export class WorkoutScreen {
     this.setTile(this.allTiles.bestScore, formatCount(a.bestScore));
     this.setTile(this.allTiles.bestDistance, formatDistance(a.bestDistance));
     this.setTile(this.allTiles.longest, formatDuration(a.longestRunSec));
-    this.setTile(this.allTiles.days, formatCount(a.activeDays));
+    // Same floor as the streak: the day map only keeps so many days, so say "180+" rather than
+    // quietly reporting the size of our storage as the size of their habit.
+    this.setTile(this.allTiles.days, `${formatCount(a.activeDays)}${s.activeDaysCapped ? '+' : ''}`);
   }
 
   private renderList(s: WorkoutStats): void {
