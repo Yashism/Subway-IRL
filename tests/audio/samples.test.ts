@@ -192,11 +192,11 @@ function renderEngine(seconds: number, setup: (e: AudioEngine) => void, bank?: S
 }
 
 /** A bank pre-filled with a recognisable tone for the given names. */
-async function loadedBank(names: string[], hz = 150): Promise<SampleBank> {
+async function loadedBank(names: string[], hz = 150, seconds = 0.5): Promise<SampleBank> {
   const bank = new SampleBank(asContext(new FakeOfflineContext(8, SR)), {
     ext: 'ogg',
     fetch: (async () => okResponse()) as unknown as typeof fetch,
-    decode: async () => sine(hz, 0.5, SR) as unknown as AudioBuffer,
+    decode: async () => sine(hz, seconds, SR) as unknown as AudioBuffer,
   });
   await bank.load(names);
   return bank;
@@ -244,6 +244,28 @@ describe('sample or synth', () => {
     expect(measure(synthOnly, SR).peak).toBeGreaterThan(0.005);
     // The recorded bed is a tone here, the synthetic one is filtered noise.
     expect(measure(withSample, SR).tonality).toBeGreaterThan(measure(synthOnly, SR).tonality);
+  });
+
+  it('shapes the flat train recording into a pass-by, since it was recorded mid-pass', async () => {
+    // The stand-in has to be as long as the real recording, or the envelope has nothing to shape.
+    const bank = await loadedBank(['train-pass'], 200, 5.5);
+    const buf = renderEngine(3.5, (e) => e.cue('trainPass', 1, 1), bank);
+    const m = measure(buf, SR);
+    expect(m.peak).toBeGreaterThan(0.01);
+    // The manifest's attack/decay must put the loudest moment in the middle and make it grow,
+    // exactly as the synth patch does — a flat texture played raw would fail both of these.
+    expect(m.peakAt).toBeGreaterThan(0.15);
+    expect(m.peakAt).toBeLessThan(0.85);
+    expect(m.frontLoad).toBeLessThan(1);
+  });
+
+  it('puts a Doppler on the train that the recording does not have', async () => {
+    const bank = await loadedBank(['train-pass'], 300, 5.5);
+    const buf = renderEngine(3.5, (e) => e.cue('trainPass', 1, 1), bank);
+    // Early in the pass it is pitched up, late in it pitched down.
+    const early = measure(buf.subarray(Math.round(SR * 0.6), Math.round(SR * 1.4)), SR);
+    const late = measure(buf.subarray(Math.round(SR * 3.0), Math.round(SR * 3.4)), SR);
+    expect(early.crossingsPerSec).toBeGreaterThan(late.crossingsPerSec * 1.02);
   });
 
   it('walks round the footstep recordings instead of repeating one', async () => {

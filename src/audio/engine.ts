@@ -361,7 +361,7 @@ export class AudioEngine implements AudioSink {
       const l = spec.layers[i];
       const buf = i === 0 ? body : bank.get(l.file);
       if (!buf) continue; // A missing extra layer just thins the cue; the body still plays.
-      playBuffer(v, buf, t + (l.delay ?? 0), a * (l.gain ?? 1), l.fixedPitch ? 1 : rate, spec.send ?? 0);
+      playBuffer(v, buf, t + (l.delay ?? 0), a * (l.gain ?? 1), l.fixedPitch ? 1 : rate, spec.send ?? 0, l.shape);
     }
     return true;
   }

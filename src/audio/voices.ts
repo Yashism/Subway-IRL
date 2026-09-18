@@ -159,6 +159,19 @@ function route(v: VoiceCtx, node: AudioNode, send = 0): void {
 }
 
 /**
+ * Shaping for a recording that is a texture rather than an event — the train, which was recorded
+ * mid-pass and has no approach of its own.
+ */
+export interface BufferShape {
+  /** Seconds of fade-in. Turns a flat stretch of rail noise into something arriving. */
+  attack?: number;
+  /** Seconds of fade-out at the end. */
+  decay?: number;
+  /** Playback-rate spread across the sound, rate·(1+d) falling to rate·(1−d): a real Doppler. */
+  doppler?: number;
+}
+
+/**
  * A recorded sample, through the same bus and the same reverb taps as a synth voice.
  * `rate` is the playback ratio, so the coin ladder and the chaser's whistle ride a recording
  * exactly as they ride an oscillator.
@@ -170,17 +183,36 @@ export function playBuffer(
   peak: number,
   rate = 1,
   send = 0,
+  shape?: BufferShape,
 ): void {
   if (peak <= 0.0005) return;
+  const r = rate > 0 && Number.isFinite(rate) ? Math.min(4, Math.max(0.25, rate)) : 1;
   const s = v.ctx.createBufferSource();
   s.buffer = buffer;
-  s.playbackRate.value = rate > 0 && Number.isFinite(rate) ? Math.min(4, Math.max(0.25, rate)) : 1;
-  const g = gain(v.ctx, peak);
+  s.playbackRate.value = r;
+  const dur = buffer.duration / r;
+  const d = shape?.doppler ?? 0;
+  if (d > 0) {
+    // Falling pitch across the pass. This is the Doppler the recording does not have: it was made
+    // standing beside a train that was already going past, so the shift has to be put back.
+    s.playbackRate.setValueAtTime(r * (1 + d), t);
+    s.playbackRate.linearRampToValueAtTime(Math.max(0.25, r * (1 - d)), t + dur);
+  }
+  const g = gain(v.ctx, shape?.attack || shape?.decay ? 0 : peak);
   s.connect(g);
   route(v, g, send);
+  if (shape?.attack || shape?.decay) {
+    // Linear, not exponential: this is something approaching, not something struck.
+    const a = Math.min(shape.attack ?? 0, dur * 0.8);
+    const dec = Math.min(shape.decay ?? 0, dur - a);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t + Math.max(0.001, a));
+    g.gain.setValueAtTime(peak, t + Math.max(0.001, dur - dec));
+    g.gain.linearRampToValueAtTime(0, t + dur);
+  }
   s.start(t);
-  // A hard stop at the end so a long tail cannot outlive the node; +0.05 s of slack for the rate.
-  s.stop(t + buffer.duration / s.playbackRate.value + 0.05);
+  // A hard stop at the end so a long tail cannot outlive the node; slack for a Doppler'd rate.
+  s.stop(t + dur * (1 + d) + 0.05);
 }
 
 /** A looping bed from a sample — the station ambience, once its file has landed. */

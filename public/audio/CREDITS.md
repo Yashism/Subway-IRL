@@ -42,6 +42,27 @@ it is given here because it should be.
 | `josh-end.*` | Digital Audio | `lowDown.ogg` | Kenney | CC0 1.0 |
 | `unfurl.*` | RPG Audio, https://kenney.nl/assets/rpg-audio | `cloth1.ogg` | Kenney | CC0 1.0 |
 
+## OpenGameArt (CC0 1.0) — https://opengameart.org
+
+| File(s) | Source | Author | License |
+|---|---|---|---|
+| `crow.*` | "Crow caw", https://opengameart.org/content/crow-caw | as credited on the submission page | CC0 1.0 |
+
+## archive.org / radio aporee
+
+| File(s) | Source | Author | License |
+|---|---|---|---|
+| `train-pass.*` | "Via Gioacchino Rossini, 43, 22063 Cantù Asnago CO, Italy — Train station with train announcement", https://archive.org/details/aporee_51225_58462 (seconds 5.5–11.0 only: the train, not the announcement) | mq.wc7fe.o | Public Domain Mark 1.0 |
+
+**A note on that one, so a reviewer can make their own call.** Public Domain Mark is an *assertion*
+by the uploader that a work carries no known copyright, not a licence grant like CC0. Creative
+Commons recommends CC0 for a creator releasing their own work. radio aporee contributors pick a
+licence per upload and most choose CC BY-NC-SA, so choosing public domain here was a deliberate act
+rather than a default — which is why it is used. It is the only file in this folder that is not
+either CC0 or a Commons-reviewed public-domain item, and it is the one to drop first if anyone
+disagrees: `trainPass` still has its full synth patch, so removing the file costs nothing but
+texture.
+
 ## Wikimedia Commons
 
 | File(s) | Source | Author | License |
@@ -56,9 +77,18 @@ Kept here so nobody repeats the search.
 
 | Candidate | Why not |
 |---|---|
-| Carrion crow calls (Commons, via xeno-canto) | CC BY-SA 4.0. Share-alike is a copyleft obligation on a derivative, and a trimmed clip is a derivative. The crow is synthesised instead. |
+| Carrion crow calls (Commons, via xeno-canto) | CC BY-SA 4.0 — share-alike is a copyleft obligation on a derivative, and a trimmed clip is a derivative. Superseded: OpenGameArt has a CC0 crow, which is what ships. |
+| "Freight train — passing by with fast whooshes" (OpenGameArt) | GPL 3. A copyleft licence on an asset, which is not CC0 and not CC-BY. |
+| "City rail bridge" (OpenGameArt) | GPL 3, same reason. |
+| "Train Tunnel" (OpenGameArt) | CC BY-SA 3.0/4.0 — share-alike. |
+| radio aporee train pass-bys (most of them) | CC BY-NC-ND or CC BY-NC: non-commercial, and several no-derivatives. |
+| "Tabla 01" (OpenGameArt) | GPL 3. |
+| "Electronic Indian tabla tune" (OpenGameArt, CC0) | Genuinely CC0, but it is a finished mix. The music bed sequences individual strokes so it can add layers with the run speed; a fixed tune would throw that away. |
+| Tabla recitals (archive.org: NCAA, Sahapedia, ICCR) | CC BY-NC 4.0 or unmarked, and they are named artists' performances — sampling a recital into a game groove is exactly the lift this project does not do. |
+| Kassel Hauptbahnhof hall (archive.org, Public Domain Mark) | A good station bed, and a real alternative to the one shipped — not used only to avoid putting the single largest file in the build on a Public Domain Mark rather than a Commons-reviewed licence. |
 | "Taiwan Railway Station Arrival Sound" (Commons, CC0) | Genuinely CC0, but it is platform noise: the spectrogram is flat broadband hiss with no chime in it. The station tannoy is synthesised. |
-| "Train passing by in the Wirikuta Desert" (Commons, CC0) | Genuinely CC0, but every slice renders as featureless noise at a constant level — no approach, no recede, no wheel clacks. There is no Doppler in it to use, so the train pass-by is synthesised. |
+| "Train passing by in the Wirikuta Desert" (Commons, CC0) | Genuinely CC0, but every slice renders as featureless noise at a constant level — no approach, no recede, no wheel clacks. Superseded by the Cantù recording, which has real wheel clacks. |
+| Station PA announcements (Kassel, Baltimore Penn, Cantù, El Palomar) | All public-domain-marked and all usable, but every one of them is SPEECH, in German, English, Italian or Spanish. A German platform announcement in a Mumbai station is worse than the synthesised chime. |
 | Freesound direct downloads | The API needs a token and the site needs a login; nothing there is reachable anonymously. |
 | Mixkit | Free for commercial use, but its licence forbids redistributing a sound as a stand-alone file, which is exactly what committing it to this repo would be. |
 | The `assets/` folder in this repo | Third-party rips supplied for local reference only. Gitignored, never used, never shipped. |

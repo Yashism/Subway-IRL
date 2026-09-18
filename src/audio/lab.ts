@@ -580,7 +580,8 @@ async function renderLayers(): Promise<void> {
 async function renderCues(): Promise<void> {
   const host = $('cues');
   for (const cue of CUES) {
-    const seconds = cue === 'caught' || cue === 'trainPass' || cue === 'introWhistle' ? 3 : 2;
+    // The train runs 5.5 s; a 3 s window would cut it off half way up its own swell.
+    const seconds = cue === 'trainPass' ? 6 : cue === 'caught' || cue === 'introWhistle' ? 3 : 2;
     const sampled = isSampled(cue);
     await card(
       host,

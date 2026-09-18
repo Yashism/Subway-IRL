@@ -22,6 +22,7 @@
  *
  * Every file's source, author and licence is in `public/audio/CREDITS.md`.
  */
+import type { BufferShape } from './voices';
 import type { CueName } from './types';
 
 /** Where the files are served from. */
@@ -36,6 +37,8 @@ export const AUDIO_FORMATS = [
 export interface SampleLayer {
   /** Basename in `public/audio`, without extension. */
   file: string;
+  /** Shaping for a texture recording (the train): fade-in, fade-out, Doppler. */
+  shape?: BufferShape;
   /** Level for this layer within the cue. */
   gain?: number;
   /** Seconds after the cue's start. */
@@ -95,6 +98,14 @@ export const CUE_SAMPLES: Partial<Record<CueName, CueSample>> = {
   brush: { layers: [{ file: 'brush' }], gain: 0.75, send: 0.3 },
   unfurl: { layers: [{ file: 'unfurl' }], gain: 0.5, send: 0.35 },
   introWhistle: { layers: [{ file: 'whistle' }], gain: 0.5, send: 0.8 },
+  crow: { layers: [{ file: 'crow' }], gain: 0.45, send: 0.6 },
+  // The recording is five seconds of real rail texture with real wheel clacks, taken from the
+  // middle of a pass — so the arrival, the departure and the pitch drop are put back here.
+  trainPass: {
+    layers: [{ file: 'train-pass', shape: { attack: 2.2, decay: 2.4, doppler: 0.055 } }],
+    gain: 0.55,
+    send: 0.4,
+  },
 };
 
 /**
