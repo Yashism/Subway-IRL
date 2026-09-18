@@ -16,7 +16,7 @@ export const CONTROL_EFFECT: Record<MoveId, string> = {
   right: 'move one lane right',
   jump: 'jump the barrier',
   roll: 'roll under it',
-  hover: 'ride the hoverboard',
+  hover: 'ride the hoverboard and rest — no jogging needed while it lasts',
 };
 
 /** Keyboard fallbacks, listed on the cheat sheet (see src/input/keyboard.ts). */

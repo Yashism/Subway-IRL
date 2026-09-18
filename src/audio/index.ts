@@ -77,6 +77,8 @@ export class GameAudio implements AudioSink {
     joshActive: false,
     airborne: false,
     hoverboard: false,
+    resting: false,
+    restEnding: false,
     rocket: false,
     magnet: false,
     activity: NO_ACTIVITY,
@@ -182,6 +184,9 @@ export class GameAudio implements AudioSink {
     f.joshActive = game.josh.active;
     f.airborne = game.runner.y > 0.02 && !game.runner.flying;
     f.hoverboard = game.powerups.hoverboard > 0;
+    // A rest is the board plus actually stopping: a player jogging through a board is not resting.
+    f.resting = game.resting && game.movingLevel !== 'ok';
+    f.restEnding = game.restEnding;
     f.rocket = game.powerups.rocket > 0;
     f.magnet = game.powerups.magnet > 0;
     f.activity = activity;

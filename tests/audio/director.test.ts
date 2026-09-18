@@ -66,6 +66,8 @@ const frame = (over: Partial<DirectorFrame> = {}): DirectorFrame => ({
   joshActive: false,
   airborne: false,
   hoverboard: false,
+  resting: false,
+  restEnding: false,
   rocket: false,
   magnet: false,
   activity: activity(),
@@ -197,6 +199,40 @@ describe('the chaser', () => {
     const { sink, d, f } = setup({ chaserGap: TUNING.chaserFarGap + 5 });
     run(d, f, 20);
     expect(sink.named('whistle')).toHaveLength(0);
+  });
+});
+
+describe('a hoverboard rest', () => {
+  it('lets the tick go faint and the groove relax while they rest, with no heartbeat', () => {
+    const { sink, d } = setup({ speedFraction: 1 });
+    run(d, frame({ speedFraction: 1 }), 1);
+    const running = { tabla: sink.level('tabla'), pulse: sink.level('pulse') };
+
+    // On the board and still: the game reports no idle time, since a rest never counts.
+    const rest = frame({ speedFraction: 1, hoverboard: true, resting: true, idleMs: 0 });
+    d.update(rest, []);
+    expect(sink.level('pulse')).toBeGreaterThan(0); // faint, never silent: keep the tempo
+    expect(sink.level('pulse')).toBeLessThan(running.pulse / 2);
+    expect(sink.level('tabla')).toBeLessThan(running.tabla);
+    expect(sink.level('heartbeat')).toBe(0);
+    expect(sink.named('idleWarn')).toHaveLength(0);
+  });
+
+  it('brings the tick back at its strongest as the rest runs out', () => {
+    const { sink, d } = setup({ speedFraction: 1 });
+    run(d, frame({ speedFraction: 1 }), 1);
+    const running = sink.level('pulse');
+    d.update(frame({ speedFraction: 1, hoverboard: true, resting: true, restEnding: true }), []);
+    expect(sink.level('pulse')).toBeGreaterThan(running);
+  });
+
+  it('changes nothing for a player jogging through the board', () => {
+    const plain = setup({ speedFraction: 1 });
+    run(plain.d, frame({ speedFraction: 1 }), 1);
+    const board = setup({ speedFraction: 1 });
+    run(board.d, frame({ speedFraction: 1, hoverboard: true, resting: false }), 1);
+    expect(board.sink.level('pulse')).toBeCloseTo(plain.sink.level('pulse'), 5);
+    expect(board.sink.level('tabla')).toBeCloseTo(plain.sink.level('tabla'), 5);
   });
 });
 

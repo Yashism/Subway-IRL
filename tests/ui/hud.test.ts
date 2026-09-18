@@ -52,6 +52,45 @@ describe('hudModel', () => {
     expect(m.sub).toMatch(/Enter to play again/);
   });
 
+  it('offers a jogger a rest on the board, calmly, and warns them before it ends', () => {
+    const JOGGING: ActivityStatus = { ...STILL, msSinceStep: 0, cadenceSpm: 150 };
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.step(1 / 60, [{ type: 'start' }], JOGGING);
+    for (let i = 0; i < 200; i++) g.step(1 / 60, [], JOGGING);
+    g.step(1 / 60, [{ type: 'hoverboard' }], STILL);
+
+    let m = hudModel(g);
+    expect(m.center).toBe('Rest — catch your breath');
+    expect(m.tone).toBe('rest');
+    expect(m.danger).toBe(false);
+    expect(m.timers.find((t) => t.kind === 'hoverboard')!.label).toBe('Rest');
+
+    // The line has said its piece after a moment; resting on is quiet, never a warning.
+    for (let i = 0; i < 60 * 10; i++) g.step(1 / 60, [], STILL);
+    m = hudModel(g);
+    expect(m.center).toBe('');
+    expect(m.danger).toBe(false);
+
+    // The last seconds of the rest, still standing: time to get going.
+    while (g.powerups.hoverboard > TUNING.restWarnSeconds - 0.5) g.step(1 / 60, [], STILL);
+    m = hudModel(g);
+    expect(m.center).toBe('Get ready to jog!');
+    expect(m.tone).toBe('ready');
+    expect(m.danger).toBe(false);
+  });
+
+  it('keeps the plain hoverboard for a keyboard player, who has no jog rule to rest from', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
+    g.step(1 / 60, [{ type: 'start' }], KB);
+    for (let i = 0; i < 200; i++) g.step(1 / 60, [], KB);
+    g.step(1 / 60, [{ type: 'hoverboard' }], KB);
+    const m = hudModel(g);
+    expect(m.center).toBe('');
+    expect(m.timers.find((t) => t.kind === 'hoverboard')!.label).toBe('Hoverboard');
+    while (g.powerups.hoverboard > 1) g.step(1 / 60, [], KB);
+    expect(hudModel(g).center).toBe('');
+  });
+
   it('tells a lost player to step back into frame', () => {
     const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
     g.step(1 / 60, [{ type: 'start' }], KB);

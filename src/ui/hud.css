@@ -401,6 +401,23 @@ body {
   opacity: 1;
   animation: hud-shake 0.3s ease-in-out infinite;
 }
+/* A hoverboard rest: permission, not alarm — the board's own cyan, no shake, a size that fits the
+   longer line. */
+.hud-warn.rest {
+  color: var(--cyan);
+  font-size: clamp(40px, 6vw, 78px);
+}
+.hud-warn.rest.on {
+  animation: hud-pop-in 0.4s cubic-bezier(0.3, 1.8, 0.5, 1) both;
+}
+/* The rest is ending: a steady heads-up, still not the red of a warning. */
+.hud-warn.ready {
+  color: var(--gold);
+  font-size: clamp(44px, 7vw, 90px);
+}
+.hud-warn.ready.on {
+  animation: hud-pulse 0.9s ease-in-out infinite;
+}
 @keyframes hud-shake {
   0%, 100% { transform: translateX(0) rotate(-2deg) scale(1); }
   25% { transform: translateX(-6px) rotate(1deg) scale(1.04); }

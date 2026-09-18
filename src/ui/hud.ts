@@ -64,6 +64,11 @@ export interface HudModel {
   go: boolean;
   /** Stopped jogging: flash the screen edges. */
   danger: boolean;
+  /**
+   * How the in-run line should feel: 'danger' for the idle warning, 'rest' for the calm "you may
+   * stop" as a hoverboard arrives, 'ready' for the heads-up before the rest ends.
+   */
+  tone: 'danger' | 'rest' | 'ready';
   summary: HudSummary;
   profile: HudProfileModel;
 }
@@ -94,9 +99,18 @@ function centerText(g: Game): string {
     case 'summary':
       return `Score ${g.stats.score}`;
     default:
-      return g.idleLevel === 'warn' ? 'Bhaago!' : '';
+      if (g.restEnding) return 'Get ready to jog!';
+      if (g.idleLevel === 'warn') return 'Bhaago!';
+      // Say it as the board arrives: the rest is only worth anything if the player knows they have it.
+      if (g.resting && g.jogRule && g.powerups.hoverboard > TUNING.hoverboardSeconds - REST_HINT_SECONDS) {
+        return 'Rest — catch your breath';
+      }
+      return '';
   }
 }
+
+/** How long the "you may rest" line shows after the board arrives. */
+const REST_HINT_SECONDS = 2.5;
 
 function subText(g: Game): string {
   switch (g.state) {
@@ -163,7 +177,9 @@ export function hudModel(g: Game, view?: HudProfileView): HudModel {
   const timers: PowerupTimer[] = [];
   for (const t of TIMERS) {
     const left = powerupLeft(g, t.kind);
-    if (left > 0) timers.push({ kind: t.kind, icon: t.icon, label: t.label, seconds: Math.ceil(left), frac: Math.min(1, left / t.total) });
+    // For a jogger the board's timer is how long they may rest, so name it that.
+    const label = t.kind === 'hoverboard' && g.jogRule ? 'Rest' : t.label;
+    if (left > 0) timers.push({ kind: t.kind, icon: t.icon, label, seconds: Math.ceil(left), frac: Math.min(1, left / t.total) });
   }
   const s = g.stats;
   return {
@@ -181,6 +197,7 @@ export function hudModel(g: Game, view?: HudProfileView): HudModel {
     multiplier: g.josh.active ? '×2' : '',
     go: g.state === 'playing' && g.time < 0.7,
     danger: g.state === 'playing' && g.idleLevel === 'warn',
+    tone: g.restEnding ? 'ready' : g.resting ? 'rest' : 'danger',
     summary: {
       score: String(s.score),
       coins: String(s.coins),
@@ -278,6 +295,7 @@ function monitorLink(parent: HTMLElement): HTMLAnchorElement {
 
 interface TimerRow {
   row: HTMLElement;
+  label: HTMLElement;
   fill: HTMLElement;
   secs: HTMLElement;
 }
@@ -366,11 +384,11 @@ export class Hud {
       el('div', 'hud-timer-icon', row, t.icon);
       const body = el('div', 'hud-timer-body', row);
       const head = el('div', 'hud-timer-head', body);
-      el('span', 'hud-timer-label', head, t.label);
+      const label = el('span', 'hud-timer-label', head, t.label);
       const secs = el('span', 'hud-timer-secs', head);
       const bar = el('div', 'hud-timer-bar', body);
       const fill = el('div', 'hud-timer-fill', bar);
-      this.timers.set(t.kind, { row, fill, secs });
+      this.timers.set(t.kind, { row, label, fill, secs });
     }
 
     // Top right: josh badge + score, coin pill, speed.
@@ -597,6 +615,7 @@ export class Hud {
       const t = m.timers.find((x) => x.kind === kind);
       this.flag(row.row, 'on', !!t);
       if (!t) continue;
+      this.text(row.label, t.label);
       this.text(row.secs, `${t.seconds}s`);
       this.flag(row.row, 'low', t.seconds <= 3);
       this.style(row.fill, `timer-${kind}`, 'transform', `scaleX(${t.frac.toFixed(3)})`);
@@ -609,6 +628,8 @@ export class Hud {
     this.flag(this.vignette, 'danger', m.danger);
     this.text(this.warn, g.state === 'playing' ? m.center : '');
     this.flag(this.warn, 'on', g.state === 'playing' && m.center !== '');
+    this.flag(this.warn, 'rest', m.tone === 'rest');
+    this.flag(this.warn, 'ready', m.tone === 'ready');
     this.flag(this.go, 'on', m.go);
 
     if (m.state === 'countdown') for (const [n, e] of this.countNums) this.flag(e, 'on', n === m.center);

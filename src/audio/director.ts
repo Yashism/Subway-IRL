@@ -40,6 +40,10 @@ export interface DirectorFrame {
   /** Off the ground (not counting rocket flight): the falling edge is the landing. */
   airborne: boolean;
   hoverboard: boolean;
+  /** On a hoverboard *and* actually standing still: a rest, which the jog rule allows. */
+  resting: boolean;
+  /** The last seconds of a rest, still standing: time to lead the player back into their stride. */
+  restEnding: boolean;
   rocket: boolean;
   magnet: boolean;
   activity: ActivityStatus;
@@ -162,6 +166,10 @@ const DUCK: Partial<Record<CueName, number>> = {
 
 /** Seconds for a full duck to release. */
 const DUCK_RELEASE = 0.55;
+/** The jog tick while the player rests on a hoverboard: there, but no longer asking anything. */
+const RESTING_PULSE = 0.12;
+/** …and in the last seconds of the rest: the strongest it gets, to pull them back to their feet. */
+const REST_ENDING_PULSE = 0.9;
 
 /**
  * The coin ladder, in semitones above the chime's root: a minor pentatonic climbing two octaves,
@@ -374,8 +382,15 @@ export class Director {
 
     // The jog pulse. It is the one layer the idle warning makes LOUDER: when everything else
     // drops away it is the beat they have to put a foot back onto, so it has to be the thing left.
+    // A hoverboard rest is the exception: nagging someone who has been told they may stop would
+    // undo the point of it, so the tick goes faint — not silent, so the tempo stays in their head —
+    // and comes back strong in the last seconds to carry them back into their stride.
     this.pulse.update(dt, t, frame.activity);
-    m.pulse = (this.pulse.locked ? 0.42 : 0.8) * (1 + 0.35 * e);
+    if (frame.restEnding) m.pulse = REST_ENDING_PULSE;
+    else if (frame.resting) m.pulse = RESTING_PULSE;
+    else m.pulse = (this.pulse.locked ? 0.42 : 0.8) * (1 + 0.35 * e);
+    // The groove relaxes while they rest; the drone and the station carry on around them.
+    if (frame.resting && !frame.restEnding) m.tabla *= 0.55;
     this.setTempo(this.pulse.bpm);
 
     this.chaser(dt, frame);

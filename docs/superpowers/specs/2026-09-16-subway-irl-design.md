@@ -143,6 +143,7 @@ A single sensitivity setting (0.75×–1.25×) scales every threshold. The debug
   - Jump, roll and lane events reset `msSinceStep`.
   - A held squat keeps resetting it for at most 1 s.
   - The idle timer is suspended during calibration, countdowns, pause and menus.
+  - **A hoverboard is a rest** (added 2026-09-18 at the user's request: "Make hoverboard as thing where human can rest so don't have to jog"). While one is active the player may stop jogging and cannot be caught for it, the warning and heartbeat stay off, and the chaser falls back. When it ends — timed out, or spent absorbing a crash — the idle timer restarts, so the player gets the full 2 s to start jogging again rather than a catch for time they were allowed to rest. See §5.7.
 - Losing tracking pauses the game. It never counts as idle.
 
 ### 5.6 Chaser
@@ -156,6 +157,9 @@ The TT and dog start right behind the runner, drop out of view after about 4 s, 
 - **Diwali Rocket (8 s):** flight above the trains along a coin trail. Lane changes still work, jump and roll are disabled, and the **jog rule still applies**. It ends with a safe landing window of 1 s with no obstacles.
 - **Kolhapuri Chappals (10 s):** higher, longer jumps that can reach train roofs.
 - **Hoverboard:** 3 per run, activated by gesture (or Ctrl). Lasts 30 s or until it absorbs one crash. It can't be activated again while one is active.
+  - **It is also a rest.** For a webcam player (the jog rule in force) the board suspends the idle catch, so it doubles as a breather mid-workout — three per run, up to 30 s each. The HUD names its timer "Rest", says "Rest — catch your breath" as it arrives, and "Get ready to jog!" in its last 3 s (`TUNING.restWarnSeconds`) if the player is still standing. The jog pulse drops to a faint tick while they rest (faint, not silent, so the tempo stays in their head) and returns at its strongest for those last seconds.
+  - **Resting is still counted honestly.** The game keeps two idle signals: `idleLevel`, which the catch rule acts on and which a rest excuses, and `movingLevel`, which is never excused. Missions that ask for unbroken jogging read `movingLevel`, so a rest breaks the streak; and time spent resting (on the board and not moving) is left out of the workout's active minutes, because that screen promises what the player actually moved.
+  - Keyboard play has no jog rule, so there the board is only a shield, labelled "Hoverboard" as before.
 
 ### 5.8 State machine
 `Menu → Calibrate → Countdown → Playing ⇄ Paused → Caught → Summary → (Calibrate | Menu)`. `Paused` is entered on `lost`, a hidden tab, or WebGL context loss.

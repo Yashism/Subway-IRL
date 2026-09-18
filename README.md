@@ -22,7 +22,7 @@ Allow the camera, stand back far enough to be seen, hold still for two seconds t
 | Step / lean left or right | Change lane |
 | Jump | Jump |
 | Squat or duck | Roll |
-| Both hands up | Hoverboard |
+| Both hands up | Hoverboard — survives one crash, and is a **rest**: stop jogging for up to 30 s without being caught (3 per run) |
 | Right hand up | Start the run |
 
 **Keyboard** (works alongside, and on its own): ← → lanes · Space jump · S roll · Ctrl hoverboard ·
