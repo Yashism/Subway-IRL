@@ -263,3 +263,62 @@ describe('createIntro', () => {
     seq.dispose();
   });
 });
+
+describe('the cinematic gives its GPU memory back', () => {
+  /**
+   * Two things own GPU memory that a geometry/material sweep does not reach: a Skeleton's bone
+   * texture, and an InstancedMesh's instance buffer. Both are allocated fresh per play — the
+   * cinematic builds its own kid and TT each time — so a miss here is a leak that grows by a
+   * fixed amount every single viewing, on skips as well as full plays.
+   */
+  const gpuOwners = (root: THREE.Object3D) => {
+    const skeletons: THREE.Skeleton[] = [];
+    const instanced: THREE.InstancedMesh[] = [];
+    root.traverse((o) => {
+      const skinned = o as THREE.SkinnedMesh;
+      if (skinned.isSkinnedMesh && skinned.skeleton) skeletons.push(skinned.skeleton);
+      const inst = o as THREE.InstancedMesh;
+      if (inst.isInstancedMesh) instanced.push(inst);
+    });
+    return { skeletons, instanced };
+  };
+
+  it('disposes both rigs\u2019 skeletons and the paste splatter, on a full play', () => {
+    const { scene, camera } = world();
+    const seq = intro.createIntro({ scene, camera, seed: 3 });
+    const { skeletons, instanced } = gpuOwners(seq.root);
+    // The kid and the TT.
+    expect(skeletons.length).toBeGreaterThanOrEqual(2);
+    expect(instanced.length).toBeGreaterThanOrEqual(1);
+    const spies = [...skeletons.map((s) => vi.spyOn(s, 'dispose')), ...instanced.map((m) => vi.spyOn(m, 'dispose'))];
+
+    playThrough(seq);
+    seq.dispose();
+    for (const spy of spies) expect(spy).toHaveBeenCalled();
+  });
+
+  it('does the same on a skip, which is the path most plays take', () => {
+    const { scene, camera } = world();
+    const seq = intro.createIntro({ scene, camera, seed: 4 });
+    const { skeletons, instanced } = gpuOwners(seq.root);
+    const spies = [...skeletons.map((s) => vi.spyOn(s, 'dispose')), ...instanced.map((m) => vi.spyOn(m, 'dispose'))];
+    seq.update(0.3);
+    seq.skip();
+    seq.dispose();
+    for (const spy of spies) expect(spy).toHaveBeenCalled();
+  });
+
+  it('finds them before the group is emptied, not after', () => {
+    // The sweep has to run while `root` still has its children; clearing first would leave
+    // nothing to traverse and the leak would be silent.
+    const { scene, camera } = world();
+    const seq = intro.createIntro({ scene, camera, seed: 5 });
+    const { skeletons } = gpuOwners(seq.root);
+    let childrenWhenDisposed = -1;
+    vi.spyOn(skeletons[0], 'dispose').mockImplementation(() => {
+      childrenWhenDisposed = seq.root.children.length;
+    });
+    seq.dispose();
+    expect(childrenWhenDisposed).toBeGreaterThan(0);
+  });
+});

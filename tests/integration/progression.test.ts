@@ -89,13 +89,20 @@ function page(o: { saveRuns?: boolean; intro?: boolean } = {}) {
   });
 
   let now = 0;
-  const frame = (n = 1) => {
+  /** Frames where the loop ran no game step, as a real display at 120 Hz routinely produces. */
+  let idleFrames = 0;
+  const frame = (n = 1, stepsPerFrame: () => number = () => 1) => {
     for (let i = 0; i < n; i++) {
       now += 1000 / HZ;
-      // main.ts's order: the cinematic advances first, so the handover and the countdown share a frame.
-      intro.advance(DT, game);
+      // main.ts's order: the cinematic advances first, so the handover and the countdown share a
+      // frame — and a frame it hands over on is guaranteed a step even when the stepper wants none.
+      const wasPlaying = intro.playing;
+      const stillPlaying = intro.advance(DT, game);
+      const handedOver = wasPlaying && !stillPlaying;
+      const steps = Math.max(stepsPerFrame(), handedOver ? 1 : 0);
+      if (steps === 0) idleFrames++;
       loop.beginFrame();
-      loop.step(DT, now);
+      for (let k = 0; k < steps; k++) loop.step(DT, now);
       loop.endFrame(now);
       runs.frame(game, DT);
     }
@@ -111,7 +118,23 @@ function page(o: { saveRuns?: boolean; intro?: boolean } = {}) {
     for (let i = 0; i < HZ * 60 && game.state !== 'summary'; i++) frame();
     expect(game.state).toBe('summary');
   };
-  return { game, flow, keyboard, progression, profile, runs, loop, intro, stage, summaries, frame, key, fullRun, forceIntro: (v: boolean) => (wantIntro = v) };
+  return {
+    game,
+    flow,
+    keyboard,
+    progression,
+    profile,
+    runs,
+    loop,
+    intro,
+    stage,
+    summaries,
+    frame,
+    key,
+    fullRun,
+    idle: () => idleFrames,
+    forceIntro: (v: boolean) => (wantIntro = v),
+  };
 }
 
 describe('the page ledger: banking a run', () => {
@@ -238,5 +261,33 @@ describe('the page ledger: the intro cinematic', () => {
       expect(p.game.state).toBe('countdown');
       expect(p.summaries.length).toBe(0);
     }
+  });
+});
+
+describe('the handover frame is guaranteed a game step', () => {
+  it('reaches the countdown even on a frame the fixed stepper wanted no step for', () => {
+    // A 120 Hz display: most frames carry less than one fixed step. Without the guarantee, the
+    // frame the cinematic ends on renders the game still in `menu` — a hard cut to the menu
+    // camera and a slide back — because the queued start had nothing to consume it.
+    const p = page({ intro: true });
+    p.keyboard.jogEnabled = true;
+    p.key('KeyJ');
+    p.key('Enter');
+    p.frame(2); // the key press has to reach a game step for the cinematic to begin at all
+    expect(p.intro.playing).toBe(true);
+    // From here the stepper is starved, as it is on most frames of a 120 Hz display.
+    p.frame(Math.round(4.2 * HZ) + 4, () => 0);
+    expect(p.idle()).toBeGreaterThan(0); // the stepper really was starving
+    expect(p.intro.playing).toBe(false);
+    expect(p.stage.ends).toBe(1);
+    // The run began on the frame the cinematic handed over, not some frames later.
+    expect(p.game.state).toBe('countdown');
+  });
+
+  it('does not invent a step on any other frame', () => {
+    const p = page();
+    p.frame(10, () => 0);
+    expect(p.idle()).toBe(10);
+    expect(p.game.state).toBe('menu');
   });
 });

@@ -666,6 +666,20 @@ export function createIntro(o: IntroOptions): IntroSequence {
       disposed = true;
       brush.removeFromParent();
       root.removeFromParent();
+      // Two things own GPU memory that `own` cannot hold, and both have to be found while the
+      // group still has its children — hence before `root.clear()`.
+      //
+      //  - Every THREE.Skeleton allocates a bone texture the first time it is drawn, and only
+      //    `Skeleton.dispose()` frees it. The cinematic builds a fresh kid and TT each time it
+      //    plays, so without this each viewing left two textures behind for the session.
+      //  - An InstancedMesh's `instanceMatrix` is a GL buffer of its own. `own` holds the paste
+      //    splatter's geometry and material, which are not the same thing as the mesh.
+      root.traverse((o) => {
+        const skinned = o as THREE.SkinnedMesh;
+        if (skinned.isSkinnedMesh) skinned.skeleton?.dispose();
+        const instanced = o as THREE.InstancedMesh;
+        if (instanced.isInstancedMesh) instanced.dispose();
+      });
       root.clear();
       for (const d of own) d.dispose();
       own.length = 0;

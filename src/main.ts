@@ -859,8 +859,16 @@ function frame(now: number): void {
   // The cinematic is advanced *before* the game steps, so the frame it hands over on is the same
   // frame the countdown starts in — the camera goes straight from the intro's last pose to the
   // running pose with no menu shot in between.
-  intro.advance(dt, game);
-  const steps = stepper.advance(dt);
+  //
+  // "The same frame" has to be true, not merely intended. `onEnd` queues the run, and only a game
+  // step consumes it; the fixed stepper returns 0 steps whenever the accumulator has not filled,
+  // which on a 120 Hz panel is most frames. On such a frame the world would render with the game
+  // still in `menu` and `camReady` just cleared — a hard cut to the menu camera, then a slide
+  // back. So the one frame the cinematic hands over on is guaranteed its step.
+  const wasPlaying = intro.playing;
+  const stillPlaying = intro.advance(dt, game);
+  const handedOver = wasPlaying && !stillPlaying;
+  const steps = Math.max(stepper.advance(dt), handedOver ? 1 : 0);
   loop.beginFrame();
   for (let i = 0; i < steps; i++) loop.step(stepper.stepSec, now);
   loop.endFrame(now);
