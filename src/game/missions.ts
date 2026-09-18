@@ -31,7 +31,10 @@ export interface RunCounters {
   rolls: number;
   laneChanges: number;
   hoverboardsUsed: number;
-  /** Longest unbroken stretch, in seconds, with the game's own idle clock at 'ok'. */
+  /**
+   * Longest unbroken stretch, in seconds, of the player actually moving (`Game.movingLevel` at
+   * 'ok'). Resting on a hoverboard is not moving, so a rest breaks it even though it cannot catch.
+   */
   bestJogStreakSec: number;
   /** The streak running right now (0 the moment the player stops). */
   jogStreakSec: number;
@@ -40,6 +43,11 @@ export interface RunCounters {
   joshStreakSec: number;
   /** Seconds spent actually riding a hoverboard. */
   hoverboardSec: number;
+  /**
+   * Seconds spent resting on a hoverboard — riding it without moving. Not exercise, so the
+   * workout's active minutes leave it out.
+   */
+  restSec: number;
   /** Most coins pulled in during a single magnet. */
   magnetCoinsBest: number;
   /** Times the TT closed in and was shaken off again. */
@@ -69,6 +77,7 @@ export const emptyCounters = (): RunCounters => ({
   bestJoshStreakSec: 0,
   joshStreakSec: 0,
   hoverboardSec: 0,
+  restSec: 0,
   magnetCoinsBest: 0,
   nearMisses: 0,
   stumbles: 0,
@@ -84,7 +93,12 @@ export interface RunSample {
   /** False outside `playing`: a paused or counting-down frame breaks no streak and adds no time. */
   playing: boolean;
   stats: Readonly<RunStats>;
+  /** The level the catch rule acts on: 'ok' throughout a hoverboard rest. Drives the warnings. */
   idleLevel: IdleLevel;
+  /** Whether the player is actually moving, never excused by a rest. Drives the jog streak. */
+  movingLevel: IdleLevel;
+  /** On a hoverboard, where stopping is allowed. */
+  resting: boolean;
   joshActive: boolean;
   /** Seconds left on the magnet (0 = off). */
   magnetSec: number;
@@ -101,6 +115,8 @@ export function runSample(g: Game, dt: number): RunSample {
     playing: g.state === 'playing',
     stats: g.stats,
     idleLevel: g.idleLevel,
+    movingLevel: g.movingLevel,
+    resting: g.resting,
     joshActive: g.josh.active,
     magnetSec: g.powerups.magnet,
     hoverboardSec: g.powerups.hoverboard,
@@ -161,13 +177,16 @@ export class MissionTracker {
     }
     const dt = Number.isFinite(s.dt) && s.dt > 0 ? s.dt : 0;
 
-    // --- jog streak: unbroken seconds with the game's idle clock happy
-    if (s.idleLevel === 'ok') {
+    // --- jog streak: unbroken seconds of actually moving. Read `movingLevel`, not `idleLevel`: a
+    // hoverboard rest keeps the catch rule happy, and must not let a player stand still into a
+    // "keep jogging" mission.
+    if (s.movingLevel === 'ok') {
       c.jogStreakSec += dt;
       c.bestJogStreakSec = Math.max(c.bestJogStreakSec, c.jogStreakSec);
     } else {
       c.jogStreakSec = 0;
     }
+    if (s.resting && s.movingLevel !== 'ok') c.restSec += dt;
     if (this.lastIdle === 'ok' && s.idleLevel !== 'ok') {
       c.idleWarnings++;
       c.cleanMeters = 0;

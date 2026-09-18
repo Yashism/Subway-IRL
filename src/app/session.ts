@@ -222,10 +222,12 @@ export class RunSession {
       seed: facts.seed,
       input: facts.input,
     };
-    // `timeSec` only advances while the game is `playing`, so it already *is* the active time.
+    // `timeSec` only advances while the game is `playing` — but a hoverboard rest is playing time
+    // spent standing still, so it comes off: the workout screen promises what you actually moved.
     // The play mode is only recorded when something really detected one: a keyboard run is not a
     // "full body" run, and the history row would be claiming something nobody measured.
-    const result = this.o.profile.recordRun({ ...run, ...record, activeSeconds: c.timeSec, mode: this.detectedMode ?? '', day });
+    const activeSeconds = Math.max(0, c.timeSec - c.restSec);
+    const result = this.o.profile.recordRun({ ...run, ...record, activeSeconds, mode: this.detectedMode ?? '', day });
     this.previousDistance = c.distance;
     // The summary shows the board *as this run left it* — the two just finished still reading
     // "Done!" — and only then is it refilled for the next one.

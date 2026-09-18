@@ -75,9 +75,28 @@ describe('RunSession: banking a run', () => {
     const row = s.profile.profile.history[0];
     expect(row.distance).toBeCloseTo(s.game.stats.distance, 5);
     expect(row.steps).toBe(s.game.stats.steps);
-    // `timeSec` only advances while playing, so it is the active time the workout screen wants.
+    // `timeSec` only advances while playing, and with no hoverboard rest it is all active time.
     expect(row.activeSeconds).toBeCloseTo(s.game.stats.timeSec, 5);
     expect(row.day).toBe('2026-09-18');
+  });
+
+  it('leaves a hoverboard rest out of the active minutes, but not a board ridden at a jog', () => {
+    const s = setup();
+    s.frame(JOGGING, [{ type: 'start' }]);
+    s.play(5); // countdown and a little running
+    s.frame(STILL, [{ type: 'hoverboard' }]);
+    s.play(10, STILL); // ten seconds resting on the board
+    expect(s.game.state).toBe('playing');
+    s.play(TUNING.hoverboardSeconds, JOGGING); // off the board and running again
+    for (let i = 0; i < 60 * 40 && s.game.state !== 'summary'; i++) s.frame(STILL);
+    s.end();
+    const row = s.profile.profile.history[0];
+    const rested = s.game.stats.timeSec - row.activeSeconds;
+    // The first `idleWarnMs` of standing still is the same grace any run gives before its warning,
+    // so ten still seconds on the board are nine of rest.
+    const expected = 10 - TUNING.idleWarnMs / 1000;
+    expect(rested).toBeGreaterThan(expected - 0.1);
+    expect(rested).toBeLessThan(expected + 0.1);
   });
 
   it('a run abandoned before the summary banks nothing', () => {

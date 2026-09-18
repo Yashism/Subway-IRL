@@ -42,6 +42,10 @@ const sample = (over: Partial<RunSample> = {}): RunSample => ({
     jumps: 0, rolls: 0, laneChanges: 0, steps: 0, hoverboardsUsed: 0,
   },
   idleLevel: 'ok',
+  // Outside a hoverboard rest the game keeps the two levels equal, so a sample that only says how
+  // idle the player is means the same for both unless a test sets them apart.
+  movingLevel: over.movingLevel ?? over.idleLevel ?? 'ok',
+  resting: false,
   joshActive: false,
   magnetSec: 0,
   hoverboardSec: 0,
@@ -80,6 +84,27 @@ describe('MissionTracker', () => {
     feed(t, 6, { idleLevel: 'ok' });
     expect(t.counters.jogStreakSec).toBe(12);
     expect(t.counters.bestJogStreakSec).toBe(12);
+  });
+
+  it('does not let a hoverboard rest count as unbroken jogging, and times the rest itself', () => {
+    // On the board the catch rule is happy ('ok') while the player stands still ('caught').
+    const rest = { resting: true, hoverboardSec: 20, idleLevel: 'ok', movingLevel: 'caught' } as const;
+    const t = new MissionTracker();
+    feed(t, 10, { idleLevel: 'ok' });
+    feed(t, 5, rest);
+    feed(t, 3, { idleLevel: 'ok' });
+    expect(t.counters.bestJogStreakSec).toBe(10); // the rest broke it
+    expect(t.counters.jogStreakSec).toBe(3);
+    expect(t.counters.restSec).toBe(5);
+    expect(t.counters.idleWarnings).toBe(0); // resting is allowed: no warning was ever shown
+  });
+
+  it('counts no rest for a player who keeps jogging through the board', () => {
+    const t = new MissionTracker();
+    feed(t, 8, { resting: true, hoverboardSec: 20, idleLevel: 'ok', movingLevel: 'ok' });
+    expect(t.counters.restSec).toBe(0);
+    expect(t.counters.bestJogStreakSec).toBe(8);
+    expect(t.counters.hoverboardSec).toBe(8);
   });
 
   it('times the Josh streak and the hoverboard separately', () => {
