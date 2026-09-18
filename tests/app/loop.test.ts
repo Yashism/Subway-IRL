@@ -645,3 +645,38 @@ describe('AppLoop: the per-step hook (the audio frame)', () => {
     expect(r.steps.length).toBe(4);
   });
 });
+
+describe('AppLoop: a hold outlives nothing', () => {
+  it('is dropped when the player leaves the run the cinematic was holding', () => {
+    const r = setup({ input: 'keyboard' }, false, false, { hold: () => true });
+    r.key('Enter');
+    r.frame();
+    expect(r.loop.holdingStart).toBe(true);
+
+    // Home during the cinematic: there is no longer a run to start.
+    r.loop.dispatch({ type: 'home' });
+    expect(r.flow.screen).toBe('menu');
+    expect(r.loop.holdingStart).toBe(false);
+
+    // The cinematic still plays out and still releases — into nothing.
+    r.loop.queueStart();
+    r.frame(2);
+    expect(r.game.state).toBe('menu');
+  });
+
+  it('a release with no hold outstanding starts nothing', () => {
+    const r = setup({ input: 'keyboard' }, false);
+    r.loop.queueStart();
+    r.frame(2);
+    expect(r.game.state).toBe('menu');
+  });
+
+  it('still releases normally when the run is the one that was held', () => {
+    const r = setup({ input: 'keyboard' }, false, false, { hold: () => true });
+    r.key('Enter');
+    r.frame();
+    r.loop.queueStart();
+    r.frame();
+    expect(r.game.state).toBe('countdown');
+  });
+});

@@ -214,3 +214,28 @@ describe('RunSession: the boosts a run was bought', () => {
     expect(s.game.powerups.magnet).toBe(0);
   });
 });
+
+describe('RunSession: an abandoned daily gives back what it borrowed', () => {
+  it('disarms, so the next ordinary run is not scored as today’s attempt', () => {
+    const s = setup();
+    s.runs.armDaily();
+    expect(s.runs.dailyArmed).toBe(true);
+    // The player backs out before the run ever starts.
+    s.runs.disarmDaily();
+    expect(s.runs.dailyArmed).toBe(false);
+    s.fullRun();
+    expect(s.end().daily).toBe(false);
+  });
+
+  it('a run abandoned mid-flight leaves nothing armed either', () => {
+    const s = setup();
+    s.runs.armDaily();
+    s.frame(JOGGING, [{ type: 'start' }]);
+    expect(s.runs.dailyArmed).toBe(false); // consumed by the run that started
+    for (const e of s.game.toMenu()) if (e.type === 'state' && e.state === 'menu') s.runs.abandonRun();
+    s.runs.disarmDaily();
+    s.fullRun();
+    expect(s.end().daily).toBe(false);
+    expect(s.progression.state.daily.best).toBe(0);
+  });
+});

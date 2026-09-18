@@ -775,3 +775,23 @@ describe('the menu is a screen with a live camera on it', () => {
     expect(f.screen).toBe('menu');
   });
 });
+
+describe('Esc out of a card put up over a live run', () => {
+  it('goes back to the run, not to the menu behind it', () => {
+    // The run is paused behind the recalibration. Landing on the menu would leave the pause card
+    // sitting over the menu's own screen — the player is told two different things at once.
+    const f = webcamAt('playing');
+    f.dispatch({ type: 'gameState', state: 'playing' });
+    f.dispatch({ type: 'recalibrate' });
+    expect(f.screen).toBe('calibrating');
+    f.dispatch({ type: 'gameState', state: 'paused' });
+    expect(f.dispatch({ type: 'back' })).toEqual([]);
+    expect(f.screen).toBe('playing');
+  });
+
+  it('goes to the menu when there is no run behind it', () => {
+    const f = webcamAt('calibrating');
+    expect(f.dispatch({ type: 'back' })).toEqual([]);
+    expect(f.screen).toBe('menu');
+  });
+});

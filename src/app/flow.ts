@@ -218,7 +218,10 @@ export class SessionFlow {
       case 'chooseMode':
         return this.chooseMode(i.mode);
       case 'back':
-        if (this.screen !== 'playing') this.screen = 'menu';
+        // Esc cancels the card in front of you and puts you back where you were. With a run still
+        // on screen — paused behind a recalibration, say — "where you were" is the run, not the
+        // menu: leaving the pause card sitting over the menu's own screen is neither.
+        if (this.screen !== 'playing') this.screen = this.gameState === 'menu' ? 'menu' : 'playing';
         return NONE as FlowEffect[];
       default:
         break;

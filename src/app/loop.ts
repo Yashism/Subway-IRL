@@ -135,14 +135,26 @@ export class AppLoop {
 
   /** Releases a held run: one `start` is queued for the next step. */
   queueStart(): void {
+    // Only the cinematic that took the hold may spend it. If the player left `playing` while it
+    // was up — Home, a camera failure — the run they were holding is not one they still want, and
+    // starting it now would begin a run behind the menu.
+    if (!this.held) return;
     this.held = false;
     this.startQueued = true;
+  }
+
+  /** Drops a hold without starting anything. The cinematic is still free to finish and tear down. */
+  cancelHold(): void {
+    this.held = false;
   }
 
   /** Feeds one input to the session flow and runs its effects. */
   dispatch(i: FlowInput): void {
     const fx = this.flow.dispatch(i);
     for (let k = 0; k < fx.length; k++) this.run(fx[k]);
+    // A hold belongs to the run the flow was about to start. The moment it leaves `playing` there
+    // is no such run, so the hold is dropped rather than left to fire into whatever is on screen.
+    if (this.held && this.flow.screen !== 'playing') this.held = false;
   }
 
   /** Pauses a live run (Esc-style, resumed by Enter or a raised hand) and tells the flow and telemetry. */

@@ -521,6 +521,17 @@ hud.setProfile(profile.profile, null);
 applySkins();
 
 /**
+ * The run left without reaching the summary. Whatever the daily borrowed goes back: the seed, so
+ * the rest of the session is not still running today's challenge track, and the arming, so the
+ * next ordinary run is not quietly scored as an attempt at it.
+ */
+function abandonRun(): void {
+  runs.abandonRun();
+  runs.disarmDaily();
+  game.options.seed = baseSeed;
+}
+
+/**
  * The boosts the run that is counting down was bought. `startRun` has already reset the power-ups
  * and the countdown does not tick them, so a magnet set here is running the moment play begins —
  * which is exactly what the shop card promises.
@@ -598,7 +609,7 @@ const loop: AppLoop = new AppLoop({
     if (e.type !== 'state') return;
     if (e.state === 'countdown') startBoosts(runs.beginRun());
     else if (e.state === 'summary') recordRun();
-    else if (e.state === 'menu') runs.abandonRun();
+    else if (e.state === 'menu') abandonRun();
     runs.event(e);
   },
   // The same threshold the pose source pauses on, so the "camera stalled" toast and the pause
@@ -873,7 +884,9 @@ function frame(now: number): void {
   // The check's scrim owns the screen: the PiP drops to its corner form (the player is copying the
   // figure, not watching themselves) and goes back to the big stage view afterwards.
   const setup = m.screen === 'calibrating' || m.screen === 'ready';
-  const pipOn = webcam && flow.cameraReady && (setup || checking || m.screen === 'playing');
+  // The cinematic owns the screen — the HUD clears every card for it, and the camera card is no
+  // more exempt than they are. The flow reads `playing` throughout the intro, hence the guard.
+  const pipOn = webcam && flow.cameraReady && !intro.playing && (setup || checking || m.screen === 'playing');
   pip.setActive(pipOn);
   pip.setLayout(setup ? 'stage' : 'corner');
   syncPipVideo(pipOn);
