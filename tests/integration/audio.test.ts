@@ -161,13 +161,13 @@ describe('nothing sounds before a gesture', () => {
     const p = page();
     p.frame(30);
     expect(p.unlocks).not.toHaveBeenCalled();
-    expect(p.audio.ready).toBe(false);
+    expect(p.audio.built).toBe(false);
 
     p.key('Enter');
     expect(p.unlocks).toHaveBeenCalledTimes(1);
     // jsdom has no AudioContext, so this page is the "no output device" case: the graph is never
     // built, and asking again must stay cheap rather than trying to construct one per keystroke.
-    expect(p.audio.ready).toBe(false);
+    expect(p.audio.built).toBe(false);
     expect(p.audio.audible).toBe(false);
   });
 

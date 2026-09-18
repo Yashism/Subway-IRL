@@ -100,19 +100,23 @@ export class GameAudio implements AudioSink {
     }
   }
 
-  /** True once the graph has been built — `unlock()` got as far as making a context. */
-  get ready(): boolean {
+  /**
+   * The graph has been built — `unlock()` got as far as making a context. Deliberately **not**
+   * called `ready`: a facade with a getter called `ready` that can be true over silence is what
+   * let the HUD show a speaker while nothing was coming out. Ask `audible` for that.
+   */
+  get built(): boolean {
     return this.engine !== null;
   }
 
   /**
    * True when sound is really coming out: the graph exists *and* its context is running.
    *
-   * These come apart, and the difference is the whole autoplay story. A context built outside a
-   * user gesture — from a pose frame, say — is created `suspended` and refuses to resume, so
-   * `ready` is true and the player hears nothing. The HUD's speaker reads this one, because a 🔊
-   * over silence is worse than no icon at all. A context with no `state` (an offline renderer in
-   * a test) is taken at its word.
+   * This and `built` come apart, and the difference is the whole autoplay story. A context built
+   * outside a user gesture — from a pose frame, say — is created `suspended` and refuses to
+   * resume, so it is built and the player hears nothing. The HUD's speaker reads this one, because
+   * a 🔊 over silence is worse than no icon at all. A context with no `state` (an offline renderer
+   * in a test) is taken at its word.
    */
   get audible(): boolean {
     const ctx = this.engine?.ctx;

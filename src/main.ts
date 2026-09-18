@@ -605,7 +605,7 @@ const gesture = new GestureUnlock({
   target: window,
   enabled: soundAllowed({ autopilot: autopilotOn, replay: runtime.isReplay, search: location.search }),
   onUnlock: () => audio.unlock(),
-  // Not `audio.ready`: the raised hand that starts a run arrives on a pose frame with no user
+  // Not merely "the graph exists": the raised hand that starts a run arrives on a pose frame with no user
   // activation, which builds a context the browser will not resume. Only a context that is really
   // running counts as unlocked; anything else and the next key or click gets another go.
   audible: () => audio.audible,

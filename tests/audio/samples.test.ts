@@ -316,14 +316,14 @@ describe('the facade and the recordings', () => {
     expect(() => audio.unlock()).not.toThrow();
     expect(audio.bank).toBeTruthy();
     await new Promise((r) => setTimeout(r, 0));
-    expect(audio.ready).toBe(true);
+    expect(audio.built).toBe(true);
   });
 
   it('honours ?nosamples by staying entirely synthetic', () => {
     const audio = make({ search: '?nosamples' });
     audio.unlock();
     expect(audio.bank).toBeNull();
-    expect(audio.ready).toBe(true);
+    expect(audio.built).toBe(true);
     expect(() => audio.play('coin', 1, 1)).not.toThrow();
   });
 

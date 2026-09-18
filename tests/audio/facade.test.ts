@@ -33,7 +33,7 @@ describe('GameAudio', () => {
   it('is silent and safe before any gesture', () => {
     const audio = make();
     const game = newGame();
-    expect(audio.ready).toBe(false);
+    expect(audio.built).toBe(false);
     expect(() => {
       for (let i = 0; i < 120; i++) {
         const events = game.step(1 / 60, i === 0 ? [{ type: 'start' }] : [], activity);
@@ -48,7 +48,7 @@ describe('GameAudio', () => {
     const audio = make();
     const game = newGame();
     audio.unlock();
-    expect(audio.ready).toBe(true);
+    expect(audio.built).toBe(true);
     const engine = audio.engine!;
     expect(() => {
       for (let i = 0; i < 600; i++) {
@@ -63,7 +63,7 @@ describe('GameAudio', () => {
   it('stays usable when the browser has no AudioContext at all', () => {
     const audio = make({ makeContext: () => null as unknown as BaseAudioContext });
     expect(() => audio.unlock()).not.toThrow();
-    expect(audio.ready).toBe(false);
+    expect(audio.built).toBe(false);
     expect(() => {
       audio.ui('click');
       audio.trainPass(1);
@@ -109,14 +109,14 @@ describe('GameAudio', () => {
   });
 });
 
-describe('GameAudio: ready is not the same fact as audible', () => {
+describe('GameAudio: built is not the same fact as audible', () => {
   it('a context the browser will not run is built but not audible', () => {
     // Exactly the raised-hand case: the call had no user activation, so the context is created
     // suspended. `ready` says the graph exists; only `audible` says anything is coming out.
     const ctx = new FakeOfflineContext(64, 8000);
     const audio = make({ makeContext: () => asContext(ctx) });
     audio.unlock();
-    expect(audio.ready).toBe(true);
+    expect(audio.built).toBe(true);
     expect(ctx.state).toBe('suspended');
     expect(audio.audible).toBe(false);
 
@@ -126,7 +126,7 @@ describe('GameAudio: ready is not the same fact as audible', () => {
 
   it('neither is true before a gesture', () => {
     const audio = make();
-    expect(audio.ready).toBe(false);
+    expect(audio.built).toBe(false);
     expect(audio.audible).toBe(false);
   });
 
@@ -140,7 +140,7 @@ describe('GameAudio: ready is not the same fact as audible', () => {
     });
     for (let i = 0; i < 20; i++) audio.unlock();
     expect(made).toBe(1);
-    expect(audio.ready).toBe(false);
+    expect(audio.built).toBe(false);
     expect(audio.audible).toBe(false);
   });
 });
