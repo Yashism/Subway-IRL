@@ -313,7 +313,7 @@ export class WorldView {
     r.toneMapping = tone.mapping;
     r.toneMappingExposure = tone.exposure;
     r.shadowMap.enabled = true;
-    r.shadowMap.type = THREE.PCFSoftShadowMap;
+    r.shadowMap.type = THREE.PCFShadowMap;
 
     const scene = this.scene;
     const horizon = new THREE.Color(SKY_HORIZON);
