@@ -107,7 +107,7 @@ describe('LivePoseSource (main thread; no Worker in node)', () => {
     video.frame();
     await flush();
     expect(gpu.close).toHaveBeenCalled();
-    expect(create).toHaveBeenLastCalledWith({ variant: 'lite', delegate: 'CPU' });
+    expect(create).toHaveBeenLastCalledWith({ variant: 'lite', delegate: 'CPU', numPoses: 1 });
     expect(src.backend).toBe('main-cpu-lite');
 
     video.frame();
@@ -148,6 +148,24 @@ describe('LivePoseSource (worker)', () => {
   beforeEach(() => {
     vi.stubGlobal('Worker', FakeWorker);
     vi.stubGlobal('createImageBitmap', async () => ({ close() {} }));
+  });
+
+  it('tracks one person by default, and as many as asked for when told to', async () => {
+    const sent: WorkerIn[] = [];
+    const post = vi.spyOn(FakeWorker.prototype, 'postMessage').mockImplementation(function (this: FakeWorker, msg: WorkerIn) {
+      sent.push(msg);
+      queueMicrotask(() => this.onmessage?.({ data: { type: 'ready' } }));
+    });
+    try {
+      await source(fakeVideo()).start(() => {});
+      expect(sent[0]).toMatchObject({ type: 'init', variant: 'full', numPoses: 1 });
+      LivePoseSource.numPoses = 2;
+      await source(fakeVideo()).start(() => {});
+      expect(sent[1]).toMatchObject({ type: 'init', numPoses: 2 });
+    } finally {
+      LivePoseSource.numPoses = 1;
+      post.mockRestore();
+    }
   });
 
   it('falls back to the main thread after 5 worker frame errors in a row', async () => {

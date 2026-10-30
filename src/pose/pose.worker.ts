@@ -3,7 +3,7 @@ import { createLandmarker, type ModelVariant } from './landmarker';
 import { mirrorPoses } from './mirror';
 import type { Pose } from './types';
 
-export type WorkerIn = { type: 'init'; variant: ModelVariant } | { type: 'frame'; bitmap: ImageBitmap; t: number };
+export type WorkerIn = { type: 'init'; variant: ModelVariant; numPoses?: number } | { type: 'frame'; bitmap: ImageBitmap; t: number };
 export type WorkerOut =
   | { type: 'ready' }
   | { type: 'error'; message: string }
@@ -24,6 +24,7 @@ ctx.onmessage = async (e) => {
       landmarker = null;
       landmarker = await createLandmarker({
         variant: msg.variant,
+        numPoses: msg.numPoses,
         delegate: 'GPU',
         canvas: new OffscreenCanvas(1, 1),
         useModule: true,

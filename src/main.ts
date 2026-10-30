@@ -18,6 +18,8 @@ import { Game } from './game/game';
 import { FixedStepper } from './game/loop';
 import { KeyboardInput } from './input/keyboard';
 import { listCameras } from './pose/camera';
+import { warmPoseAssets } from './pose/landmarker';
+import { LivePoseSource } from './pose/liveSource';
 import { cleanLaneSpots } from './pose/laneSpots';
 import type { Thresholds } from './pose/thresholds';
 import type { PlayMode } from './pose/types';
@@ -32,6 +34,7 @@ import { PoseScreens, cameraOptions } from './ui/poseScreens';
 import { SettingsScreen, type SettingsView } from './ui/settings';
 import { ShopScreen } from './ui/shop';
 import { WorkoutScreen } from './ui/workout';
+import { FrameLimiter, RenderScale } from './app/frameBudget';
 import { setOutlineStrength } from './world/render/materials';
 import type { PoseSample, Wander } from './wander';
 import type { RunnerPalette } from './world/models/characters';
@@ -49,12 +52,17 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?difficulty= ?obstacles=1..5 ?amount=few|normal|lots ?seed= ?god ?tone= ?line= ?sens= ?reduced
 //   ?lanes=auto|spots        full-body lanes: automatic, or the player's recorded lane spots
 //   ?pip=0 ?perf ?saveAutopilot
+//   ?poses=2                 track two people instead of one (slower; default is one)
+//   ?fps=N ?fps=0            cap the drawn frame rate (default ~60; 0 = every refresh)
+//   ?scale=off               keep the render resolution fixed instead of adapting it to the GPU
 //   ?wander                  boot straight into Wander, the free-roam mode (see src/wander/); the menu's
 //                            Wander item does the same. Esc leaves it. Nothing in it is scored or saved.
 //   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
 //                            webcam mode, because the keyboard then claims to track jogging.
 
 const params = new URLSearchParams(location.search);
+// One tracked person is much cheaper; ?poses=2 is for a room where someone else may walk through.
+LivePoseSource.numPoses = params.get('poses') === '2' ? 2 : 1;
 const flagOn = (name: string): boolean => {
   if (!params.has(name)) return false;
   return !['0', 'off', 'false', 'no'].includes((params.get(name) ?? '').toLowerCase());
@@ -1047,9 +1055,21 @@ function skippedMoves(): string[] {
 // ---------------------------------------------------------------- frame loop
 
 let last = performance.now();
+// On a 120 Hz screen the world would be drawn twice as often as the game steps, at twice the GPU
+// cost, on the same iGPU the pose model runs on. ?fps=0 draws every refresh; ?scale=off keeps the
+// render resolution fixed.
+const fpsParam = Number(params.get('fps'));
+const limiter = new FrameLimiter(params.has('fps') && Number.isFinite(fpsParam) ? (fpsParam > 0 ? 1000 / fpsParam - 3 : 0) : 13);
+const renderScale = flagOn('scale') || !params.has('scale') ? new RenderScale() : null;
 function frame(now: number): void {
+  if (!limiter.accept(now)) {
+    requestAnimationFrame(frame);
+    return;
+  }
   const dt = Math.max(0, (now - last) / 1000);
   last = now;
+  const scaled = renderScale?.update(dt * 1000);
+  if (scaled !== null && scaled !== undefined) world.setRenderScale(scaled);
   if (wander?.active) {
     wanderFrame(now, dt);
     requestAnimationFrame(frame);
@@ -1136,4 +1156,6 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+// Fetch the pose model while the player reads the menu, so starting the camera is quick.
+if (initialInput === 'webcam' && !replay) setTimeout(warmPoseAssets, 2500);
 if (flagOn('wander')) void enterWander();

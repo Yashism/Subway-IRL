@@ -21,6 +21,9 @@ export const MODEL_LOAD_FAILED = 'Pose model failed to load:';
  * An instance is single-use: after `stop()` (or a failed `start()`), create a new one to restart.
  */
 export class LivePoseSource implements PoseSource {
+  /** People to track (`?poses=2` for a room with bystanders). Read when a backend loads. */
+  static numPoses = 1;
+
   backend = 'none';
   private worker: Worker | null = null;
   private landmarker: PoseLandmarker | null = null;
@@ -98,7 +101,7 @@ export class LivePoseSource implements PoseSource {
       console.warn('Pose worker unavailable, using the main thread:', err);
     }
     try {
-      this.landmarker = await createLandmarker({ variant: 'full', delegate: 'GPU' });
+      this.landmarker = await createLandmarker({ variant: 'full', delegate: 'GPU', numPoses: LivePoseSource.numPoses });
       if (this.abortIfStopped()) return;
       this.backend = 'main-gpu-full';
       return;
@@ -107,7 +110,7 @@ export class LivePoseSource implements PoseSource {
       console.warn('GPU pose model unavailable, using CPU lite:', err);
     }
     // Last resort: let a failure propagate to start().
-    this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU' });
+    this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU', numPoses: LivePoseSource.numPoses });
     if (this.abortIfStopped()) return;
     this.backend = 'main-cpu-lite';
   }
@@ -141,7 +144,7 @@ export class LivePoseSource implements PoseSource {
           fail(e.data.message);
         }
       };
-      w.postMessage({ type: 'init', variant } satisfies WorkerIn);
+      w.postMessage({ type: 'init', variant, numPoses: LivePoseSource.numPoses } satisfies WorkerIn);
     });
   }
 
@@ -235,7 +238,7 @@ export class LivePoseSource implements PoseSource {
       } else {
         try {
           this.closeLandmarker();
-          this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'GPU' });
+          this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'GPU', numPoses: LivePoseSource.numPoses });
           if (this.abortIfStopped()) return;
           this.backend = 'main-gpu-lite';
         } catch (err) {
@@ -265,7 +268,7 @@ export class LivePoseSource implements PoseSource {
     this.worker = null;
     try {
       this.closeLandmarker();
-      this.landmarker = await createLandmarker({ variant: 'full', delegate: 'GPU' });
+      this.landmarker = await createLandmarker({ variant: 'full', delegate: 'GPU', numPoses: LivePoseSource.numPoses });
       if (this.abortIfStopped()) return;
       this.backend = 'main-gpu-full';
     } catch (err) {
@@ -303,7 +306,7 @@ export class LivePoseSource implements PoseSource {
   /** Loads CPU lite on the main thread; marks the source 'failed' if that fails too. Callers hold the busy guard. */
   private async loadCpuLite(): Promise<void> {
     try {
-      this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU' });
+      this.landmarker = await createLandmarker({ variant: 'lite', delegate: 'CPU', numPoses: LivePoseSource.numPoses });
       if (this.abortIfStopped()) return;
       this.backend = 'main-cpu-lite';
     } catch (err) {

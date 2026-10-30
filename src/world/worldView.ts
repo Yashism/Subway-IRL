@@ -537,11 +537,31 @@ export class WorldView {
     };
   }
 
+  private size = { width: 1, height: 1, dpr: 1 };
+  private renderScale = 1;
+
   resize(width: number, height: number, dpr: number): void {
-    this.renderer.setPixelRatio(Math.min(dpr, MAX_PIXEL_RATIO));
-    this.renderer.setSize(width, height, false);
+    this.size = { width, height, dpr };
+    this.applySize();
     this.camera.aspect = width / Math.max(1, height);
     this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * Draws at a fraction of the normal resolution (1 = full). Used to hold the frame rate on a weak
+   * GPU; the canvas is still stretched to the window, so only sharpness changes.
+   */
+  setRenderScale(scale: number): void {
+    const s = Math.min(1, Math.max(0.25, scale));
+    if (s === this.renderScale) return;
+    this.renderScale = s;
+    this.applySize();
+  }
+
+  private applySize(): void {
+    const { width, height, dpr } = this.size;
+    this.renderer.setPixelRatio(Math.min(dpr, MAX_PIXEL_RATIO) * this.renderScale);
+    this.renderer.setSize(width, height, false);
   }
 
   render(g: Game, dtSec: number, events: readonly GameEvent[] = NO_EVENTS): void {
