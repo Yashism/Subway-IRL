@@ -105,7 +105,7 @@ export class WorkoutScreen {
     this.attr(root, 'data-empty', 'no');
 
     const top = el('div', 'sw-top', root);
-    el('div', 'sw-tab wk-tab', top, 'YOUR RUNS');
+    el('div', 'sw-tab wk-tab', top, 'Your runs');
     el('div', 'sw-tab-sub', top, 'Everything you have actually moved');
 
     // ---- the first-run invitation (shown instead of everything below)
@@ -126,7 +126,7 @@ export class WorkoutScreen {
     const record = el('div', 'wk-col', grid);
 
     // ---- today
-    const today = this.card(now, 'wk-card-today', 'TODAY');
+    const today = this.card(now, 'wk-card-today', 'Today');
     const hero = el('div', 'wk-hero', today);
     this.todayMinutes = el('div', 'wk-hero-num', hero);
     const heroText = el('div', 'wk-hero-text', hero);
@@ -141,7 +141,7 @@ export class WorkoutScreen {
     };
 
     // ---- this week
-    const week = this.card(now, 'wk-card-week', 'THIS WEEK');
+    const week = this.card(now, 'wk-card-week', 'This week');
     const streak = el('div', 'wk-streak', week);
     const flame = el('div', 'wk-streak-badge', streak);
     el('span', 'wk-streak-flame', flame, '🔥');
@@ -165,7 +165,7 @@ export class WorkoutScreen {
     this.weekCals = el('div', 'wk-cals', weekFoot);
 
     // ---- all time
-    const all = this.card(record, 'wk-card-all', 'ALL TIME');
+    const all = this.card(record, 'wk-card-all', 'All time');
     const allTiles = el('div', 'wk-tiles wk-tiles-all', all);
     this.allTiles = {
       runs: this.tile(allTiles, 'Runs'),
@@ -180,7 +180,7 @@ export class WorkoutScreen {
     };
 
     // ---- recent runs
-    const recent = this.card(record, 'wk-card-recent', 'RECENT RUNS');
+    const recent = this.card(record, 'wk-card-recent', 'Recent runs');
     this.list = el('div', 'wk-list', recent);
     this.listEmpty = el('div', 'wk-list-empty', recent, 'No runs yet.');
 
@@ -289,7 +289,7 @@ export class WorkoutScreen {
       el('div', 'wk-run-how', when, runHow(r));
       const score = el('div', 'wk-run-score', row);
       el('div', 'wk-run-score-num', score, formatCount(r.score));
-      el('div', 'wk-run-score-label', score, r.newBest ? 'NEW BEST' : 'score');
+      el('div', 'wk-run-score-label', score, r.newBest ? 'New best' : 'score');
       const stats = el('div', 'wk-run-stats', row);
       for (const [label, value] of [
         ['dist', formatDistance(r.distance)],

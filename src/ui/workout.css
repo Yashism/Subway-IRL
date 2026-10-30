@@ -8,8 +8,7 @@
  */
 
 .wk-tab {
-  background: var(--sw-green);
-  text-shadow: 0 3px 0 #1d6b48;
+  text-shadow: 0 1px 10px rgba(14, 22, 36, 0.65), 0 0 2px rgba(14, 22, 36, 0.4);
 }
 
 /* ------------------------------------------------------------ the empty state */
@@ -24,10 +23,10 @@
   margin: auto 0;
   padding: 34px 28px 28px;
   box-sizing: border-box;
-  border-radius: 32px;
-  background: linear-gradient(180deg, var(--sw-cream), var(--sw-cream-2));
-  border: 5px solid var(--sw-ink);
-  box-shadow: 0 10px 0 var(--sw-ink), 0 30px 60px rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+  background: var(--sw-cream);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 30px 60px rgba(0, 0, 0, 0.45);
   color: var(--sw-ink);
   animation: sw-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
@@ -43,21 +42,21 @@
   place-items: center;
   width: 92px;
   height: 92px;
-  border-radius: 28px;
+  border-radius: 12px;
   font-size: 48px;
-  background: radial-gradient(circle at 35% 30%, #9ff4ff, var(--sw-cyan) 55%, #1583a0);
-  border: 5px solid var(--sw-ink);
-  box-shadow: 0 7px 0 var(--sw-ink), inset 0 -8px 0 rgba(14, 109, 134, 0.45);
+  background: var(--sw-cyan);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 -8px 0 rgba(14, 109, 134, 0.45);
   transform: rotate(-5deg);
   animation: wk-bob 2.4s ease-in-out infinite;
 }
 .wk-invite-title {
-  font: 400 clamp(28px, 3.2vw, 40px) / 1.05 var(--font-game, 'Luckiest Guy', sans-serif);
+  font: 700 clamp(28px, 3.2vw, 40px) / 1.05 var(--font-game, 'Barlow Condensed', sans-serif);
   padding-top: 6px;
 }
 .wk-invite-body {
   font: 700 clamp(15px, 1.25vw, 19px) / 1.4 var(--font-ui, sans-serif);
-  color: #5d4a2c;
+  color: #3f4858;
   max-width: 420px;
 }
 .wk-invite-actions {
@@ -84,10 +83,10 @@
 .wk-card {
   display: flex;
   flex-direction: column;
-  border-radius: 26px;
-  background: linear-gradient(180deg, var(--sw-cream), var(--sw-cream-2));
-  border: 5px solid var(--sw-ink);
-  box-shadow: 0 8px 0 var(--sw-ink), 0 20px 36px rgba(0, 0, 0, 0.32);
+  border-radius: 12px;
+  background: var(--sw-cream);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 20px 36px rgba(0, 0, 0, 0.32);
   color: var(--sw-ink);
   overflow: hidden;
   animation: sw-rise 0.4s ease-out both;
@@ -99,13 +98,9 @@
   padding: 10px 16px 9px;
   background: var(--sw-ink);
   font: 800 clamp(14px, 1.15vw, 17px) / 1 var(--font-ui, sans-serif);
-  letter-spacing: 0.18em;
-  color: var(--gold, #ffd400);
+  color: var(--gold, #f5c518);
 }
-.wk-card-today .wk-card-title {
-  background: linear-gradient(90deg, var(--magenta, #e5399b), #a12a6d);
-  color: #fff;
-}
+
 .wk-card-body {
   display: flex;
   flex-direction: column;
@@ -120,19 +115,19 @@
   align-items: center;
   gap: 16px;
   padding: 12px 16px 14px;
-  border-radius: 20px;
+  border-radius: 10px;
   background: #fff;
-  border: 3px solid var(--sw-ink);
-  box-shadow: 0 4px 0 var(--sw-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .wk-hero-num {
-  font: 400 clamp(52px, 6.5vw, 86px) / 0.9 var(--font-game, 'Luckiest Guy', sans-serif);
+  font: 700 clamp(52px, 6.5vw, 86px) / 0.9 var(--font-game, 'Barlow Condensed', sans-serif);
   padding-top: 8px;
   /* Four digits' worth: 7 → 120 must not slide the words beside it. */
   min-width: 2.4ch;
   text-align: center;
-  color: var(--magenta, #e5399b);
-  -webkit-text-stroke: 3px var(--sw-ink);
+  color: var(--magenta, #c8352e);
+  -webkit-text-stroke: 0 var(--sw-ink);
   paint-order: stroke fill;
 }
 .wk-hero-text {
@@ -166,14 +161,14 @@
   align-items: center;
   gap: 2px;
   padding: 10px 6px 9px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: #fff;
-  border: 3px solid var(--sw-ink);
-  box-shadow: 0 4px 0 var(--sw-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   min-width: 0;
 }
 .wk-tile-val {
-  font: 400 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  font: 700 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
   padding-top: 4px;
   color: var(--sw-ink);
   white-space: nowrap;
@@ -183,8 +178,6 @@
 }
 .wk-tile-label {
   font: 800 11.5px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--sw-brown);
   white-space: nowrap;
 }
@@ -196,10 +189,10 @@
   align-items: center;
   gap: 14px;
   padding: 10px 14px 11px;
-  border-radius: 20px;
+  border-radius: 10px;
   background: #fff;
-  border: 3px solid var(--sw-ink);
-  box-shadow: 0 4px 0 var(--sw-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .wk-streak-badge {
   display: flex;
@@ -207,10 +200,10 @@
   gap: 6px;
   flex: none;
   padding: 8px 16px 7px 12px;
-  border-radius: 999px;
-  background: #ece8f8;
-  border: 3px solid var(--sw-ink);
-  box-shadow: inset 0 -3px 0 rgba(27, 16, 53, 0.12);
+  border-radius: 8px;
+  background: #eceff3;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: inset 0 -3px 0 rgba(28, 36, 51, 0.12);
 }
 .wk-streak-badge[data-on='on'] {
   background: linear-gradient(180deg, #ffc46b, var(--orange, #ff7a29) 70%, #d1490a);
@@ -225,7 +218,7 @@
   animation: wk-flicker 1.6s ease-in-out infinite;
 }
 .wk-streak-num {
-  font: 400 clamp(26px, 2.6vw, 36px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  font: 700 clamp(26px, 2.6vw, 36px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
   padding-top: 4px;
   /* Reserved: 9 → 10 must not resize the badge. */
   min-width: 1.6ch;
@@ -234,7 +227,7 @@
 }
 .wk-streak-badge[data-on='on'] .wk-streak-num {
   color: #fff;
-  -webkit-text-stroke: 3px var(--sw-ink);
+  -webkit-text-stroke: 0 var(--sw-ink);
   paint-order: stroke fill;
 }
 .wk-streak-text {
@@ -261,10 +254,10 @@
   align-items: end;
   gap: 6px;
   padding: 10px 10px 8px;
-  border-radius: 20px;
+  border-radius: 10px;
   background: #fff;
-  border: 3px solid var(--sw-ink);
-  box-shadow: 0 4px 0 var(--sw-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .wk-bar {
   display: flex;
@@ -287,7 +280,7 @@
   height: clamp(74px, 12vh, 120px);
   border-radius: 10px;
   background: repeating-linear-gradient(0deg, #efecf8 0 1px, transparent 1px 25%);
-  box-shadow: inset 0 0 0 2px #e4e0f3;
+  box-shadow: inset 0 0 0 2px #e3e7ec;
   overflow: hidden;
 }
 .wk-bar-fill {
@@ -295,12 +288,12 @@
   height: 0;
   border-radius: 8px;
   background: linear-gradient(180deg, #7fe7f7, var(--sw-cyan) 60%, #1583a0);
-  box-shadow: inset 0 0 0 2px rgba(27, 16, 53, 0.35);
+  box-shadow: inset 0 0 0 2px rgba(28, 36, 51, 0.35);
   transform-origin: bottom;
   animation: sw-grow 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
 .wk-bar[data-today='on'] .wk-bar-fill {
-  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+  background: var(--gold, #f5c518);
 }
 .wk-bar[data-today='on'] .wk-bar-track {
   box-shadow: inset 0 0 0 3px var(--sw-ink);
@@ -318,15 +311,14 @@
 }
 .wk-bar-day {
   font: 800 13px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.06em;
   color: var(--sw-brown);
 }
 .wk-bar[data-today='on'] .wk-bar-day {
   color: var(--sw-ink);
   padding: 2px 8px 1px;
-  border-radius: 999px;
-  background: var(--gold, #ffd400);
-  box-shadow: 0 2px 0 var(--sw-ink);
+  border-radius: 8px;
+  background: var(--gold, #f5c518);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .wk-week-foot {
   display: flex;
@@ -378,14 +370,14 @@
   align-items: center;
   gap: 12px;
   padding: 9px 13px 9px 11px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: #fff;
-  border: 3px solid var(--sw-ink);
-  box-shadow: 0 3px 0 var(--sw-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .wk-run[data-best='on'] {
   background: linear-gradient(180deg, #fffbe6, #fff0b8);
-  box-shadow: 0 3px 0 var(--sw-ink), inset 0 0 0 2px var(--gold, #ffd400);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 0 0 2px var(--gold, #f5c518);
 }
 .wk-run-when {
   display: flex;
@@ -415,13 +407,11 @@
   min-width: 7ch;
 }
 .wk-run-score-num {
-  font: 400 clamp(21px, 2vw, 28px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  font: 700 clamp(21px, 2vw, 28px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
   padding-top: 4px;
 }
 .wk-run-score-label {
   font: 800 10.5px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--sw-brown);
 }
 .wk-run[data-best='on'] .wk-run-score-label {
@@ -454,8 +444,6 @@
 }
 .wk-run-stat-label {
   font: 800 10px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--sw-brown);
 }
 

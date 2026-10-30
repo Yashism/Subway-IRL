@@ -55,7 +55,7 @@ export function renderMissionRow(m: MissionView, opts: MissionRowOptions = {}): 
   el('div', 'ms-row-label', head, m.label);
   if (opts.reward !== false) {
     const chip = el('div', 'ms-row-reward', head);
-    el('span', 'ms-coin', chip, '🪙');
+    el('span', 'ms-coin', chip, '₹');
     el('span', 'ms-row-reward-n', chip, String(m.reward));
   }
 
@@ -115,7 +115,7 @@ export function renderDailyCard(d: DailyView, opts: DailyCardOptions = {}): HTML
   el('div', 'ms-head-title', head, 'Daily challenge');
   const streak = el('div', 'ms-streak', head);
   streak.dataset.on = d.streak > 0 ? 'on' : 'off';
-  el('span', 'ms-streak-flame', streak, '🔥');
+  el('span', 'ms-streak-flame', streak, '');
   el('span', 'ms-streak-text', streak, d.streakText);
 
   const body = el('div', 'ms-daily-body', card);
@@ -138,7 +138,7 @@ export function renderDailyCard(d: DailyView, opts: DailyCardOptions = {}): HTML
   // that apart from the game losing their coins.
   const chip = el('div', 'ms-row-reward', foot);
   chip.dataset.claimed = d.done ? 'yes' : 'no';
-  el('span', 'ms-coin', chip, '🪙');
+  el('span', 'ms-coin', chip, '₹');
   el('span', 'ms-row-reward-n', chip, d.done ? 'Claimed' : String(d.coins));
   if (opts.onPlay) missionButton(foot, 'ms-btn ms-btn-go', opts.playLabel ?? (d.done ? 'Run it again' : 'Run it'), opts.onPlay);
   return card;
@@ -157,7 +157,7 @@ export function renderMissionToast(m: MissionView): HTMLElement {
   el('span', 'ms-toast-icon', t, m.done ? '🏅' : m.icon);
   const body = el('span', 'ms-toast-body', t);
   el('span', 'ms-toast-label', body, m.done ? 'Mission complete!' : m.label);
-  el('span', 'ms-toast-count', body, m.done ? `${m.label} · +${m.reward} 🪙` : m.text);
+  el('span', 'ms-toast-count', body, m.done ? `${m.label} · +₹${m.reward}` : m.text);
   return t;
 }
 
@@ -210,7 +210,7 @@ export class MissionBoard {
       el('div', 'ms-level-text', head, m.level?.text ?? '');
       if (m.coins !== undefined) {
         const purse = el('div', 'ms-purse', head);
-        el('span', 'ms-coin', purse, '🪙');
+        el('span', 'ms-coin', purse, '₹');
         el('span', 'ms-purse-n', purse, m.coins);
       }
       if (m.level) {

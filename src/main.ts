@@ -27,11 +27,14 @@ import { Hud, menuNotice, openMonitorWindow } from './ui/hud';
 import { LaneSetupScreen } from './ui/laneSetupScreen';
 import { MissionBoard, renderMissionList, renderMissionToast } from './ui/missionCard';
 import { MoveCheckScreen, renderSummaryCard } from './ui/moveCheckScreen';
-import { PosePip, pipVisibleFromUrl } from './ui/pip';
+import { PosePip, isStalled, pipVisibleFromUrl } from './ui/pip';
 import { PoseScreens, cameraOptions } from './ui/poseScreens';
 import { SettingsScreen, type SettingsView } from './ui/settings';
 import { ShopScreen } from './ui/shop';
 import { WorkoutScreen } from './ui/workout';
+import { setOutlineStrength } from './world/render/materials';
+import type { PoseSample, Wander } from './wander';
+import type { RunnerPalette } from './world/models/characters';
 import { WorldView, type ToneChoice } from './world/worldView';
 
 // ---------------------------------------------------------------- URL options
@@ -46,6 +49,8 @@ import { WorldView, type ToneChoice } from './world/worldView';
 //   ?difficulty= ?obstacles=1..5 ?amount=few|normal|lots ?seed= ?god ?tone= ?line= ?sens= ?reduced
 //   ?lanes=auto|spots        full-body lanes: automatic, or the player's recorded lane spots
 //   ?pip=0 ?perf ?saveAutopilot
+//   ?wander                  boot straight into Wander, the free-roam mode (see src/wander/); the menu's
+//                            Wander item does the same. Esc leaves it. Nothing in it is scored or saved.
 //   ?jog                     debug: J fakes jog steps. Holding J also suppresses the idle catch in
 //                            webcam mode, because the keyboard then claims to track jogging.
 
@@ -202,9 +207,11 @@ const hud = new Hud(document.getElementById('hud')!, {
     audio.ui('back');
     loop.dispatch({ type: 'home' });
   },
+  onPlay: () => loop.dispatch({ type: 'startPressed' }),
   onSettings: () => setOverlay('settings'),
   onWorkout: () => setOverlay('workout'),
   onToggleSound: () => toggleSound(),
+  onWander: () => void enterWander(),
 });
 const stepper = new FixedStepper();
 
@@ -400,6 +407,7 @@ function exportData(): void {
 /** Puts a settings change in force, live. Called for the saved values at boot and on every change. */
 function applySettings(next: GameSettings): void {
   settings = next;
+  setOutlineStrength(next.outlines);
   applyLiveSettings(
     // A recorded session replays with the sensitivity, and the track, it was played with.
     {
@@ -702,6 +710,112 @@ function startDaily(): void {
   loop.dispatch({ type: 'startPressed' });
 }
 
+// ---------------------------------------------------------------- Wander (free roam)
+//
+// A separate mode with its own scene, keys and overlay (src/wander/), entered from the menu. While
+// it is up, `frame()` hands the whole frame to it: the game loop does not step, so there is no run,
+// no inspector, no idle clock, and nothing reaches the profile, the missions or the wallet. The
+// game stays in `menu`, exactly as it was, and Esc puts the menu back.
+
+let wander: Wander | null = null;
+let wanderLoading = false;
+/** A camera start asked for with C is in flight until this time (ms). */
+let wanderCameraUntil = 0;
+const wanderSample: PoseSample = { running: false, tracking: false, calibrated: false, jogActive: false, msSinceStep: Infinity, cadenceSpm: 0, lane: 0 };
+
+/** The pose pipeline as Wander reads it, or null while no camera is running (keys only). */
+function wanderPose(): PoseSample | null {
+  if (flow.input !== 'webcam' || !runtime.running) return null;
+  const now = performance.now();
+  const st = runtime.status();
+  const act = runtime.commands.activity(now);
+  const s = wanderSample;
+  s.running = true;
+  // No body in view, or no frame for a while: nothing to walk with.
+  s.tracking = st.tracking && !act.lost;
+  s.calibrated = st.calibrated;
+  s.jogActive = st.jog.active && !act.lost;
+  s.msSinceStep = act.msSinceStep;
+  s.cadenceSpm = act.cadenceSpm;
+  s.lane = st.lane;
+  return s;
+}
+
+function wanderSkin(): { id: string; palette?: RunnerPalette } {
+  const id = progression.state.unlocks.character;
+  return { id, palette: shopItem(id)?.palette };
+}
+
+async function enterWander(): Promise<void> {
+  if (wander?.active || wanderLoading) return;
+  const free = () => flow.screen === 'menu' && game.state === 'menu' && overlay === 'none' && !intro.playing;
+  if (!free()) return;
+  wanderLoading = true;
+  try {
+    // The module (three.js scenery, the city plan, its overlay) is only fetched when it is wanted.
+    const { Wander: WanderMode } = await import('./wander');
+    if (!free()) return;
+    wander ??= new WanderMode({
+      renderer: world.renderer,
+      seed: baseSeed,
+      line: settings.line,
+      skin: wanderSkin(),
+      pose: wanderPose,
+      canStartCamera: () => flow.input === 'webcam' && !runtime.running && !runtime.isReplay && performance.now() > wanderCameraUntil,
+      startCamera: () => {
+        wanderCameraUntil = performance.now() + 8000;
+        openCamera(null);
+      },
+      onTrainPass: (closeness) => audio.trainPass(closeness),
+      onExit: leaveWander,
+    });
+    wander.resize(window.innerWidth, window.innerHeight);
+    wander.refresh({ line: settings.line, skin: wanderSkin() });
+    audio.ui('click');
+    // Its keys are its own: the game's keyboard (Enter would start a run) stays detached meanwhile.
+    detachKeyboard?.();
+    detachKeyboard = null;
+    keyboard.drain();
+    runtime.commands.drain();
+    wander.enter();
+  } catch (err) {
+    console.warn('Wander failed to start:', err);
+    detachKeyboard ??= keyboard.attach(window);
+  } finally {
+    wanderLoading = false;
+  }
+}
+
+/** Wander was left: the menu's keyboard and camera are the game's again. */
+function leaveWander(): void {
+  audio.ui('back');
+  detachKeyboard ??= keyboard.attach(window);
+  keyboard.drain();
+  runtime.commands.drain();
+}
+
+/** One frame of Wander: the body's commands are drained unread (it reads the body itself), the PiP stays up. */
+function wanderFrame(now: number, dt: number): void {
+  keyboard.drain();
+  runtime.commands.drain();
+  const webcam = flow.input === 'webcam';
+  const pipOn = webcam && flow.cameraReady;
+  pip.setActive(pipOn);
+  pip.setLayout('corner');
+  syncPipVideo(pipOn);
+  if (pipOn) {
+    const st = runtime.status();
+    st.dark = runtime.dark(now);
+    pip.update(st, isStalled(st.lastFrameT, now, STALL_MS), now, runtime.aspect);
+  }
+  if (!contextLost) wander!.frame(dt);
+  const stats = wander!.stats;
+  if (perf && stats && dt > 0) {
+    fps += (1 / dt - fps) * 0.05;
+    perf.textContent = `${fps.toFixed(0)} fps  ${stats.calls} calls  ${(stats.triangles / 1000).toFixed(1)}k tris  dpr ${stats.pixelRatio}\nwander  ${stats.chunks} chunks`;
+  }
+}
+
 // ---------------------------------------------------------------- sound
 //
 // Nothing may be heard before a real user gesture: the browser insists, and a game that blares on
@@ -767,6 +881,7 @@ Object.assign(window as unknown as Record<string, unknown>, {
   __loop: loop,
   __telemetry: telemetry,
   __overlay: (name: Overlay) => setOverlay(name),
+  __wander: () => wander,
   __daily: () => startDaily(),
 });
 
@@ -797,6 +912,7 @@ let fps = 60;
 
 function resize(): void {
   world.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
+  wander?.resize(window.innerWidth, window.innerHeight);
 }
 resize();
 window.addEventListener('resize', resize);
@@ -934,6 +1050,11 @@ let last = performance.now();
 function frame(now: number): void {
   const dt = Math.max(0, (now - last) / 1000);
   last = now;
+  if (wander?.active) {
+    wanderFrame(now, dt);
+    requestAnimationFrame(frame);
+    return;
+  }
   // The cinematic is advanced *before* the game steps, so the frame it hands over on is the same
   // frame the countdown starts in — the camera goes straight from the intro's last pose to the
   // running pose with no menu shot in between.
@@ -1015,3 +1136,4 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+if (flagOn('wander')) void enterWander();

@@ -7,11 +7,11 @@
   color: #fff;
   user-select: none;
   overflow: hidden;
-  font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
-  --ps-ink: var(--ink, #1b1035);
-  --ps-cream: #fff9ec;
-  --ps-cream-2: #ffe9c2;
-  --ps-brown: #8a6a3a;
+  font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
+  --ps-ink: var(--ink, #1c2433);
+  --ps-cream: #f6f7f4;
+  --ps-cream-2: #e9ecef;
+  --ps-brown: #5b6577;
   --ps-green: var(--green, #3fb27f);
   --ps-red: var(--red, #e8433a);
   --ps-amber: #ffb020;
@@ -61,15 +61,15 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-btn {
   appearance: none;
   cursor: pointer;
-  border: 4px solid var(--ps-ink);
-  border-radius: 999px;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  border-radius: 8px;
   padding: 14px 34px 10px;
-  font: 400 clamp(22px, 2.4vw, 30px) / 1 var(--font-game, 'Luckiest Guy', sans-serif);
+  font: 700 clamp(22px, 2.4vw, 30px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
   letter-spacing: 0.02em;
   color: #fff;
   background: linear-gradient(180deg, #8d7bd6, #5b48a8);
-  box-shadow: 0 6px 0 var(--ps-ink);
-  text-shadow: 0 2px 0 rgba(27, 16, 53, 0.6);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s;
   white-space: nowrap;
 }
@@ -78,17 +78,17 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 }
 .ps-btn:active {
   transform: translateY(4px);
-  box-shadow: 0 2px 0 var(--ps-ink);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .ps-btn:focus-visible,
 .ps-chip:focus-visible,
 .ps-select:focus-visible {
-  outline: 4px solid var(--gold, #ffd400);
-  outline-offset: 3px;
+  outline: 2px solid var(--blue, #2c5d9e);
+  outline-offset: 2px;
 }
 .ps-btn-go {
-  background: linear-gradient(180deg, #6fe0a3, var(--ps-green) 55%, #2a8c60);
-  text-shadow: 0 3px 0 #1d6b48;
+  background: var(--ps-green);
+  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   padding: 18px 48px 12px;
   font-size: clamp(28px, 3vw, 38px);
 }
@@ -98,23 +98,23 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   color: var(--ps-ink);
   background: #fff;
   border-width: 3px;
-  box-shadow: 0 4px 0 var(--ps-ink);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   text-shadow: none;
 }
 .ps-btn-small {
   font: 800 15px/1 var(--font-ui, sans-serif);
   padding: 9px 16px 8px;
   border-width: 3px;
-  box-shadow: 0 4px 0 var(--ps-ink);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   text-shadow: none;
-  background: linear-gradient(180deg, #fff, #e4e0f3);
+  background: #fff;
   color: var(--ps-ink);
 }
 .ps-btn-ghost {
-  background: rgba(27, 16, 53, 0.55);
+  background: rgba(28, 36, 51, 0.55);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 4px 0 rgba(27, 16, 53, 0.6);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 
 /* ------------------------------------------------------------ menu mode card */
@@ -129,10 +129,10 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   align-items: center;
   gap: 12px;
   padding: 10px 12px 10px 10px;
-  border-radius: 22px;
-  background: rgba(20, 12, 45, 0.72);
-  border: 3px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 5px 0 rgba(20, 12, 45, 0.55), 0 10px 22px rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  background: rgba(14, 22, 36, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 10px 22px rgba(0, 0, 0, 0.25);
   animation: ps-drop 0.45s 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .ps-mode-card-icon {
@@ -140,20 +140,20 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 14px;
+  border-radius: 8px;
   font-size: 26px;
-  background: radial-gradient(circle at 35% 30%, #9ff4ff, var(--cyan, #29c7e0) 55%, #1583a0);
-  box-shadow: inset 0 0 0 3px #0e6d86, 0 3px 0 var(--ps-ink);
+  background: var(--cyan, #29c7e0);
+  box-shadow: inset 0 0 0 3px #0e6d86, 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .pose-ui[data-input='keyboard'] .ps-mode-card-icon {
-  background: linear-gradient(180deg, #fff, #dcd8ee);
-  box-shadow: inset 0 0 0 3px #8f88b5, 0 3px 0 var(--ps-ink);
+  background: #fff;
+  box-shadow: inset 0 0 0 3px #8a94a6, 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .ps-mode-card-title {
-  font: 400 22px/1 var(--font-game, sans-serif);
+  font: 700 22px/1 var(--font-game, sans-serif);
   padding-top: 4px;
   paint-order: stroke fill;
-  -webkit-text-stroke: 4px var(--ps-ink);
+  -webkit-text-stroke: 0 var(--ps-ink);
 }
 .ps-mode-card-sub {
   font: 700 14px/1.2 var(--font-ui, sans-serif);
@@ -170,7 +170,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   pointer-events: auto;
   padding: 46px 16px 24px;
   box-sizing: border-box;
-  background: radial-gradient(ellipse at 50% 45%, rgba(20, 12, 45, 0.45), rgba(20, 12, 45, 0.78));
+  background: radial-gradient(ellipse at 50% 45%, rgba(14, 22, 36, 0.45), rgba(14, 22, 36, 0.78));
   backdrop-filter: blur(4px);
 }
 .ps-card {
@@ -182,33 +182,22 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   width: min(640px, 100%);
   padding: 44px 30px 22px;
   box-sizing: border-box;
-  border-radius: 32px;
-  background: linear-gradient(180deg, var(--ps-cream), var(--ps-cream-2));
-  border: 5px solid var(--ps-ink);
-  box-shadow: 0 10px 0 var(--ps-ink), 0 30px 60px rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+  background: var(--ps-cream);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 30px 60px rgba(0, 0, 0, 0.45);
   color: var(--ps-ink);
   animation: ps-card-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   overflow: visible;
 }
 .ps-card-tab {
-  position: absolute;
-  top: -30px;
-  left: 50%;
-  transform: translateX(-50%) rotate(-3deg);
   white-space: nowrap;
-  font: 400 36px/1 var(--font-game, sans-serif);
-  padding: 14px 30px 8px;
-  color: #fff;
-  background: var(--magenta, #e5399b);
-  border: 5px solid var(--ps-ink);
-  border-radius: 16px;
-  box-shadow: 0 6px 0 var(--ps-ink);
+  font: 700 36px/1 var(--font-game, sans-serif);
+  margin: 0 0 8px;
+  color: var(--ps-ink);
 }
 .ps-error .ps-card-tab {
-  background: var(--ps-red);
-}
-.ps-starting .ps-card-tab {
-  background: var(--cyan, #29c7e0);
+  color: var(--ps-red);
 }
 .ps-hero {
   position: relative;
@@ -217,21 +206,21 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   width: 84px;
   height: 84px;
   margin: 2px 0 10px;
-  border-radius: 26px;
-  background: radial-gradient(circle at 35% 30%, #9ff4ff, var(--cyan, #29c7e0) 55%, #1583a0);
-  border: 5px solid var(--ps-ink);
-  box-shadow: 0 7px 0 var(--ps-ink), inset 0 -8px 0 rgba(14, 109, 134, 0.45);
+  border-radius: 12px;
+  background: var(--cyan, #29c7e0);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 -8px 0 rgba(14, 109, 134, 0.45);
   transform: rotate(-6deg);
   animation: ps-bob 2.4s ease-in-out infinite;
 }
 .ps-hero-cam {
   font-size: 44px;
   line-height: 1;
-  filter: drop-shadow(0 3px 0 rgba(27, 16, 53, 0.5));
+  filter: drop-shadow(0 1px 2px rgba(14, 22, 36, 0.3));
 }
 .ps-hero-error {
-  background: radial-gradient(circle at 35% 30%, #ffc2a8, var(--orange, #ff7a29) 55%, #c24e00);
-  box-shadow: 0 7px 0 var(--ps-ink), inset 0 -8px 0 rgba(163, 59, 0, 0.45);
+  background: var(--orange, #ff7a29);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 -8px 0 rgba(163, 59, 0, 0.45);
 }
 .ps-hero-x {
   position: absolute;
@@ -242,15 +231,15 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  font: 400 30px/1 var(--font-game, sans-serif);
+  font: 700 30px/1 var(--font-game, sans-serif);
   padding-top: 5px;
   box-sizing: border-box;
   color: #fff;
   background: var(--ps-red);
-  border: 4px solid var(--ps-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
 }
 .ps-title {
-  font: 400 clamp(30px, 3.4vw, 40px) / 1.05 var(--font-game, sans-serif);
+  font: 700 clamp(30px, 3.4vw, 40px) / 1.05 var(--font-game, sans-serif);
   color: var(--ps-ink);
   margin-top: 4px;
   padding-top: 4px;
@@ -258,14 +247,14 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-body {
   margin-top: 8px;
   font: 700 18px/1.35 var(--font-ui, sans-serif);
-  color: #5d4a2c;
+  color: #3f4858;
   max-width: 540px;
 }
 .ps-error-text {
   padding: 12px 16px 10px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: #fff;
-  border: 3px solid var(--ps-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
   color: var(--ps-ink);
   margin-top: 12px;
 }
@@ -282,10 +271,10 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   align-items: center;
   gap: 4px;
   padding: 8px 4px 7px;
-  border-radius: 18px;
+  border-radius: 10px;
   background: #fff;
-  border: 3px solid var(--ps-ink);
-  box-shadow: 0 4px 0 var(--ps-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   animation: ps-rise 0.35s ease-out both;
 }
 .ps-move:nth-child(2) { animation-delay: 0.08s; }
@@ -307,8 +296,6 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-move-step .ps-move-icon { background: var(--cyan, #29c7e0); }
 .ps-move-label {
   font: 800 13px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--ps-brown);
 }
 .ps-privacy {
@@ -319,9 +306,9 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   box-sizing: border-box;
   margin-top: 14px;
   padding: 10px 16px;
-  border-radius: 18px;
+  border-radius: 10px;
   background: #e2f7ea;
-  border: 3px dashed #2a8c60;
+  border: 1.5px dashed #2a8c60;
   text-align: left;
 }
 .ps-privacy-icon {
@@ -357,9 +344,9 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 10px solid rgba(27, 16, 53, 0.12);
+  border: 10px solid rgba(28, 36, 51, 0.12);
   border-top-color: var(--cyan, #29c7e0);
-  border-right-color: var(--gold, #ffd400);
+  border-right-color: var(--gold, #f5c518);
   animation: ps-spin 0.9s linear infinite;
 }
 .ps-spinner-cam {
@@ -379,17 +366,15 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 }
 .ps-picker-label {
   font: 800 12px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 .ps-select {
   appearance: none;
   cursor: pointer;
   width: 100%;
   padding: 10px 38px 9px 14px;
-  border-radius: 14px;
-  border: 3px solid var(--ps-ink);
-  box-shadow: 0 4px 0 var(--ps-ink);
+  border-radius: 8px;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   font: 800 15px/1.1 var(--font-ui, sans-serif);
   color: var(--ps-ink);
   background:
@@ -410,7 +395,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   flex-direction: column;
   align-items: center;
   background:
-    radial-gradient(ellipse 60% 70% at 50% 52%, rgba(20, 12, 45, 0) 40%, rgba(20, 12, 45, 0.55) 100%);
+    radial-gradient(ellipse 60% 70% at 50% 52%, rgba(14, 22, 36, 0) 40%, rgba(14, 22, 36, 0.55) 100%);
 }
 .ps-banner {
   position: absolute;
@@ -424,29 +409,20 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   z-index: 2;
 }
 .ps-banner-tab {
-  font: 400 clamp(34px, 4.4vw, 58px) / 1 var(--font-game, sans-serif);
+  text-shadow: 0 1px 10px rgba(14, 22, 36, 0.65), 0 0 2px rgba(14, 22, 36, 0.4);
+  font: 700 clamp(34px, 4.4vw, 58px) / 1 var(--font-game, sans-serif);
   white-space: nowrap;
-  padding: 16px 38px 8px;
+  padding: 0;
   color: #fff;
-  background: var(--magenta, #e5399b);
-  border: 5px solid var(--ps-ink);
-  border-radius: 18px;
-  box-shadow: 0 7px 0 var(--ps-ink), 0 16px 30px rgba(0, 0, 0, 0.3);
-  transform: rotate(-3deg);
-  text-shadow: 0 3px 0 #8e1d5c;
-  animation: ps-drop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
 .pose-ui[data-screen='ready'] .ps-banner-tab {
-  background: linear-gradient(180deg, #6fe0a3, var(--ps-green) 55%, #2a8c60);
-  text-shadow: 0 3px 0 #1d6b48;
-  animation: ps-pop 0.45s cubic-bezier(0.3, 1.8, 0.5, 1) both;
 }
 .ps-banner-sub {
   font: 800 clamp(16px, 1.6vw, 20px) / 1 var(--font-ui, sans-serif);
   padding: 8px 18px 6px;
-  border-radius: 999px;
-  background: rgba(20, 12, 45, 0.75);
-  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  background: rgba(14, 22, 36, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.55);
 }
 
 /* Body outline, sized like the stage video (pip.css .pip.stage): keep the two formulas in sync. */
@@ -518,15 +494,14 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   gap: 8px;
   padding: 14px 14px 16px;
   border-radius: 24px;
-  background: linear-gradient(180deg, var(--ps-cream), var(--ps-cream-2));
-  border: 4px solid var(--ps-ink);
-  box-shadow: 0 7px 0 var(--ps-ink), 0 18px 30px rgba(0, 0, 0, 0.3);
+  background: var(--ps-cream);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 18px 30px rgba(0, 0, 0, 0.3);
   color: var(--ps-ink);
   animation: ps-slide-in 0.45s 0.1s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .ps-checks-title {
   font: 800 13px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.2em;
   color: var(--ps-brown);
   margin: 0 0 2px 4px;
 }
@@ -535,9 +510,9 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   align-items: center;
   gap: 12px;
   padding: 8px 10px 7px 8px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: #fff;
-  border: 3px solid var(--ps-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
   transition: background 0.2s;
 }
 .ps-check-icon {
@@ -549,7 +524,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   border-radius: 50%;
   font: 800 22px/1 var(--font-ui, sans-serif);
   color: #fff;
-  background: #bdb6d8;
+  background: #bcc3cf;
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
 }
 .ps-check-label {
@@ -567,7 +542,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   background: var(--ps-red);
 }
 .ps-check[data-state='pending'] .ps-check-label {
-  color: #8f88b5;
+  color: #8a94a6;
 }
 
 .ps-tools {
@@ -575,10 +550,10 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   flex-direction: column;
   gap: 12px;
   padding: 12px;
-  border-radius: 22px;
-  background: rgba(20, 12, 45, 0.72);
-  border: 3px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 5px 0 rgba(20, 12, 45, 0.55);
+  border-radius: 10px;
+  background: rgba(14, 22, 36, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   animation: ps-slide-in 0.45s 0.2s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .ps-chip {
@@ -589,10 +564,10 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   gap: 8px;
   width: 100%;
   padding: 9px 12px 8px;
-  border-radius: 999px;
-  border: 3px solid var(--ps-ink);
-  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 50%, #ffae00);
-  box-shadow: 0 4px 0 var(--ps-ink);
+  border-radius: 8px;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  background: var(--gold, #f5c518);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   color: var(--ps-ink);
   text-align: left;
   transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1);
@@ -602,15 +577,14 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 }
 .ps-chip:active {
   transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ps-ink);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .ps-chip-kicker {
   font: 800 10px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.14em;
   padding: 4px 7px 3px;
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--ps-ink);
-  color: var(--gold, #ffd400);
+  color: var(--gold, #f5c518);
 }
 .ps-chip-label {
   flex: 1;
@@ -651,10 +625,10 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
   padding: 10px 30px 10px 10px;
-  border-radius: 999px;
-  background: rgba(20, 12, 45, 0.82);
-  border: 4px solid #fff;
-  box-shadow: 0 7px 0 rgba(20, 12, 45, 0.6), 0 16px 30px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  background: rgba(14, 22, 36, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.3);
   z-index: 2;
   animation: ps-rise 0.4s 0.15s ease-out both;
 }
@@ -662,10 +636,10 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   background: linear-gradient(180deg, #2fa866, #1d6b48);
 }
 .ps-message {
-  font: 400 clamp(22px, 2.5vw, 34px) / 1.1 var(--font-game, sans-serif);
+  font: 700 clamp(22px, 2.5vw, 34px) / 1.1 var(--font-game, sans-serif);
   padding-top: 5px;
   paint-order: stroke fill;
-  -webkit-text-stroke: 5px var(--ps-ink);
+  -webkit-text-stroke: 0 var(--ps-ink);
 }
 .pose-ui[data-hint='on'][data-screen='calibrating'] .ps-message {
   color: var(--ps-amber);
@@ -711,7 +685,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 }
 .ps-ring-arc {
   fill: none;
-  stroke: var(--gold, #ffd400);
+  stroke: var(--gold, #f5c518);
   stroke-width: 7;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.12s linear;
@@ -721,7 +695,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   inset: 0;
   display: grid;
   place-items: center;
-  font: 400 19px/1 var(--font-game, sans-serif);
+  font: 700 19px/1 var(--font-game, sans-serif);
   padding-top: 4px;
   box-sizing: border-box;
 }
@@ -761,15 +735,15 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font: 400 clamp(22px, 2.6vw, 34px) / 1 var(--font-game, sans-serif);
+  font: 700 clamp(22px, 2.6vw, 34px) / 1 var(--font-game, sans-serif);
   padding: 16px 32px 11px;
-  border-radius: 999px;
-  color: var(--gold, #ffd400);
-  background: rgba(20, 12, 45, 0.85);
-  border: 4px solid #fff;
-  box-shadow: 0 6px 0 rgba(20, 12, 45, 0.6), 0 14px 28px rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  color: var(--gold, #f5c518);
+  background: rgba(14, 22, 36, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 14px 28px rgba(0, 0, 0, 0.35);
   paint-order: stroke fill;
-  -webkit-text-stroke: 5px var(--ps-ink);
+  -webkit-text-stroke: 0 var(--ps-ink);
   animation: ps-rise 0.4s 0.9s ease-out both;
 }
 .ps-again:empty {
@@ -798,9 +772,9 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
   padding: 9px 20px 8px 10px;
-  border-radius: 999px;
-  border: 3px solid var(--ps-ink);
-  box-shadow: 0 5px 0 var(--ps-ink), 0 10px 22px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 10px 22px rgba(0, 0, 0, 0.3);
   color: var(--ps-ink);
   background: var(--ps-amber);
   transform: translate(-50%, -160%);
@@ -882,7 +856,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
     justify-content: center;
     gap: 6px;
     padding: 8px;
-    border-radius: 18px;
+    border-radius: 10px;
   }
   .ps-checks-title,
   .ps-tools {
@@ -891,7 +865,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   .ps-check {
     gap: 6px;
     padding: 4px 10px 3px 4px;
-    border-radius: 999px;
+    border-radius: 8px;
   }
   .ps-check-icon {
     width: 26px;
@@ -930,7 +904,6 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
     font-size: 26px;
     padding: 10px 22px 5px;
     border-width: 4px;
-    box-shadow: 0 4px 0 var(--ps-ink);
   }
   .ps-banner-sub {
     display: none;

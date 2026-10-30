@@ -53,14 +53,14 @@ export const warningToast = (slow: boolean, stalled: boolean, running = true): T
 type CopyScreen = Exclude<FlowScreen, 'menu' | 'moveCheck' | 'laneSetup' | 'playing'>;
 const COPY: Record<CopyScreen, { tab: string; title: string; body: string }> = {
   cameraPrompt: {
-    tab: 'CAMERA TIME',
+    tab: 'Camera time',
     title: 'Your body is the controller!',
     body: 'Video never leaves this laptop. Nothing is recorded or uploaded.',
   },
-  cameraStarting: { tab: 'HOLD ON', title: 'Starting camera…', body: 'Allow camera access if your browser asks.' },
-  cameraError: { tab: 'UH-OH', title: 'Camera trouble', body: '' },
-  calibrating: { tab: 'GET IN POSITION', title: 'Stand inside the outline', body: '' },
-  ready: { tab: 'READY!', title: 'Calibrated!', body: '' },
+  cameraStarting: { tab: 'Hold on', title: 'Starting camera…', body: 'Allow camera access if your browser asks.' },
+  cameraError: { tab: 'Uh-oh', title: 'Camera trouble', body: '' },
+  calibrating: { tab: 'Get in position', title: 'Stand inside the outline', body: '' },
+  ready: { tab: 'Ready!', title: 'Calibrated!', body: '' },
 };
 
 export const screenCopy = (s: CopyScreen) => COPY[s];
@@ -233,7 +233,7 @@ export class PoseScreens {
     el('span', 'ps-privacy-icon', privacy, '🔒');
     el('span', 'ps-privacy-text', privacy, COPY.cameraPrompt.body);
     const pActions = el('div', 'ps-actions', prompt);
-    this.button(pActions, 'ps-btn ps-btn-go', 'USE WEBCAM', () => this.emit({ type: 'startPressed' }));
+    this.button(pActions, 'ps-btn ps-btn-go', 'Use webcam', () => this.emit({ type: 'startPressed' }));
     this.button(pActions, 'ps-btn ps-btn-alt', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
     el('div', 'ps-foot', prompt, 'Your browser will ask for camera permission.');
 
@@ -255,7 +255,7 @@ export class PoseScreens {
     this.errorText = el('div', 'ps-body ps-error-text', error);
     this.picker(error, 'ps-picker-inline');
     const eActions = el('div', 'ps-actions', error);
-    this.button(eActions, 'ps-btn ps-btn-go', 'RETRY', () => this.emit({ type: 'retry' }));
+    this.button(eActions, 'ps-btn ps-btn-go', 'Retry', () => this.emit({ type: 'retry' }));
     this.button(eActions, 'ps-btn ps-btn-alt', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
 
     // ---- calibration / ready
@@ -271,7 +271,7 @@ export class PoseScreens {
 
     const side = el('div', 'ps-side', cal);
     const list = el('div', 'ps-checks', side);
-    el('div', 'ps-checks-title', list, 'CHECKLIST');
+    el('div', 'ps-checks-title', list, 'Checklist');
     const check = (label: string): CheckRow => {
       const row = el('div', 'ps-check', list);
       const icon = el('div', 'ps-check-icon', row);

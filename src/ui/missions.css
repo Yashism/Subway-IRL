@@ -1,42 +1,49 @@
 /*
  * Missions, the daily challenge and the level strip.
- * Same visual language as moveCheck.css / poseScreens.css: chunky cream cards, 5px ink borders,
- * hard drop shadows, Luckiest Guy headings. Tokens come from hud.css (--ink, --gold, --font-game…).
+ *
+ * These are sections, not cards: they sit inside a panel that already has a surface (the menu's
+ * side panel, the summary card), so each one is a heading and its rows, separated by a hairline.
+ * Tokens come from hud.css (--ink, --gold, --line, --font-game…).
  */
 
 /*
- * On :root, not on .ms-board: renderMissionList and renderDailyCard hand out detached cards that
+ * On :root, not on .ms-board: renderMissionList and renderDailyCard hand out detached sections that
  * the summary and the HUD show on their own, and outside the board they would have no colours.
  */
 :root {
-  --ms-ink: var(--ink, #1b1035);
-  --ms-cream: #fff9ec;
-  --ms-cream-2: #ffe9c2;
-  --ms-brown: #8a6a3a;
-  --ms-green: var(--green, #3fb27f);
-  --ms-grey: #bdb6d8;
+  --ms-ink: var(--ink, #1c2433);
+  --ms-sub: #5b6577;
+  --ms-line: rgba(28, 36, 51, 0.12);
+  --ms-track: #e3e7ec;
+  --ms-green: var(--green, #2f8f62);
+  --ms-fill: var(--blue, #2c5d9e);
+  /* Names the shop and the workout screen still read. */
+  --ms-cream: #f6f7f4;
+  --ms-cream-2: #e9ecef;
+  --ms-brown: #5b6577;
+  --ms-grey: #bcc3cf;
 }
 
-/* ------------------------------------------------------------ cards */
+/* ------------------------------------------------------------ sections */
 
 .ms-card {
   box-sizing: border-box;
   width: 100%;
-  padding: clamp(12px, 1.6vh, 18px) clamp(14px, 1.6vw, 22px) clamp(13px, 1.7vh, 19px);
-  border-radius: 26px;
-  background: linear-gradient(180deg, var(--ms-cream), var(--ms-cream-2));
-  border: 5px solid var(--ms-ink);
-  box-shadow: 0 8px 0 var(--ms-ink), 0 22px 44px rgba(0, 0, 0, 0.38);
+  padding: 14px 0 0;
+  border-top: 1px solid var(--ms-line);
   color: var(--ms-ink);
   text-align: left;
-  font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
+  font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
+}
+.ms-board > .ms-card:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .ms-board {
   display: none;
   flex-direction: column;
-  gap: clamp(10px, 1.4vh, 16px);
-  width: min(470px, 92vw);
+  gap: 14px;
   pointer-events: auto;
 }
 .ms-board[data-on='on'] {
@@ -47,22 +54,18 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: clamp(8px, 1.1vh, 13px);
+  margin-bottom: 8px;
 }
 .ms-head-title {
   flex: 1;
   min-width: 0;
-  font: 400 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, sans-serif);
-  text-transform: uppercase;
+  font: 600 17px / 1.1 var(--font-game, sans-serif);
   letter-spacing: 0.01em;
   color: var(--ms-ink);
-  text-shadow: 0 3px 0 rgba(27, 16, 53, 0.13);
 }
 .ms-head-note {
-  font: 800 clamp(11px, 0.9vw, 14px) / 1 var(--font-ui, sans-serif);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ms-brown);
+  font: 500 13px / 1 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
   white-space: nowrap;
 }
 
@@ -70,23 +73,20 @@
 
 .ms-bar {
   position: relative;
-  height: 14px;
-  border-radius: 999px;
-  background: #fff;
-  border: 3px solid var(--ms-ink);
-  box-shadow: inset 0 2px 0 rgba(27, 16, 53, 0.12);
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ms-track);
   overflow: hidden;
 }
 .ms-bar-big {
-  height: clamp(18px, 2vh, 24px);
-  border-width: 4px;
+  height: 8px;
 }
 .ms-bar-fill {
   width: 0;
   height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #ffc8a8, var(--orange, #ff7a29) 60%, #c24e00);
-  transition: width 0.25s cubic-bezier(0.2, 1.2, 0.4, 1);
+  border-radius: inherit;
+  background: var(--ms-fill);
+  transition: width 0.25s ease-out;
 }
 
 /* ------------------------------------------------------------ a mission row */
@@ -94,47 +94,40 @@
 .ms-rows {
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.1vh, 12px);
+  gap: 12px;
 }
 .ms-row {
   display: flex;
   align-items: flex-start;
-  gap: clamp(9px, 1vw, 13px);
-  padding: clamp(8px, 1vh, 11px) clamp(9px, 1vw, 13px);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 3px solid rgba(27, 16, 53, 0.16);
+  gap: 10px;
 }
-.ms-row[data-state='done'] {
-  background: linear-gradient(180deg, #d9f7e8, #b6ecd3);
-  border-color: var(--ms-green);
-}
-
+/* The tick is the only icon a row needs: a mission is either done or it is not. */
 .ms-row-icon {
   display: grid;
   place-items: center;
   flex: none;
-  width: clamp(34px, 3vw, 42px);
-  height: clamp(34px, 3vw, 42px);
-  border-radius: 14px;
-  background: #fff;
-  border: 3px solid var(--ms-ink);
-  box-shadow: 0 3px 0 var(--ms-ink);
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid #aab2c0;
+  box-sizing: border-box;
 }
 .ms-row-glyph {
-  font: 800 clamp(16px, 1.4vw, 21px) / 1 var(--font-ui, sans-serif);
+  font: 700 12px / 1 var(--font-ui, sans-serif);
+  color: transparent;
 }
 .ms-row[data-state='done'] .ms-row-icon {
-  background: linear-gradient(180deg, #6fe0a3, var(--ms-green) 60%, #2a8c60);
+  background: var(--ms-green);
+  border-color: var(--ms-green);
+}
+.ms-row[data-state='done'] .ms-row-glyph {
   color: #fff;
 }
-.ms-row[data-group='movement'] .ms-row-icon {
-  background: linear-gradient(180deg, #fff, #ffe6c9);
+/* Anything but the tick is hidden: the old emoji glyph, whatever it was. */
+.ms-row:not([data-state='done']) .ms-row-glyph {
+  font-size: 0;
 }
-.ms-row[data-state='done'][data-group='movement'] .ms-row-icon {
-  background: linear-gradient(180deg, #6fe0a3, var(--ms-green) 60%, #2a8c60);
-}
-
 .ms-row-body {
   flex: 1;
   min-width: 0;
@@ -150,159 +143,118 @@
 .ms-row-label {
   flex: 1;
   min-width: 0;
-  font: 800 clamp(13px, 1.15vw, 17px) / 1.2 var(--font-ui, sans-serif);
+  font: 500 15px / 1.25 var(--font-ui, sans-serif);
   color: var(--ms-ink);
 }
 .ms-row-count {
-  font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--ms-brown);
+  font: 500 12.5px / 1 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
+  font-variant-numeric: tabular-nums;
 }
-.ms-row[data-state='done'] .ms-row-count {
-  color: #1d6b48;
+.ms-row[data-state='done'] .ms-row-label {
+  color: var(--ms-sub);
 }
-.ms-row[data-state='done'] .ms-bar-fill {
-  background: linear-gradient(180deg, #6fe0a3, var(--ms-green) 55%, #2a8c60);
-}
-.ms-row[data-state='done'] .ms-bar {
-  border-color: #1d6b48;
+.ms-row[data-state='done'] .ms-bar-fill,
+.ms-daily[data-state='done'] .ms-bar-fill {
+  background: var(--ms-green);
 }
 
-/* coin chips */
+/* The reward: a small yellow tag, the way a fare is printed on a ticket. */
 .ms-row-reward,
 .ms-purse {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  align-items: baseline;
+  gap: 2px;
   flex: none;
-  padding: 3px 9px 2px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 60%, #ffae00);
-  border: 2px solid var(--ms-ink);
-  font: 800 clamp(11px, 0.95vw, 14px) / 1 var(--font-ui, sans-serif);
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--gold, #f5c518);
+  font: 600 13px / 1.2 var(--font-ui, sans-serif);
   color: var(--ms-ink);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .ms-coin {
   font-size: 0.95em;
 }
 /*
- * Today's daily pays once. A gold chip still reading "220" on a finished challenge is an advert
- * for a reward the next run will not pay, so once it is claimed the chip goes quiet and says so.
+ * Today's daily pays once. A yellow tag still reading "220" on a finished challenge is an advert
+ * for a reward the next run will not pay, so once it is claimed the tag goes quiet and says so.
  */
 .ms-row-reward[data-claimed='yes'] {
-  background: rgba(27, 16, 53, 0.08);
-  border-color: rgba(27, 16, 53, 0.28);
-  color: var(--ms-brown);
+  background: var(--ms-track);
+  color: var(--ms-sub);
 }
-.ms-row-reward[data-claimed='yes'] .ms-coin {
-  opacity: 0.45;
-}
-
 .ms-empty {
-  padding: 14px 6px;
-  text-align: center;
-  font: 800 clamp(12px, 1.05vw, 15px) / 1.4 var(--font-ui, sans-serif);
-  color: var(--ms-brown);
+  padding: 6px 0;
+  font: 500 14px / 1.4 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
 }
 
 /* ------------------------------------------------------------ daily challenge */
 
-.ms-daily[data-state='done'] {
-  background: linear-gradient(180deg, #e6fbf1, #bdf0d8);
-}
 .ms-daily-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .ms-daily-title {
-  font: 400 clamp(21px, 2.2vw, 32px) / 1.05 var(--font-game, sans-serif);
+  font: 600 22px / 1.1 var(--font-game, sans-serif);
   color: var(--ms-ink);
-  text-shadow: 0 3px 0 rgba(27, 16, 53, 0.13);
 }
 .ms-daily-goal {
-  font: 800 clamp(12px, 1.05vw, 16px) / 1.3 var(--font-ui, sans-serif);
-  color: #5d4a2c;
+  font: 400 14px / 1.3 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
+  margin-bottom: 4px;
 }
 .ms-daily-foot {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: clamp(9px, 1.2vh, 13px);
+  margin-top: 10px;
 }
 .ms-daily-count {
   flex: 1;
   min-width: 0;
-  font: 800 clamp(11px, 0.95vw, 14px) / 1 var(--font-ui, sans-serif);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--ms-brown);
+  font: 500 12.5px / 1 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
+  font-variant-numeric: tabular-nums;
 }
-.ms-daily[data-state='done'] .ms-daily-count {
-  color: #1d6b48;
-}
-.ms-daily[data-state='done'] .ms-bar-fill {
-  background: linear-gradient(180deg, #6fe0a3, var(--ms-green) 55%, #2a8c60);
-}
-
 .ms-streak {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   flex: none;
-  padding: 4px 11px 3px;
-  border-radius: 999px;
-  border: 2px solid var(--ms-ink);
-  background: #fff;
-  font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
-  color: var(--ms-brown);
+  font: 500 13px / 1 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
   white-space: nowrap;
 }
-.ms-streak[data-on='on'] {
-  color: #fff;
-  background: linear-gradient(180deg, #ff9a4d, var(--orange, #ff7a29) 60%, #d64b00);
+.ms-streak-flame {
+  display: none;
 }
-.ms-streak[data-on='off'] .ms-streak-flame {
-  filter: grayscale(1);
-  opacity: 0.5;
+.ms-streak[data-on='on'] {
+  color: var(--ms-ink);
+  font-weight: 600;
 }
 
 /* ------------------------------------------------------------ level strip */
 
 .ms-level-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   margin-bottom: 8px;
 }
 .ms-level-text {
   flex: 1;
   min-width: 0;
-  font: 400 clamp(17px, 1.7vw, 24px) / 1 var(--font-game, sans-serif);
+  font: 600 22px / 1 var(--font-game, sans-serif);
   color: var(--ms-ink);
-  text-shadow: 0 3px 0 rgba(27, 16, 53, 0.13);
 }
 .ms-level-sub {
   margin-top: 6px;
-  font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--ms-brown);
-}
-.ms-level .ms-bar-fill {
-  background: linear-gradient(180deg, #a9e6ff, var(--cyan, #29c7e0) 60%, #0e7f96);
-}
-.ms-level-head {
-  /* The purse and the Shop button sit beside the level, not over the bar. */
-  align-items: center;
-}
-.ms-btn-shop {
-  flex: none;
-  align-self: center;
-  padding: 8px 18px 6px;
-  font-size: clamp(12px, 1vw, 15px);
+  font: 500 12.5px / 1 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------ buttons */
@@ -310,31 +262,36 @@
 .ms-btn {
   appearance: none;
   cursor: pointer;
-  border: 4px solid var(--ms-ink);
-  border-radius: 999px;
-  padding: 10px 22px 8px;
-  font: 800 clamp(13px, 1.05vw, 16px) / 1 var(--font-ui, sans-serif);
+  flex: none;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font: 600 14px / 1.1 var(--font-ui, sans-serif);
   color: var(--ms-ink);
-  background: linear-gradient(180deg, #fff, #e4e0f3);
-  box-shadow: 0 5px 0 var(--ms-ink);
-  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s;
+  background: #fff;
+  transition: background-color 0.12s, border-color 0.12s;
   white-space: nowrap;
 }
 .ms-btn:hover {
-  transform: translateY(-2px) scale(1.03);
+  background: #eef0f3;
 }
 .ms-btn:active {
-  transform: translateY(4px);
-  box-shadow: 0 1px 0 var(--ms-ink);
+  background: #e3e7ec;
 }
 .ms-btn:focus-visible {
-  outline: 4px solid var(--gold, #ffd400);
-  outline-offset: 3px;
+  outline: 2px solid var(--blue, #2c5d9e);
+  outline-offset: 2px;
 }
 .ms-btn-go {
   color: #fff;
-  background: linear-gradient(180deg, #6fe0a3, var(--ms-green) 55%, #2a8c60);
-  text-shadow: 0 2px 0 #1d6b48;
+  background: var(--ms-green);
+  border-color: transparent;
+}
+.ms-btn-go:hover {
+  background: #278055;
+}
+.ms-btn-shop {
+  align-self: center;
 }
 
 /* ------------------------------------------------------------ the live toast */
@@ -343,25 +300,19 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 18px 8px 12px;
-  border-radius: 999px;
-  border: 4px solid var(--ms-ink);
-  background: linear-gradient(180deg, var(--ms-cream), var(--ms-cream-2));
-  box-shadow: 0 5px 0 var(--ms-ink), 0 14px 26px rgba(0, 0, 0, 0.35);
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: #f6f7f4;
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.25), 0 8px 24px rgba(14, 22, 36, 0.28);
   color: var(--ms-ink);
   font-family: var(--font-ui, sans-serif);
-  animation: ms-toast-in 0.34s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  animation: ms-toast-in 0.3s ease-out both;
 }
 .ms-toast[data-state='done'] {
-  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 60%, #ffae00);
-}
-.ms-toast[data-state='done'] .ms-toast-count {
-  /* The brown that reads on cream is washed out on gold. */
-  color: #6a4a00;
+  background: var(--gold, #f5c518);
 }
 .ms-toast-icon {
-  font-size: clamp(17px, 1.5vw, 22px);
-  line-height: 1;
+  display: none;
 }
 .ms-toast-body {
   display: flex;
@@ -369,56 +320,27 @@
   gap: 2px;
 }
 .ms-toast-label {
-  font: 800 clamp(12px, 1.05vw, 15px) / 1 var(--font-ui, sans-serif);
+  font: 600 15px / 1.1 var(--font-ui, sans-serif);
 }
 .ms-toast-count {
-  font: 800 clamp(10px, 0.85vw, 12px) / 1 var(--font-ui, sans-serif);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--ms-brown);
+  font: 500 12.5px / 1.1 var(--font-ui, sans-serif);
+  color: var(--ms-sub);
+  font-variant-numeric: tabular-nums;
 }
-
+.ms-toast[data-state='done'] .ms-toast-count {
+  color: #4a3a00;
+}
 @keyframes ms-toast-in {
   from {
-    transform: translateY(-14px) scale(0.9);
+    transform: translateY(-8px);
     opacity: 0;
   }
 }
-
-/* ------------------------------------------------------------ small windows */
-
-@media (max-width: 560px), (max-height: 620px) {
-  .ms-board {
-    width: min(430px, 94vw);
-    gap: 8px;
-  }
-  .ms-card {
-    padding: 10px 12px 11px;
-    border-radius: 20px;
-    border-width: 4px;
-    box-shadow: 0 6px 0 var(--ms-ink), 0 14px 26px rgba(0, 0, 0, 0.36);
-  }
-  .ms-row {
-    gap: 8px;
-    padding: 7px 8px;
-    border-radius: 14px;
-  }
-  .ms-row-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 11px;
-  }
-  .ms-btn-shop {
-    padding: 7px 14px 5px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .ms-bar-fill,
-  .ms-btn {
-    transition: none;
-  }
   .ms-toast {
     animation: none;
+  }
+  .ms-bar-fill {
+    transition: none;
   }
 }

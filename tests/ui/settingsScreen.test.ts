@@ -109,8 +109,8 @@ describe('mounting', () => {
     ui.update(view());
     ui.update(view());
     ui.update(view({ settings: { ...DEFAULT_SETTINGS, line: 'harbour' } }));
-    expect(root.querySelectorAll('.sw-group')).toHaveLength(5);
-    expect(root.querySelectorAll('.sw-chip')).toHaveLength(14); // mode 3 + lanes 2 + line 3 + pace 3 + obstacle amount 3
+    expect(root.querySelectorAll('.sw-group')).toHaveLength(6);
+    expect(root.querySelectorAll('.sw-chip')).toHaveLength(17); // mode 3 + lanes 2 + line 3 + pace 3 + obstacle amount 3 + outlines 3
   });
 
   it('takes everything back down on destroy', () => {
@@ -121,7 +121,7 @@ describe('mounting', () => {
     expect(root.className).toBe('');
     // And can be brought back up again.
     ui.update(view());
-    expect(root.querySelectorAll('.sw-group')).toHaveLength(5);
+    expect(root.querySelectorAll('.sw-group')).toHaveLength(6);
   });
 });
 
@@ -133,7 +133,7 @@ describe('the controls', () => {
     expect(chip(root, 'Western').dataset.on).toBe('off');
     expect(chip(root, 'Beast').dataset.on).toBe('on');
     expect(chip(root, 'Small room').dataset.on).toBe('on');
-    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(5); // one per group: mode, lanes, line, pace, amount
+    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(6); // one per group: mode, lanes, line, pace, amount, outlines
   });
 
   it('asks for the change it was clicked for, and changes nothing itself', () => {
@@ -315,7 +315,7 @@ describe('the rest of the buttons', () => {
     byText(root, '.sw-btn', 'Redo the move check')!.click();
     byText(root, '.sw-btn', 'Export my data')!.click();
     byText(root, '.sw-btn', 'Done')!.click();
-    byText(root, '.sw-btn', '📈 Your runs')!.click();
+    byText(root, '.sw-btn', 'Your runs')!.click();
     expect(calls.fired).toEqual(['redo', 'export', 'close', 'workout']);
     expect(blur).toHaveBeenCalledTimes(4);
     blur.mockRestore();

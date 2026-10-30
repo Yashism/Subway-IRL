@@ -16,8 +16,8 @@
   pointer-events: auto;
   color: #fff;
   user-select: none;
-  font-family: var(--font-ui, 'Baloo 2', system-ui, sans-serif);
-  background: radial-gradient(ellipse at 50% 40%, rgba(20, 12, 45, 0.62), rgba(20, 12, 45, 0.94));
+  font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
+  background: rgba(14, 22, 36, 0.66);
   z-index: 6;
 }
 .shop[data-on='on'] {
@@ -33,26 +33,17 @@
   flex: none;
 }
 .sh-title {
-  font: 400 clamp(30px, 3.6vw, 52px) / 1 var(--font-game, sans-serif);
-  padding: 13px 34px 7px;
+  font: 600 clamp(34px, 4vw, 48px) / 1 var(--font-game, sans-serif);
   color: #fff;
-  background: var(--gold-deep, #f59e0b);
-  border: 5px solid var(--ms-ink);
-  border-radius: 18px;
-  box-shadow: 0 7px 0 var(--ms-ink), 0 16px 30px rgba(0, 0, 0, 0.3);
-  transform: rotate(-3deg);
-  text-shadow: 0 3px 0 #9a5f00;
 }
 .sh-purse {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 20px 8px;
-  border-radius: 999px;
-  border: 4px solid var(--ms-ink);
-  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 60%, #ffae00);
-  box-shadow: 0 5px 0 var(--ms-ink);
-  font: 400 clamp(20px, 2vw, 30px) / 1 var(--font-game, sans-serif);
+  padding: 7px 14px 6px;
+  border-radius: 6px;
+  background: var(--gold, #f5c518);
+  font: 700 clamp(20px, 2vw, 30px) / 1 var(--font-game, sans-serif);
   color: var(--ms-ink);
 }
 
@@ -61,10 +52,9 @@
   width: min(820px, 96vw);
   flex: none;
   padding: clamp(10px, 1.3vh, 15px) clamp(14px, 1.6vw, 22px) clamp(11px, 1.4vh, 16px);
-  border-radius: 22px;
-  border: 5px solid var(--ms-ink);
-  background: linear-gradient(180deg, var(--ms-cream), var(--ms-cream-2));
-  box-shadow: 0 8px 0 var(--ms-ink), 0 20px 40px rgba(0, 0, 0, 0.36);
+  border-radius: 10px;
+  background: var(--paper, #f6f7f4);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.25), 0 12px 32px rgba(14, 22, 36, 0.3);
   color: var(--ms-ink);
 }
 .sh-level-head {
@@ -76,15 +66,13 @@
 .sh-level-text {
   flex: 1;
   min-width: 0;
-  font: 400 clamp(18px, 1.8vw, 26px) / 1 var(--font-game, sans-serif);
-  text-shadow: 0 3px 0 rgba(27, 16, 53, 0.13);
+  font: 700 clamp(18px, 1.8vw, 26px) / 1 var(--font-game, sans-serif);
+  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .sh-level-sub,
 .sh-level-note {
   font: 800 clamp(11px, 0.9vw, 13px) / 1.3 var(--font-ui, sans-serif);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ms-brown);
+  color: var(--ms-sub);
   white-space: nowrap;
 }
 .sh-level-note {
@@ -94,7 +82,7 @@
   white-space: normal;
 }
 .sh-level .ms-bar-fill {
-  background: linear-gradient(180deg, #a9e6ff, var(--cyan, #29c7e0) 60%, #0e7f96);
+  background: var(--blue, #2c5d9e);
 }
 
 /* ------------------------------------------------------------ sections */
@@ -114,14 +102,12 @@
   margin-bottom: clamp(7px, 1vh, 11px);
 }
 .sh-section-title {
-  font: 400 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, sans-serif);
+  font: 700 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, sans-serif);
   color: #fff;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .sh-section-note {
   font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -139,22 +125,22 @@
   gap: clamp(10px, 1.1vw, 14px);
   box-sizing: border-box;
   padding: clamp(10px, 1.2vh, 14px) clamp(11px, 1.2vw, 15px);
-  border-radius: 22px;
-  border: 5px solid var(--ms-ink);
-  background: linear-gradient(180deg, var(--ms-cream), var(--ms-cream-2));
-  box-shadow: 0 7px 0 var(--ms-ink), 0 16px 30px rgba(0, 0, 0, 0.32);
+  border-radius: 10px;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  background: var(--paper, #f6f7f4);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.32);
   color: var(--ms-ink);
 }
 .sh-item[data-state='equipped'] {
   background: linear-gradient(180deg, #e6fbf1, #bdf0d8);
   border-color: #1d6b48;
-  box-shadow: 0 7px 0 #1d6b48, 0 16px 30px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.32);
 }
 .sh-item[data-state='locked'] {
   /* Still fully readable: a player has to be able to see what they are saving for. */
   background: linear-gradient(180deg, #efe9dd, #ded6c6);
-  border-color: #6c6484;
-  box-shadow: 0 7px 0 #6c6484, 0 16px 30px rgba(0, 0, 0, 0.3);
+  border-color: #667085;
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.3);
 }
 
 .sh-art {
@@ -170,11 +156,11 @@
   place-items: center;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 16px;
+  border-radius: 8px;
   font-size: clamp(24px, 2.2vw, 32px);
   background: #fff;
-  border: 3px solid var(--ms-ink);
-  box-shadow: 0 4px 0 var(--ms-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .sh-item[data-state='locked'] .sh-art-glyph {
   filter: grayscale(0.7);
@@ -187,7 +173,7 @@
   width: 12px;
   height: 12px;
   border-radius: 4px;
-  border: 2px solid var(--ms-ink);
+  border: 1px solid rgba(28, 36, 51, 0.28);
 }
 
 .sh-body {
@@ -205,20 +191,20 @@
 .sh-name {
   flex: 1;
   min-width: 0;
-  font: 400 clamp(16px, 1.5vw, 22px) / 1.1 var(--font-game, sans-serif);
-  text-shadow: 0 2px 0 rgba(27, 16, 53, 0.12);
+  font: 700 clamp(16px, 1.5vw, 22px) / 1.1 var(--font-game, sans-serif);
+  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .sh-held {
   flex: none;
   padding: 3px 9px 2px;
-  border-radius: 999px;
-  border: 2px solid var(--ms-ink);
+  border-radius: 8px;
+  border: 1px solid rgba(28, 36, 51, 0.28);
   background: #fff;
   font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
 }
 .sh-blurb {
   font: 800 clamp(11px, 0.95vw, 14px) / 1.32 var(--font-ui, sans-serif);
-  color: #5d4a2c;
+  color: #3f4858;
 }
 .sh-foot {
   display: flex;
@@ -234,7 +220,7 @@
   flex: 1;
   min-width: 0;
   font: 800 clamp(12px, 1.05vw, 15px) / 1 var(--font-ui, sans-serif);
-  color: var(--ms-brown);
+  color: var(--ms-sub);
 }
 
 /* ------------------------------------------------------------ item buttons */
@@ -243,13 +229,13 @@
   appearance: none;
   cursor: pointer;
   flex: none;
-  border: 4px solid var(--ms-ink);
-  border-radius: 999px;
+  border: 1px solid rgba(28, 36, 51, 0.28);
+  border-radius: 8px;
   padding: 9px 18px 7px;
   font: 800 clamp(12px, 1vw, 15px) / 1 var(--font-ui, sans-serif);
   color: var(--ms-ink);
-  background: linear-gradient(180deg, #fff, #e4e0f3);
-  box-shadow: 0 5px 0 var(--ms-ink);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
   transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s;
   white-space: nowrap;
 }
@@ -258,33 +244,33 @@
 }
 .sh-btn:not(:disabled):active {
   transform: translateY(4px);
-  box-shadow: 0 1px 0 var(--ms-ink);
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .sh-btn:focus-visible {
-  outline: 4px solid var(--gold, #ffd400);
-  outline-offset: 3px;
+  outline: 2px solid var(--blue, #2c5d9e);
+  outline-offset: 2px;
 }
 .sh-btn-buy {
-  background: linear-gradient(180deg, #fff27a, var(--gold, #ffd400) 55%, #ffae00);
+  background: var(--gold, #f5c518);
 }
 .sh-btn-equip {
   color: #fff;
-  background: linear-gradient(180deg, #6fe0a3, var(--ms-green) 55%, #2a8c60);
-  text-shadow: 0 2px 0 #1d6b48;
+  background: var(--ms-green);
+  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .sh-btn-on {
   cursor: default;
   color: #1d6b48;
   background: #fff;
   border-color: #1d6b48;
-  box-shadow: 0 5px 0 #1d6b48;
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .sh-btn-locked {
   cursor: not-allowed;
   color: #fff;
-  background: #6c6484;
-  border-color: #453f5a;
-  box-shadow: 0 5px 0 #453f5a;
+  background: #667085;
+  border-color: #3d4558;
+  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 
 .sh-actions {
@@ -317,8 +303,8 @@
   .sh-item,
   .sh-level {
     border-width: 4px;
-    border-radius: 16px;
-    box-shadow: 0 5px 0 var(--ms-ink), 0 12px 22px rgba(0, 0, 0, 0.33);
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 12px 22px rgba(0, 0, 0, 0.33);
   }
   .sh-art {
     width: 44px;

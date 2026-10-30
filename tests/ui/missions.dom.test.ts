@@ -185,7 +185,7 @@ describe('renderMissionToast', () => {
     const done = renderMissionToast(view({ done: true }));
     expect(done.dataset.state).toBe('done');
     expect(done.querySelector('.ms-toast-label')!.textContent).toBe('Mission complete!');
-    expect(done.querySelector('.ms-toast-count')!.textContent).toContain('+75');
+    expect(done.querySelector('.ms-toast-count')!.textContent).toContain('+₹75');
   });
 });
 

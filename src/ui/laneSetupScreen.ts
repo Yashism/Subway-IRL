@@ -140,7 +140,7 @@ export class LaneSetupScreen {
     // ---- banner + step dots (the move check's, so the two read as one family)
     const top = el('div', 'mc-top', root);
     const banner = el('div', 'mc-banner', top);
-    el('div', 'mc-banner-tab ls-tab', banner, 'LANE SPOTS');
+    el('div', 'mc-banner-tab ls-tab', banner, 'Lane spots');
     this.sub = el('div', 'mc-banner-sub', banner);
     const dots = el('div', 'mc-dots', top);
     this.dots = SPOT_ORDER.map((id, i) => {
@@ -219,7 +219,7 @@ export class LaneSetupScreen {
     this.redoBtn = button(actions, 'mc-btn mc-btn-alt', '↺ Start over', () => this.handlers.redo());
     button(actions, 'mc-btn mc-btn-ghost', 'Cancel', () => this.handlers.cancel());
     const sActions = el('div', 'mc-actions ls-actions-summary', root);
-    button(sActions, 'mc-btn mc-btn-go', 'SAVE MY SPOTS', () => this.handlers.save());
+    button(sActions, 'mc-btn mc-btn-go', 'Save my spots', () => this.handlers.save());
     button(sActions, 'mc-btn mc-btn-alt', '↺ Redo', () => this.handlers.redo());
     button(sActions, 'mc-btn mc-btn-ghost', 'Cancel', () => this.handlers.cancel());
   }
@@ -300,7 +300,7 @@ export class LaneSetupScreen {
     this.attr(this.ringCore.parentElement as Element, 'data-state', m.taken ? 'taken' : m.blocked ? 'blocked' : m.hold > 0 ? 'holding' : 'idle');
     this.text(
       this.holdLabel,
-      m.taken ? 'GOT IT!' : you === null ? 'CAN’T SEE YOU' : m.blocked ? 'NOT HERE' : m.hold > 0 ? 'HOLD STILL…' : 'STAND STILL',
+      m.taken ? 'Got it!' : you === null ? 'Can’t see you' : m.blocked ? 'Not here' : m.hold > 0 ? 'Hold still…' : 'Stand still',
     );
     this.text(this.hint, m.hint ?? '');
     this.attr(this.hint, 'data-on', m.hint ? 'on' : 'off');

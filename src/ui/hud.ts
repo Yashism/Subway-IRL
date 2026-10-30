@@ -248,6 +248,15 @@ export function openMonitorWindow(): boolean {
 
 // ---------------------------------------------------------------- DOM
 
+/** The speaker button's line icons: fixed markup, no dynamic data. */
+const SVG_OPEN = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+const SPEAKER_BODY = '<path d="M4 9v6h4l5 4V5L8 9H4z"/>';
+const SPEAKER = {
+  on: `${SVG_OPEN}${SPEAKER_BODY}<path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>`,
+  idle: `${SVG_OPEN}${SPEAKER_BODY}<path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg>`,
+  muted: `${SVG_OPEN}${SPEAKER_BODY}<path d="M17 9l5 6M22 9l-5 6"/></svg>`,
+};
+
 const el = (tag: string, cls: string, parent: HTMLElement, text?: string): HTMLElement => {
   const e = document.createElement(tag);
   e.className = cls;
@@ -274,13 +283,17 @@ export interface HudHandlers {
   onSettings?(): void;
   /** "Your runs": the workout screen, from the menu and from the summary card. */
   onWorkout?(): void;
+  /** The menu's Play item: the same as pressing Enter. */
+  onPlay?(): void;
+  /** "Wander": the menu's free-roam mode, no obstacles and no inspector. */
+  onWander?(): void;
   /** The speaker button (and the N key): mute and unmute. */
   onToggleSound?(): void;
 }
 
 /** "Live monitor (M)": opens monitor.html in its own popup window. */
 function monitorLink(parent: HTMLElement): HTMLAnchorElement {
-  const a = el('a', 'hud-monitor-link', parent, '📈 Live monitor (M)') as HTMLAnchorElement;
+  const a = el('a', 'hud-monitor-link', parent, 'Live monitor (M)') as HTMLAnchorElement;
   a.href = MONITOR_URL;
   a.target = MONITOR_WINDOW;
   a.title = 'Open the live monitor in a separate window to watch what the game sees';
@@ -362,6 +375,7 @@ export class Hud {
   private readonly toastHost: HTMLElement;
   private readonly introHint: HTMLElement;
   private readonly soundBtn: HTMLButtonElement;
+  private soundIcon = '';
 
   private readonly lastText = new Map<HTMLElement, string>();
   private readonly lastStyle = new Map<string, string>();
@@ -411,29 +425,42 @@ export class Hud {
     this.warn = el('div', 'hud-warn', root);
     this.go = el('div', 'hud-go', root, 'GO!');
 
-    // Menu.
+    // Menu: a side panel (the station board, the way in to every mode, today's board) and, along
+    // the bottom of the scene, the keys. The runner stands in the empty half of the screen.
     const menu = el('div', 'hud-screen hud-menu', root);
-    const logo = el('div', 'hud-logo', menu);
-    el('div', 'hud-logo-top', logo, 'SUBWAY');
-    el('div', 'hud-logo-big', logo, 'IRL');
-    el('div', 'hud-ribbon', menu, 'Run for real. Bhaago!');
-    this.menuStats = el('div', 'hud-menu-stats', menu);
-    const bestPill = el('div', 'hud-pill hud-menu-pill hud-menu-best', this.menuStats);
-    el('span', 'hud-menu-pill-icon', bestPill, '🏆');
-    this.menuBest = el('span', 'hud-menu-pill-text', bestPill);
-    const coinPill = el('div', 'hud-pill hud-menu-pill hud-menu-coins', this.menuStats);
-    el('span', 'hud-coin-glyph', el('span', 'hud-coin', coinPill), '₹');
-    this.menuCoins = el('span', 'hud-menu-pill-text', coinPill);
-    el('span', 'hud-menu-pill-unit', coinPill, 'coins');
-    const cta = el('div', 'hud-cta', menu);
-    el('span', 'hud-cta-text', cta, 'PRESS ENTER');
-    this.menuPanel = el('div', 'hud-menu-rail', menu);
-    const bottom = el('div', 'hud-menu-bottom', menu);
-    const foot = el('div', 'hud-menu-foot', bottom);
+    const side = el('div', 'hud-side', menu);
+    const board = el('div', 'hud-board', side);
+    el('div', 'hud-board-name', board, 'Subway IRL');
+    el('div', 'hud-board-tag', board, 'Run for real. Bhaago!');
+    this.menuStats = el('div', 'hud-menu-stats', side);
+    const bestStat = el('div', 'hud-menu-stat hud-menu-best', this.menuStats);
+    this.menuBest = el('span', 'hud-menu-pill-text', bestStat);
+    const coinStat = el('div', 'hud-menu-stat hud-menu-coins', this.menuStats);
+    el('span', 'hud-menu-pill-unit', coinStat, '₹');
+    this.menuCoins = el('span', 'hud-menu-pill-text', coinStat);
+    const nav = el('nav', 'hud-nav', side);
+    nav.setAttribute('aria-label', 'Main menu');
+    const navItem = (name: string, hint: string, key: string, cls: string, onClick: () => void): void => {
+      const b = el('button', `hud-nav-item ${cls}`, nav) as HTMLButtonElement;
+      b.type = 'button';
+      const text = el('span', 'hud-nav-text', b);
+      el('span', 'hud-nav-name', text, name);
+      el('span', 'hud-nav-hint', text, hint);
+      if (key) el('span', 'hud-nav-key', b, key);
+      b.addEventListener('click', () => {
+        b.blur();
+        onClick();
+      });
+    };
+    navItem('Play', 'Jog, dodge, outrun the TT', 'Enter', 'hud-nav-play', () => this.handlers.onPlay?.());
+    navItem('Wander', 'Walk the city. No inspector, no score', '', 'hud-nav-wander', () => this.handlers.onWander?.());
+    navItem('Your runs', 'Minutes, steps and your streak', '', 'hud-nav-runs hud-workout', () => this.handlers.onWorkout?.());
+    navItem('Settings', 'Controls, pace, sound, camera', '', 'hud-nav-settings hud-gear', () => this.handlers.onSettings?.());
+    this.menuPanel = el('div', 'hud-menu-rail', side);
+    const foot = el('div', 'hud-menu-foot', side);
     this.menuFoot = el('span', 'hud-menu-foot-text', foot, 'Press Enter to start');
-    hudButton(foot, 'hud-btn hud-gear', '\u2699 Settings', () => this.handlers.onSettings?.());
-    hudButton(foot, 'hud-btn hud-workout', '\u{1F4CA} Your runs', () => this.handlers.onWorkout?.());
     monitorLink(foot);
+    const bottom = el('div', 'hud-menu-bottom', menu);
     const controls = el('div', 'hud-controls', bottom);
     const control = (keys: string[], label: string) => {
       const c = el('div', 'hud-control', controls);
@@ -455,16 +482,16 @@ export class Hud {
     // Caught.
     const caught = el('div', 'hud-screen hud-caught', root);
     el('div', 'hud-flash', caught);
-    el('div', 'hud-stamp', caught, 'PAKDA GAYA!');
+    el('div', 'hud-stamp', caught, 'Pakda gaya!');
     this.caughtReason = el('div', 'hud-caught-reason', caught);
 
     // Summary card.
     const summary = el('div', 'hud-screen hud-summary', root);
     const card = el('div', 'hud-card', summary);
-    el('div', 'hud-card-title', card, 'RUN OVER');
-    el('div', 'hud-card-label', card, 'SCORE');
+    el('div', 'hud-card-title', card, 'Run over');
+    el('div', 'hud-card-label', card, 'Score');
     const sumScore = el('div', 'hud-card-score', card);
-    this.newBest = el('div', 'hud-newbest', card, 'NEW BEST!');
+    this.newBest = el('div', 'hud-newbest', card, 'New best!');
     this.cardBest = el('div', 'hud-card-best', card);
     const grid = el('div', 'hud-card-grid', card);
     const tile = (icon: string, label: string, cls: string): HTMLElement => {
@@ -493,11 +520,11 @@ export class Hud {
     this.lifeVals = { runs: lifeItem('Runs'), coins: lifeItem('Coins ₹'), distance: lifeItem('Distance') };
     this.summaryPanel = el('div', 'hud-card-missions', card);
     const again = el('div', 'hud-again', card);
-    el('span', 'hud-again-text', again, 'PLAY AGAIN');
+    el('span', 'hud-again-text', again, 'Play again');
     el('div', 'hud-again-hint', card, 'Press Enter to run again');
     const cardFoot = el('div', 'hud-card-foot', card);
-    hudButton(cardFoot, 'hud-btn hud-workout', '\u{1F4CA} Your runs', () => this.handlers.onWorkout?.());
-    hudButton(cardFoot, 'hud-btn hud-home', '\u2302 Main menu', () => this.handlers.onHome?.());
+    hudButton(cardFoot, 'hud-btn hud-workout', 'Your runs', () => this.handlers.onWorkout?.());
+    hudButton(cardFoot, 'hud-btn hud-home', 'Main menu', () => this.handlers.onHome?.());
     this.sum = { score: sumScore, coins: sumCoins, distance: sumDist, jumps: sumJumps, rolls: sumRolls, time: sumTime };
 
     // Paused.
@@ -507,9 +534,9 @@ export class Hud {
     this.pauseSub = el('div', 'hud-pause-sub', paused);
     this.pauseControls = el('div', 'hud-pause-controls', paused);
     const pauseFoot = el('div', 'hud-pause-foot', paused);
-    hudButton(pauseFoot, 'hud-btn hud-gear', '\u2699 Settings', () => this.handlers.onSettings?.());
+    hudButton(pauseFoot, 'hud-btn hud-gear', 'Settings', () => this.handlers.onSettings?.());
     monitorLink(pauseFoot);
-    hudButton(pauseFoot, 'hud-btn hud-home', '\u2302 Main menu', () => this.handlers.onHome?.());
+    hudButton(pauseFoot, 'hud-btn hud-home', 'Main menu', () => this.handlers.onHome?.());
 
     // Live mission toasts, and the intro's skip line. Both sit above every card.
     this.toastHost = el('div', 'hud-toasts', root);
@@ -517,7 +544,8 @@ export class Hud {
 
     // Mute, reachable at all times: not inside any card, so it survives the menu, the run, the
     // pause, the summary and the intro. M belongs to the live monitor, so this one is N.
-    this.soundBtn = hudButton(root, 'hud-sound', '\u{1F50A}', () => this.handlers.onToggleSound?.());
+    this.soundBtn = hudButton(root, 'hud-sound', '', () => this.handlers.onToggleSound?.());
+    this.soundBtn.innerHTML = this.soundIcon = SPEAKER.idle;
     this.soundBtn.title = 'Mute / unmute (N)';
     this.soundBtn.setAttribute('aria-label', 'Mute');
   }
@@ -527,8 +555,11 @@ export class Hud {
    * the button says plainly rather than pretending the game is already making a sound.
    */
   setSound(s: { muted: boolean; ready: boolean }): void {
-    const icon = s.muted ? '\u{1F507}' : s.ready ? '\u{1F50A}' : '\u{1F509}';
-    this.text(this.soundBtn, icon);
+    const icon = s.muted ? SPEAKER.muted : s.ready ? SPEAKER.on : SPEAKER.idle;
+    if (this.soundIcon !== icon) {
+      this.soundIcon = icon;
+      this.soundBtn.innerHTML = icon;
+    }
     this.flag(this.soundBtn, 'muted', s.muted);
     this.flag(this.soundBtn, 'idle', !s.ready && !s.muted);
     const label = s.muted ? 'Unmute (N)' : s.ready ? 'Mute (N)' : 'Sound starts on your first key or click';

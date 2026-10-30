@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { addOutline, enableShadows, toonMaterial } from '../render/materials';
+import { addOutline, enableShadows, OUTLINE_INK, toonMaterial } from '../render/materials';
 import { canvasTexture } from '../render/canvasTexture';
 
 /**
@@ -50,8 +50,8 @@ const OUTLINE_HUMAN = 0.02;
 const OUTLINE_DOG = 0.012;
 // addOutline caches its material by colour, so distinct (visually identical) colours
 // keep our thicknesses independent of other modules' outlines.
-const OUTLINE_COLOR_HUMAN = 0x151515;
-const OUTLINE_COLOR_DOG = 0x161616;
+const OUTLINE_COLOR_HUMAN = OUTLINE_INK;
+const OUTLINE_COLOR_DOG = OUTLINE_INK;
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const smooth = (a: number, b: number, x: number) => {
@@ -1512,7 +1512,7 @@ const GLB_SPECS: Record<GlbKind, GlbSpec> = {
   },
 };
 
-const OUTLINE_COLOR_GLB: Record<GlbKind, number> = { runner: 0x171717, inspector: 0x181818, dog: 0x191919 };
+const OUTLINE_COLOR_GLB: Record<GlbKind, number> = { runner: OUTLINE_INK, inspector: OUTLINE_INK, dog: OUTLINE_INK };
 
 class GlbRig implements CharacterRig {
   readonly root = new THREE.Group();

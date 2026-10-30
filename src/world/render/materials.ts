@@ -110,20 +110,36 @@ export function basicMaterial(o: THREE.MeshBasicMaterialParameters = {}): THREE.
 const outlineMaterials = new Map<string, THREE.MeshBasicMaterial>();
 
 /**
+ * How heavy every outline is, as a multiple of the thickness its caller asked for. One uniform
+ * shared by every outline material, so changing it reaches meshes that are already on screen.
+ * 0 collapses the hull inside its mesh, which hides it.
+ */
+const outlineScale = { value: 0.4 };
+export const OUTLINE_STRENGTH = { off: 0, thin: 0.4, bold: 1 } as const;
+export type OutlineStrength = keyof typeof OUTLINE_STRENGTH;
+export function setOutlineStrength(s: OutlineStrength): void {
+  outlineScale.value = OUTLINE_STRENGTH[s];
+}
+
+/** The ink of an outline: a deep aubergine, so edges read as a shade of the scene, not a hole in it. */
+export const OUTLINE_INK = 0x2a2236;
+
+/**
  * Shared inverted-hull outline material (back faces pushed out along the normal, curved).
  * Cached per colour and thickness. Exported so instanced meshes (coins) can build their own
  * outline InstancedMesh with the same geometry.
  */
-export function outlineMaterial(thickness = 0.03, color = 0x141414): THREE.MeshBasicMaterial {
+export function outlineMaterial(thickness = 0.03, color = OUTLINE_INK): THREE.MeshBasicMaterial {
   const cacheKey = `${color}|${thickness}`;
   let mat = outlineMaterials.get(cacheKey);
   if (!mat) {
     mat = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uOutline = { value: thickness };
+      shader.uniforms.uOutlineScale = outlineScale;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uOutline;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normalize( normal ) * uOutline;');
+        .replace('#include <common>', '#include <common>\nuniform float uOutline;\nuniform float uOutlineScale;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normalize( normal ) * uOutline * uOutlineScale;');
     };
     mat.customProgramCacheKey = () => `outline-${thickness}`;
     applyCurve(mat);
@@ -136,7 +152,7 @@ export function outlineMaterial(thickness = 0.03, color = 0x141414): THREE.MeshB
  * Inverted-hull outline: adds a slightly larger back-face black copy to every mesh
  * under `root`. Use only on hero objects (runner, trains, obstacles, pickups).
  */
-export function addOutline(root: THREE.Object3D, thickness = 0.03, color = 0x141414): void {
+export function addOutline(root: THREE.Object3D, thickness = 0.03, color = OUTLINE_INK): void {
   const mat = outlineMaterial(thickness, color);
   const meshes: THREE.Mesh[] = [];
   root.traverse((o) => {

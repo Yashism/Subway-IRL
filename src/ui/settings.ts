@@ -21,6 +21,9 @@ import {
   LINE_NAMES,
   MODE_BLURBS,
   MODE_CHOICES,
+  OUTLINE_BLURBS,
+  OUTLINE_CHOICES,
+  OUTLINE_NAMES,
   MODE_NAMES,
   OBSTACLE_AMOUNT_BLURBS,
   OBSTACLE_AMOUNT_NAMES,
@@ -172,6 +175,7 @@ export class SettingsScreen {
   private obstaclesValue!: HTMLElement;
   private obstaclesWords!: HTMLElement;
   private amountChips!: Map<string, HTMLButtonElement>;
+  private outlineChips!: Map<string, HTMLButtonElement>;
   private camSelect!: HTMLSelectElement;
   private camKey = '';
   private mirrorBtn!: HTMLButtonElement;
@@ -204,13 +208,16 @@ export class SettingsScreen {
     this.attr(root, 'data-on', 'off');
 
     const top = el('div', 'sw-top', root);
-    el('div', 'sw-tab', top, 'SETTINGS');
-    el('div', 'sw-tab-sub', top, 'Everything applies straight away');
+    el('div', 'sw-tab', top, 'Settings');
+    el('div', 'sw-tab-sub', top, 'Changes apply straight away.');
 
-    const grid = el('div', 'sw-grid', root);
+    const body = el('div', 'sw-grid', root);
+    // Two columns, filled by hand so the panels end at about the same height.
+    const left = el('div', 'sw-col', body);
+    const right = el('div', 'sw-col', body);
 
     // ---- movement
-    const moveBody = this.group(grid, '🏃', 'MOVEMENT', 'How hard the game makes you work for a move', 'You are on the keyboard — these need the camera.');
+    const moveBody = this.group(left, 'Movement', 'How big a move has to be before it counts', 'You are on the keyboard. These settings need the camera.');
     // The dimming rule reads `data-off` on the card, not on the body it fades.
     this.moveGroup = moveBody.parentElement as HTMLElement;
     const sensRow = el('div', 'sw-row sw-row-slider', moveBody);
@@ -246,7 +253,7 @@ export class SettingsScreen {
     );
 
     // ---- camera
-    const camBody = this.group(grid, '📷', 'CAMERA', 'Video never leaves this laptop', 'You are on the keyboard — the camera is off.');
+    const camBody = this.group(left, 'Camera', 'Video never leaves this laptop', 'You are on the keyboard, so the camera is off.');
     this.camGroup = camBody.parentElement as HTMLElement;
     const camRow = el('div', 'sw-row', camBody);
     el('div', 'sw-row-label', camRow, 'Camera');
@@ -258,7 +265,7 @@ export class SettingsScreen {
     );
 
     // ---- audio
-    const audio = this.group(grid, '🔊', 'SOUND', 'Mumbai local, tabla and all');
+    const audio = this.group(right, 'Sound', 'Music, effects and the overall level');
     this.vol = {
       master: this.volumeRow(audio, 'Everything', (v) => this.handlers.audioChange({ master: v })),
       music: this.volumeRow(audio, 'Music', (v) => this.handlers.audioChange({ music: v })),
@@ -269,7 +276,7 @@ export class SettingsScreen {
     );
 
     // ---- game
-    const game = this.group(grid, '🚂', 'THE RUN', 'Which line you run, and how hard it pushes');
+    const game = this.group(right, 'The run', 'Which line you run, and how hard it pushes');
     this.lineChips = this.chips(game, 'Line', LINES, LINE_NAMES, LINE_BLURBS, (v) => this.handlers.change({ line: v as GameSettings['line'] }));
     // Pace is the speed of the run; the obstacles below are their own setting.
     this.diffChips = this.chips(game, 'Pace', DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_BLURBS, (v) =>
@@ -288,13 +295,19 @@ export class SettingsScreen {
     this.amountChips = this.chips(game, 'Obstacle amount', OBSTACLE_AMOUNTS, OBSTACLE_AMOUNT_NAMES, OBSTACLE_AMOUNT_BLURBS, (v) =>
       this.handlers.change({ obstacleAmount: v as GameSettings['obstacleAmount'] }),
     );
-    this.reducedMotionBtn = this.toggle(game, 'Reduced motion', 'No screen shake or speed lines.', (on) => this.handlers.change({ reducedMotion: on }));
-    this.reducedEffectsBtn = this.toggle(game, 'Reduced effects', 'No bloom. Kinder to a weaker laptop.', (on) =>
+
+    // ---- picture
+    const picture = this.group(right, 'Picture', 'How the game looks, and how hard it works your laptop');
+    this.outlineChips = this.chips(picture, 'Outlines', OUTLINE_CHOICES, OUTLINE_NAMES, OUTLINE_BLURBS, (v) =>
+      this.handlers.change({ outlines: v as GameSettings['outlines'] }),
+    );
+    this.reducedMotionBtn = this.toggle(picture, 'Reduced motion', 'No screen shake or speed lines.', (on) => this.handlers.change({ reducedMotion: on }));
+    this.reducedEffectsBtn = this.toggle(picture, 'Reduced effects', 'No bloom. Kinder to a weaker laptop.', (on) =>
       this.handlers.change({ reducedEffects: on }),
     );
 
     // ---- data
-    const data = this.group(grid, '💾', 'YOUR DATA', 'All of it stays on this laptop');
+    const data = this.group(left, 'Your data', 'All of it stays on this laptop');
     const weightRow = el('div', 'sw-row', data);
     const weightHead = el('div', 'sw-row-head', weightRow);
     el('div', 'sw-row-label', weightHead, 'Your weight');
@@ -324,7 +337,7 @@ export class SettingsScreen {
     // ---- footer
     const foot = el('div', 'sw-foot', root);
     button(foot, 'sw-btn sw-btn-go sw-btn-wide', 'Done', () => this.handlers.close());
-    button(foot, 'sw-btn sw-btn-ghost', '📈 Your runs', () => this.handlers.openWorkout());
+    button(foot, 'sw-btn sw-btn-ghost', 'Your runs', () => this.handlers.openWorkout());
 
     // ---- confirm dialog
     this.dialog = el('div', 'sw-dialog', root);
@@ -371,6 +384,7 @@ export class SettingsScreen {
     // Obstacles are laid when a run starts, so say when a change lands.
     this.text(this.obstaclesWords, `${OBSTACLE_LEVEL_BLURBS[level]}. Applies from your next run.`);
     this.select(this.amountChips, s.obstacleAmount);
+    this.select(this.outlineChips, s.outlines);
 
     this.setToggle(this.mirrorBtn, s.mirror);
     this.setToggle(this.reducedMotionBtn, s.reducedMotion);
@@ -445,13 +459,11 @@ export class SettingsScreen {
   }
 
   /** A group card. `offNote` is the strip shown in its place of a reason when the group is inert. */
-  private group(parent: Element, icon: string, title: string, blurb: string, offNote?: string): HTMLElement {
+  private group(parent: Element, title: string, blurb: string, offNote?: string): HTMLElement {
     const g = el('div', 'sw-group', parent);
     const head = el('div', 'sw-group-head', g);
-    el('div', 'sw-group-icon', head, icon);
-    const t = el('div', 'sw-group-text', head);
-    el('div', 'sw-group-title', t, title);
-    el('div', 'sw-group-blurb', t, blurb);
+    el('div', 'sw-group-title', head, title);
+    el('div', 'sw-group-blurb', head, blurb);
     // Greying a control out says it is unavailable; only the note says why, so it always comes with one.
     if (offNote !== undefined) el('div', 'sw-group-note', g, offNote);
     return el('div', 'sw-group-body', g);

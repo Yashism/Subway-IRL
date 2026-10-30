@@ -148,7 +148,7 @@ describe('MoveCheckScreen: buttons', () => {
     const s = screen(summaryModel([]));
     expect(s.root.dataset.phase).toBe('summary');
     const actions = s.root.querySelectorAll('.mc-actions-summary .mc-btn:not([hidden])');
-    expect([...actions].map((b) => b.textContent)).toEqual(['START PLAYING', 'Redo the check', 'Reset to defaults']);
+    expect([...actions].map((b) => b.textContent)).toEqual(['Start playing', 'Redo the check', 'Reset to defaults']);
     for (const b of actions) {
       (b as HTMLButtonElement).focus();
       (b as HTMLButtonElement).click();

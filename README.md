@@ -64,12 +64,27 @@ a second. Lanes then change halfway between your spots. Reached from Settings �
 lane spots") and from the ready screen. Small-room mode leans to change lane, so spots do not apply
 there.
 
+## Wander
+
+A relaxed free-roam mode: walk a Mumbai-style neighbourhood (chawls, street trees, parked autos,
+billboards, a railway station with a platform you can walk onto, a local that passes now and then)
+with no obstacles, no inspector, no score. Menu → **Wander**, or open `/?wander`. Nothing in it is
+scored or saved. **W / ↑** walk · **← →** (or A D) turn · **Q E** sidestep · **Shift** run · **P** pause ·
+**Esc** back to the menu. With a calibrated camera you can jog in place to walk and lean or step to
+steer (press **C** to turn the camera on from inside Wander). Code: `src/wander/`.
+
 ## Screens
 
-- **Menu** — missions, the daily challenge, your level, the shop.
+- **Menu** — Play, Wander, Your runs and Settings down one side panel, with today's daily challenge,
+  missions and your level beneath them. The shop is on the level strip.
+- **Wander** — a free-roam walk round a Mumbai neighbourhood: streets, chawls, parks and a railway
+  station with trains passing. No obstacles, no inspector, no score, and nothing is recorded.
+  W / ↑ walk, ← → or A D turn, Q E sidestep, Shift run, P pause, Esc back to the menu. With the camera
+  open and calibrated, jog in place to walk (jog fast to run) and lean or step to steer. `?wander`
+  boots straight into it.
 - **Settings** (⚙, from the menu or pause) — sensitivity, play mode, lanes (Automatic / My spots), camera, audio, line
   (Western / Central / Harbour), pace (Chill / Cardio / Beast), obstacle difficulty (1 Gentle – 5
-  Brutal) and obstacle amount (Few / Normal / Lots), reduced motion and effects, export or clear
+  Brutal) and obstacle amount (Few / Normal / Lots), outlines (Off / Thin / Bold — the ink line round every model), reduced motion and effects, export or clear
   your data. Obstacle settings only ever choose among patterns the passability solver has checked,
   so every track stays clearable; the daily challenge always uses the designed ones.
 - **Your runs** — today's active minutes and steps, a week chart with your streak, all-time totals,
@@ -84,7 +99,7 @@ there.
 `?input=keyboard` · `?mode=full|small` · `?line=western|central|harbour` · `?difficulty=` ·
 `?obstacles=1..5` · `?amount=few|normal|lots` · `?lanes=auto|spots` ·
 `?sens=` · `?intro=always|off` · `?movecheck=skip|force` · `?mute` · `?vol=0.5` · `?audio=0` ·
-`?posereplay=<fixture>` · `?session=<recording>` · `?autopilot` · `?perf` · `?god`
+`?posereplay=<fixture>` · `?session=<recording>` · `?autopilot` · `?perf` · `?god` · `?wander`
 
 ## Development
 

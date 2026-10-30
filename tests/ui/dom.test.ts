@@ -214,7 +214,7 @@ describe('Hud: the Home button', () => {
     expect(h.root.querySelector('.hud-paused .hud-home')).not.toBeNull();
     expect(h.root.querySelector('.hud-summary .hud-home')).not.toBeNull();
     for (const b of h.buttons) {
-      expect(b.textContent).toBe('⌂ Main menu');
+      expect(b.textContent).toBe('Main menu');
       b.focus();
       b.click();
       // A focused button would swallow the Enter that starts the next run.
@@ -366,7 +366,7 @@ describe('Hud: the mute button', () => {
 
     h.h.setSound({ muted: true, ready: true });
     expect(h.btn.classList.contains('muted')).toBe(true);
-    expect(h.btn.textContent).toBe('\u{1F507}');
+    expect(h.btn.querySelector('svg')).not.toBeNull();
     expect(h.btn.getAttribute('aria-label')).toBe('Unmute (N)');
     expect(h.btn.getAttribute('aria-pressed')).toBe('true');
   });

@@ -106,7 +106,7 @@ describe('LaneSetupScreen', () => {
     expect(root.getAttribute('data-phase')).toBe('summary');
     expect(root.querySelector('[data-spot="left"] .ls-row-value')!.textContent).toBe('0.72');
     expect(root.querySelectorAll('.ls-bound[data-on="on"]')).toHaveLength(2);
-    for (const [re, name] of [[/SAVE MY SPOTS/, 'save'], [/Redo/, 'redo']] as const) {
+    for (const [re, name] of [[/Save my spots/, 'save'], [/Redo/, 'redo']] as const) {
       const b = btn(root.querySelector('.ls-actions-summary')!, re);
       b.focus();
       b.click();

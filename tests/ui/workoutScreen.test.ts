@@ -220,7 +220,7 @@ describe('the run list', () => {
     const rows = root.querySelectorAll<HTMLElement>('.wk-run');
     expect(Array.from(rows).map((r) => r.querySelector('.wk-run-score-num')!.textContent)).toEqual(['300', '900', '100']);
     expect(rows[1].dataset.best).toBe('on');
-    expect(rows[1].querySelector('.wk-run-score-label')!.textContent).toBe('NEW BEST');
+    expect(rows[1].querySelector('.wk-run-score-label')!.textContent).toBe('New best');
     expect(rows[0].dataset.best).toBeUndefined();
   });
 

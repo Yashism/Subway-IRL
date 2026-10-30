@@ -178,7 +178,7 @@ export function renderSummaryCard(summary: MoveCheckSummary, opts: { title?: str
   el('div', 'mc-tuned', card, tunedCount ? `Tuned ${tunedCount} setting${tunedCount === 1 ? '' : 's'} to the way you move.` : 'Nothing measured — the default settings stay.');
 
   const keys = el('div', 'mc-keys', card);
-  el('div', 'mc-keys-title', keys, 'KEYBOARD');
+  el('div', 'mc-keys-title', keys, 'Keyboard');
   const keyList = el('div', 'mc-keys-list', keys);
   for (const r of KEY_ROWS) {
     const k = el('div', 'mc-key', keyList);
@@ -255,7 +255,7 @@ export class MoveCheckScreen {
     // ---- banner + step dots
     const top = el('div', 'mc-top', root);
     const banner = el('div', 'mc-banner', top);
-    el('div', 'mc-banner-tab', banner, 'MOVE CHECK');
+    el('div', 'mc-banner-tab', banner, 'Move check');
     this.sub = el('div', 'mc-banner-sub', banner);
 
     const dots = el('div', 'mc-dots', top);
@@ -286,7 +286,7 @@ export class MoveCheckScreen {
 
     const strength = el('div', 'mc-strength', body);
     const sHead = el('div', 'mc-strength-head', strength);
-    el('div', 'mc-strength-title', sHead, 'HOW BIG WAS IT');
+    el('div', 'mc-strength-title', sHead, 'How big was it');
     this.barValue = el('div', 'mc-strength-value', sHead);
     el('div', 'mc-strength-goal', sHead, '100% IS ENOUGH');
     this.bar = el('div', 'mc-bar', strength);
@@ -311,7 +311,7 @@ export class MoveCheckScreen {
     const sum = el('div', 'mc-summary', root);
     this.sheetBox = el('div', 'mc-sheet-box', sum);
     const sActions = el('div', 'mc-actions mc-actions-summary', sum);
-    button(sActions, 'mc-btn mc-btn-go', 'START PLAYING', () => this.handlers.start());
+    button(sActions, 'mc-btn mc-btn-go', 'Start playing', () => this.handlers.start());
     button(sActions, 'mc-btn mc-btn-alt', 'Redo the check', () => this.handlers.redo());
     button(sActions, 'mc-btn mc-btn-ghost', 'Reset to defaults', () => this.handlers.resetTuning());
     const sHome = button(sActions, 'mc-btn mc-btn-ghost mc-btn-home', '\u2302 Main menu', () => this.opts.onHome?.());
