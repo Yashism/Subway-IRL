@@ -138,7 +138,7 @@ const snap = (p: Partial<PoseSnapshot>): FlowInput => ({
 });
 
 function buildFlow(s: Screen): SessionFlow {
-  const f = new SessionFlow({ input: s === 'menu-keyboard' ? 'keyboard' : 'webcam', cameraId: 'usb' });
+  const f = new SessionFlow({ input: s === 'menu-keyboard' ? 'keyboard' : 'webcam', cameraId: 'usb', moveCheck: 'skip' });
   if (s === 'menu' || s === 'menu-keyboard') return f;
   f.dispatch({ type: 'startPressed' });
   if (s === 'prompt') return f;

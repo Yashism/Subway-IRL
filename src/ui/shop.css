@@ -1,6 +1,7 @@
 /*
- * The shop screen. Shares the tokens, bars, coin chips and buttons in missions.css; this file
- * is only the full-screen layer and the item grid.
+ * The shop screen, in the game kit's look (kit.css): a ribbon title, the purse as a coin chip, wood
+ * framed item cards and glossy buttons (the .gk-btn classes are added in shop.ts). This file is the
+ * full-screen layer and the item grid; nothing here leans on missions.css.
  */
 
 .shop {
@@ -9,15 +10,15 @@
   display: none;
   flex-direction: column;
   align-items: center;
-  gap: clamp(10px, 1.6vh, 18px);
+  gap: clamp(14px, 2vh, 22px);
   box-sizing: border-box;
   padding: clamp(14px, 2.4vh, 32px) 16px clamp(14px, 2vh, 26px);
   overflow-y: auto;
   pointer-events: auto;
-  color: #fff;
+  color: var(--gk-text);
   user-select: none;
-  font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
-  background: rgba(14, 22, 36, 0.66);
+  font-family: var(--gk-body, 'Fredoka', system-ui, sans-serif);
+  background: radial-gradient(ellipse at 50% 40%, rgba(48, 24, 10, 0.6), rgba(30, 14, 6, 0.88));
   z-index: 6;
 }
 .shop[data-on='on'] {
@@ -29,60 +30,76 @@
 .sh-top {
   display: flex;
   align-items: center;
-  gap: clamp(10px, 1.4vw, 18px);
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px clamp(16px, 2vw, 28px);
   flex: none;
 }
 .sh-title {
-  font: 600 clamp(34px, 4vw, 48px) / 1 var(--font-game, sans-serif);
-  color: #fff;
+  font-size: clamp(40px, 4.4vw, 58px);
 }
 .sh-purse {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 14px 6px;
-  border-radius: 6px;
-  background: var(--gold, #f5c518);
-  font: 700 clamp(20px, 2vw, 30px) / 1 var(--font-game, sans-serif);
-  color: var(--ms-ink);
+  font-size: clamp(24px, 2.2vw, 30px);
+  height: 50px;
 }
 
 .sh-level {
+  --wood-w: 10px;
   box-sizing: border-box;
   width: min(820px, 96vw);
   flex: none;
-  padding: clamp(10px, 1.3vh, 15px) clamp(14px, 1.6vw, 22px) clamp(11px, 1.4vh, 16px);
-  border-radius: 10px;
-  background: var(--paper, #f6f7f4);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.25), 0 12px 32px rgba(14, 22, 36, 0.3);
-  color: var(--ms-ink);
+  padding: clamp(10px, 1.4vh, 16px) clamp(14px, 1.6vw, 22px) clamp(12px, 1.6vh, 18px);
+  border-radius: 22px;
 }
 .sh-level-head {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 .sh-level-text {
   flex: 1;
   min-width: 0;
-  font: 700 clamp(18px, 1.8vw, 26px) / 1 var(--font-game, sans-serif);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font: 400 clamp(24px, 2.1vw, 30px) / 1 var(--gk-display);
+  color: var(--gk-text);
 }
 .sh-level-sub,
 .sh-level-note {
-  font: 800 clamp(11px, 0.9vw, 13px) / 1.3 var(--font-ui, sans-serif);
-  color: var(--ms-sub);
+  font: 600 clamp(15px, 1.2vw, 17px) / 1.3 var(--gk-body);
+  color: var(--gk-text-soft);
   white-space: nowrap;
 }
 .sh-level-note {
-  margin-top: 7px;
-  letter-spacing: 0.03em;
-  text-transform: none;
+  margin-top: 8px;
   white-space: normal;
 }
-.sh-level .ms-bar-fill {
-  background: var(--blue, #2c5d9e);
+.sh-bar {
+  position: relative;
+  box-sizing: border-box;
+  height: 30px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #c9b693, #e8dac0);
+  box-shadow: inset 0 3px 0 rgba(58, 31, 18, 0.22), 0 3px 0 rgba(58, 31, 18, 0.45);
+}
+.sh-bar-fill {
+  position: relative;
+  height: 100%;
+  min-width: 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6fd0ff, var(--gk-blue-2));
+  box-shadow: inset 0 0 0 2px rgba(58, 31, 18, 0.35);
+}
+/* The gloss along the top of the fill. */
+.sh-bar-fill::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  height: 32%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
 }
 
 /* ------------------------------------------------------------ sections */
@@ -90,90 +107,91 @@
 .sh-sections {
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 1.8vh, 20px);
+  gap: clamp(16px, 2.2vh, 26px);
   /* Two columns at full width: four skins land as a tidy 2x2 instead of a ragged 3 + 1. */
   width: min(820px, 96vw);
   flex: none;
 }
 .sh-section-head {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: clamp(7px, 1vh, 11px);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: clamp(12px, 1.6vh, 16px);
 }
 .sh-section-title {
-  font: 700 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, sans-serif);
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font-size: clamp(24px, 2vw, 28px);
+  padding: 0.3em 1.3em 0.42em;
 }
 .sh-section-note {
-  font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
-  color: rgba(255, 255, 255, 0.6);
+  font: 600 clamp(15px, 1.2vw, 17px) / 1 var(--gk-body);
+  color: #fff3d4;
+  text-shadow: 0 2px 0 var(--gk-ink);
 }
 
 .sh-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: clamp(9px, 1.2vw, 14px);
+  gap: clamp(14px, 1.4vw, 20px);
 }
 
 /* ------------------------------------------------------------ an item */
 
 .sh-item {
+  --wood-w: 8px;
   display: flex;
   align-items: stretch;
   gap: clamp(10px, 1.1vw, 14px);
-  box-sizing: border-box;
+  border-radius: 20px;
   padding: clamp(10px, 1.2vh, 14px) clamp(11px, 1.2vw, 15px);
-  border-radius: 10px;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  background: var(--paper, #f6f7f4);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.32);
-  color: var(--ms-ink);
 }
 .sh-item[data-state='equipped'] {
-  background: linear-gradient(180deg, #e6fbf1, #bdf0d8);
-  border-color: #1d6b48;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.32);
+  background:
+    linear-gradient(180deg, #e7f7c9, #c8ec93) padding-box,
+    repeating-linear-gradient(90deg, rgba(58, 31, 18, 0.07) 0 2px, transparent 2px 16px) border-box,
+    linear-gradient(180deg, #8fdc5a, var(--gk-green-2)) border-box;
 }
 .sh-item[data-state='locked'] {
   /* Still fully readable: a player has to be able to see what they are saving for. */
-  background: linear-gradient(180deg, #efe9dd, #ded6c6);
-  border-color: #667085;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.3);
+  background:
+    linear-gradient(180deg, #efe4c8, #d9ccaa) padding-box,
+    repeating-linear-gradient(90deg, rgba(58, 31, 18, 0.07) 0 2px, transparent 2px 16px) border-box,
+    linear-gradient(180deg, #b08a60, #7a5636) border-box;
 }
 
 .sh-art {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   flex: none;
-  width: clamp(52px, 4.6vw, 64px);
+  width: clamp(58px, 5vw, 70px);
 }
 .sh-art-glyph {
   display: grid;
   place-items: center;
+  box-sizing: border-box;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
-  font-size: clamp(24px, 2.2vw, 32px);
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  font-size: clamp(28px, 2.4vw, 34px);
+  background: linear-gradient(180deg, #fffbe9, #f1d899);
+  box-shadow: inset 0 3px 0 #fff, 0 3px 0 rgba(58, 31, 18, 0.5);
 }
 .sh-item[data-state='locked'] .sh-art-glyph {
   filter: grayscale(0.7);
 }
 .sh-swatch {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 .sh-chip {
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-  border: 1px solid rgba(28, 36, 51, 0.28);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--gk-ink);
+  border-radius: 5px;
+  box-sizing: border-box;
 }
 
 .sh-body {
@@ -181,30 +199,31 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 .sh-item-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 .sh-name {
   flex: 1;
   min-width: 0;
-  font: 700 clamp(16px, 1.5vw, 22px) / 1.1 var(--font-game, sans-serif);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font: 400 clamp(21px, 1.8vw, 25px) / 1.1 var(--gk-display);
+  color: var(--gk-text);
 }
 .sh-held {
   flex: none;
-  padding: 3px 9px 2px;
-  border-radius: 8px;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  background: #fff;
-  font: 800 clamp(11px, 0.9vw, 13px) / 1 var(--font-ui, sans-serif);
+  padding: 3px 10px 4px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe873, var(--gk-gold-2));
+  font: 600 15px/1 var(--gk-body);
+  color: var(--gk-text);
 }
 .sh-blurb {
-  font: 800 clamp(11px, 0.95vw, 14px) / 1.32 var(--font-ui, sans-serif);
-  color: #3f4858;
+  font: 500 clamp(15px, 1.2vw, 16px) / 1.32 var(--gk-body);
+  color: var(--gk-text);
 }
 .sh-foot {
   display: flex;
@@ -212,65 +231,44 @@
   gap: 9px;
   margin-top: auto;
   padding-top: 8px;
+  padding-bottom: 4px;
 }
 .sh-price {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex: 1;
   min-width: 0;
-  font: 800 clamp(12px, 1.05vw, 15px) / 1 var(--font-ui, sans-serif);
-  color: var(--ms-sub);
+  font: 400 clamp(20px, 1.6vw, 23px) / 1 var(--gk-display);
+  color: var(--gk-text);
+}
+.sh-coin {
+  width: 26px;
+  height: 26px;
+  font-size: 15px;
 }
 
 /* ------------------------------------------------------------ item buttons */
 
+/* The look is the kit's (.gk-btn); these are the states that must not look switched off. */
 .sh-btn {
-  appearance: none;
-  cursor: pointer;
   flex: none;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  border-radius: 8px;
-  padding: 9px 18px 7px;
-  font: 800 clamp(12px, 1vw, 15px) / 1 var(--font-ui, sans-serif);
-  color: var(--ms-ink);
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s;
-  white-space: nowrap;
+  min-height: 44px;
+  font-size: 18px;
 }
-.sh-btn:not(:disabled):hover {
-  transform: translateY(-2px) scale(1.03);
-}
-.sh-btn:not(:disabled):active {
-  transform: translateY(4px);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-}
-.sh-btn:focus-visible {
-  outline: 2px solid var(--blue, #2c5d9e);
-  outline-offset: 2px;
-}
-.sh-btn-buy {
-  background: var(--gold, #f5c518);
-}
-.sh-btn-equip {
-  color: #fff;
-  background: var(--ms-green);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-}
-.sh-btn-on {
+.sh-btn-on:disabled {
   cursor: default;
-  color: #1d6b48;
-  background: #fff;
-  border-color: #1d6b48;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  opacity: 1;
+  filter: none;
+  color: #2f6d12;
+  -webkit-text-stroke: 0;
 }
-.sh-btn-locked {
-  cursor: not-allowed;
-  color: #fff;
-  background: #667085;
-  border-color: #3d4558;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+.sh-btn-on .gk-icon {
+  filter: none;
+}
+.sh-btn-locked:disabled {
+  opacity: 0.85;
+  filter: grayscale(0.5);
 }
 
 .sh-actions {
@@ -278,7 +276,7 @@
   justify-content: center;
   gap: 12px;
   flex: none;
-  padding-bottom: 6px;
+  padding: 6px 0 12px;
 }
 
 /* ------------------------------------------------------------ small windows */
@@ -286,28 +284,16 @@
 @media (max-width: 760px), (max-height: 620px) {
   .shop {
     padding: 10px 10px 14px;
-    gap: 8px;
+    gap: 12px;
   }
   .sh-title {
-    font-size: clamp(22px, 5vw, 30px);
-    padding: 9px 20px 5px;
-    border-width: 4px;
-  }
-  .sh-purse {
-    font-size: clamp(16px, 4vw, 22px);
-    padding: 7px 14px 5px;
+    font-size: clamp(32px, 7vw, 40px);
   }
   .sh-grid {
     grid-template-columns: 1fr;
   }
-  .sh-item,
-  .sh-level {
-    border-width: 4px;
-    border-radius: 8px;
-    box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 12px 22px rgba(0, 0, 0, 0.33);
-  }
   .sh-art {
-    width: 44px;
+    width: 56px;
   }
   .sh-level-head {
     flex-direction: column;

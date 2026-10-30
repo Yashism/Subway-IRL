@@ -1,34 +1,86 @@
 /*
- * The workout screen. Shares the layer, buttons and palette with settings.css (.sw-*); everything
- * here is the reading side: the hero number, the week chart, the tiles and the run list.
+ * The workout screen, in the game kit's look (kit.css): wood-framed cream cards with ribbon titles,
+ * chunky outlined tiles and bars, glossy buttons (the .gk-btn classes are added in workout.ts).
+ * The layer is its own: nothing here leans on settings.css.
  *
- * Same distance rule: the headline numbers are read from across the room, so the ones that matter
- * (today's minutes, the streak) are set in the game face at display sizes, and the supporting
- * numbers stay above 15px. Every value cell reserves its width so counting up shifts nothing.
+ * Same distance rule as before: the headline numbers are read from across the room, so the ones
+ * that matter (today's minutes, the streak) are set in the display face at big sizes, and the
+ * supporting numbers stay at 15px or more. Every value cell reserves its width so counting up
+ * shifts nothing.
  */
 
+/* ------------------------------------------------------------ the layer */
+
+.wk-screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  padding: clamp(14px, 3vh, 34px) clamp(12px, 2vw, 28px) clamp(12px, 2.2vh, 24px);
+  overflow-y: auto;
+  pointer-events: auto;
+  color: var(--gk-text);
+  user-select: none;
+  font-family: var(--gk-body, 'Fredoka', system-ui, sans-serif);
+  background: radial-gradient(ellipse at 50% 40%, rgba(48, 24, 10, 0.6), rgba(30, 14, 6, 0.88));
+  z-index: 6;
+}
+.wk-screen[data-on='on'] {
+  display: flex;
+}
+.wk-screen .wk-btn[hidden] {
+  display: none;
+}
+
+.wk-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin-bottom: clamp(30px, 4.6vh, 44px);
+}
 .wk-tab {
-  text-shadow: 0 1px 10px rgba(14, 22, 36, 0.65), 0 0 2px rgba(14, 22, 36, 0.4);
+  font-size: clamp(40px, 4.4vw, 58px);
+  white-space: nowrap;
+}
+.wk-tab-sub {
+  font: 600 clamp(17px, 1.4vw, 20px) / 1.2 var(--gk-body);
+  color: #fff3d4;
+  text-shadow: 0 2px 0 var(--gk-ink);
+  text-align: center;
+}
+
+.wk-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  flex: none;
+  width: min(1160px, 100%);
+  padding: clamp(26px, 3.4vh, 36px) 0 10px;
+  margin-top: auto;
+}
+.wk-foot .wk-foot-run {
+  order: 2;
 }
 
 /* ------------------------------------------------------------ the empty state */
 
 .wk-invite {
+  --wood-w: 12px;
   display: none;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 10px;
+  gap: 12px;
   width: min(560px, 100%);
   margin: auto 0;
-  padding: 34px 28px 28px;
-  box-sizing: border-box;
-  border-radius: 12px;
-  background: var(--sw-cream);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 30px 60px rgba(0, 0, 0, 0.45);
-  color: var(--sw-ink);
-  animation: sw-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  padding: 30px 28px 30px;
+  animation: wk-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .wk-screen[data-empty='yes'] .wk-invite {
   display: flex;
@@ -40,28 +92,31 @@
 .wk-invite-icon {
   display: grid;
   place-items: center;
-  width: 92px;
-  height: 92px;
-  border-radius: 12px;
-  font-size: 48px;
-  background: var(--sw-cyan);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 -8px 0 rgba(14, 109, 134, 0.45);
+  width: 96px;
+  height: 96px;
+  box-sizing: border-box;
+  border: 4px solid var(--gk-ink);
+  border-radius: 28px;
+  font-size: 58px;
+  background: linear-gradient(180deg, var(--gk-blue), var(--gk-blue-2));
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.5), inset 0 -6px 0 rgba(0, 0, 0, 0.16), 0 6px 0 var(--gk-ink), 0 14px 18px rgba(0, 0, 0, 0.25);
   transform: rotate(-5deg);
   animation: wk-bob 2.4s ease-in-out infinite;
 }
 .wk-invite-title {
-  font: 700 clamp(28px, 3.2vw, 40px) / 1.05 var(--font-game, 'Barlow Condensed', sans-serif);
-  padding-top: 6px;
+  font-size: clamp(34px, 3.4vw, 44px);
+  margin-top: 8px;
 }
 .wk-invite-body {
-  font: 700 clamp(15px, 1.25vw, 19px) / 1.4 var(--font-ui, sans-serif);
-  color: #3f4858;
+  font: 600 clamp(17px, 1.3vw, 20px) / 1.4 var(--gk-body);
+  color: var(--gk-text);
   max-width: 420px;
 }
 .wk-invite-actions {
+  display: flex;
   justify-content: center;
-  margin-top: 6px;
+  margin-top: 10px;
+  padding-bottom: 6px;
 }
 
 /* ------------------------------------------------------------ layout */
@@ -70,42 +125,41 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: clamp(12px, 1.6vw, 20px);
+  gap: clamp(14px, 1.8vw, 24px);
   width: min(1160px, 100%);
   flex: none;
 }
 .wk-col {
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 1.6vw, 20px);
+  /* Room for the next card's ribbon, which hangs over its top edge. */
+  gap: clamp(40px, 5.4vh, 52px);
   min-width: 0;
 }
 .wk-card {
+  --wood-w: 10px;
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
-  background: var(--sw-cream);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 20px 36px rgba(0, 0, 0, 0.32);
-  color: var(--sw-ink);
-  overflow: hidden;
-  animation: sw-rise 0.4s ease-out both;
+  border-radius: 24px;
+  animation: wk-rise 0.4s ease-out both;
 }
 .wk-card-week { animation-delay: 0.06s; }
 .wk-card-all { animation-delay: 0.12s; }
 .wk-card-recent { animation-delay: 0.18s; }
 .wk-card-title {
-  padding: 10px 16px 9px;
-  background: var(--sw-ink);
-  font: 800 clamp(14px, 1.15vw, 17px) / 1 var(--font-ui, sans-serif);
-  color: var(--gold, #f5c518);
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--wood-w) - 24px);
+  translate: -50% 0;
+  font-size: 26px;
+  padding: 0.34em 1.5em 0.46em;
 }
 
 .wk-card-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: 14px;
+  padding: 30px 14px 16px;
 }
 
 /* ------------------------------------------------------------ today */
@@ -114,21 +168,21 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 16px 14px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  padding: 10px 18px 12px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f4dfae, #fff3d4);
+  box-shadow: inset 0 4px 0 rgba(58, 31, 18, 0.14);
 }
 .wk-hero-num {
-  font: 700 clamp(52px, 6.5vw, 86px) / 0.9 var(--font-game, 'Barlow Condensed', sans-serif);
-  padding-top: 8px;
+  font: 400 clamp(60px, 6.6vw, 92px) / 0.95 var(--gk-display);
   /* Four digits' worth: 7 → 120 must not slide the words beside it. */
   min-width: 2.4ch;
   text-align: center;
-  color: var(--magenta, #c8352e);
-  -webkit-text-stroke: 0 var(--sw-ink);
+  color: var(--gk-gold);
+  -webkit-text-stroke: 0.14em var(--gk-ink);
   paint-order: stroke fill;
+  text-shadow: 0 0.05em 0 var(--gk-ink);
 }
 .wk-hero-text {
   display: flex;
@@ -137,12 +191,12 @@
   min-width: 0;
 }
 .wk-hero-unit {
-  font: 800 clamp(17px, 1.5vw, 22px) / 1.1 var(--font-ui, sans-serif);
-  letter-spacing: 0.02em;
+  font: 600 clamp(20px, 1.7vw, 25px) / 1.1 var(--gk-body);
+  color: var(--gk-text);
 }
 .wk-cals {
-  font: 700 clamp(13px, 1.05vw, 15px) / 1.3 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 500 clamp(15px, 1.15vw, 16px) / 1.3 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 
 /* ------------------------------------------------------------ tiles */
@@ -150,7 +204,7 @@
 .wk-tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 .wk-tiles-all {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -159,26 +213,25 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   padding: 10px 6px 9px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffbe9, #f7e3b0);
+  box-shadow: inset 0 3px 0 #fff, 0 3px 0 rgba(58, 31, 18, 0.5);
   min-width: 0;
 }
 .wk-tile-val {
-  font: 700 clamp(19px, 1.9vw, 27px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
-  padding-top: 4px;
-  color: var(--sw-ink);
+  font: 400 clamp(23px, 2vw, 30px) / 1 var(--gk-display);
+  color: var(--gk-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
 .wk-tile-label {
-  font: 800 11.5px/1 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 600 15px/1 var(--gk-body);
+  color: var(--gk-text-soft);
   white-space: nowrap;
 }
 
@@ -188,60 +241,59 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 14px 11px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  padding: 8px 14px 10px 8px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fffbe9, #f7e3b0);
+  box-shadow: inset 0 3px 0 #fff, 0 3px 0 rgba(58, 31, 18, 0.5);
 }
 .wk-streak-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: none;
-  padding: 8px 16px 7px 12px;
-  border-radius: 8px;
-  background: #eceff3;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: inset 0 -3px 0 rgba(28, 36, 51, 0.12);
+  padding: 6px 16px 8px 10px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #d9cdb4, #b3a487);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -4px 0 rgba(0, 0, 0, 0.14);
 }
 .wk-streak-badge[data-on='on'] {
-  background: linear-gradient(180deg, #ffc46b, var(--orange, #ff7a29) 70%, #d1490a);
+  background: linear-gradient(180deg, #ffd25e, var(--gk-orange-2));
 }
 .wk-streak-flame {
-  font-size: 26px;
+  display: grid;
+  font-size: 34px;
   line-height: 1;
-  filter: grayscale(1) opacity(0.45);
+  filter: grayscale(1) opacity(0.5);
 }
 .wk-streak-badge[data-on='on'] .wk-streak-flame {
   filter: none;
   animation: wk-flicker 1.6s ease-in-out infinite;
 }
 .wk-streak-num {
-  font: 700 clamp(26px, 2.6vw, 36px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
-  padding-top: 4px;
+  font: 400 clamp(30px, 2.8vw, 40px) / 1 var(--gk-display);
+  padding-top: 2px;
   /* Reserved: 9 → 10 must not resize the badge. */
   min-width: 1.6ch;
   text-align: center;
-  color: var(--sw-ink);
-}
-.wk-streak-badge[data-on='on'] .wk-streak-num {
   color: #fff;
-  -webkit-text-stroke: 0 var(--sw-ink);
+  -webkit-text-stroke: 0.16em var(--gk-ink);
   paint-order: stroke fill;
 }
 .wk-streak-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 .wk-streak-words {
-  font: 800 clamp(16px, 1.35vw, 20px) / 1.15 var(--font-ui, sans-serif);
+  font: 600 clamp(18px, 1.5vw, 22px) / 1.15 var(--gk-body);
+  color: var(--gk-text);
 }
 .wk-streak-best {
-  font: 700 13px/1.2 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 500 15px/1.2 var(--gk-body);
+  color: var(--gk-text-soft);
   /* Reserved: the line is empty until they have beaten it. */
   min-height: 1.2em;
 }
@@ -252,23 +304,23 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: end;
-  gap: 6px;
-  padding: 10px 10px 8px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  gap: 8px;
+  padding: 10px 10px 10px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f4dfae, #fff3d4);
+  box-shadow: inset 0 4px 0 rgba(58, 31, 18, 0.14);
 }
 .wk-bar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 .wk-bar-cap {
-  font: 800 12.5px/1 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 600 15px/1 var(--gk-body);
+  color: var(--gk-text);
   /* Always reserved, so a day earning a label does not shorten the bars beside it. */
   min-height: 1em;
 }
@@ -276,58 +328,61 @@
   position: relative;
   display: flex;
   align-items: flex-end;
+  box-sizing: border-box;
   width: 100%;
   height: clamp(74px, 12vh, 120px);
-  border-radius: 10px;
-  background: repeating-linear-gradient(0deg, #efecf8 0 1px, transparent 1px 25%);
-  box-shadow: inset 0 0 0 2px #e3e7ec;
+  padding: 2px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #c9b693, #e8dac0);
+  box-shadow: inset 0 3px 0 rgba(58, 31, 18, 0.22);
   overflow: hidden;
 }
 .wk-bar-fill {
+  position: relative;
   width: 100%;
   height: 0;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #7fe7f7, var(--sw-cyan) 60%, #1583a0);
-  box-shadow: inset 0 0 0 2px rgba(28, 36, 51, 0.35);
+  border-radius: 10px;
+  background: linear-gradient(90deg, #8fdcff, var(--gk-blue) 45%, var(--gk-blue-2));
+  box-shadow: inset 0 0 0 2px rgba(58, 31, 18, 0.4);
   transform-origin: bottom;
-  animation: sw-grow 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+  animation: wk-grow 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
 .wk-bar[data-today='on'] .wk-bar-fill {
-  background: var(--gold, #f5c518);
-}
-.wk-bar[data-today='on'] .wk-bar-track {
-  box-shadow: inset 0 0 0 3px var(--sw-ink);
+  background: linear-gradient(90deg, #ffe873, var(--gk-gold) 45%, var(--gk-gold-2));
 }
 .wk-bar[data-empty='yes'] .wk-bar-track::after {
   /* A day with nothing on it still reads as a day: a flat ink line, not a missing column. */
   content: '';
   position: absolute;
-  left: 12%;
-  right: 12%;
-  bottom: 4px;
-  height: 4px;
-  border-radius: 2px;
-  background: #c7bfe0;
+  left: 14%;
+  right: 14%;
+  bottom: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(58, 31, 18, 0.35);
 }
 .wk-bar-day {
-  font: 800 13px/1 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 600 16px/1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .wk-bar[data-today='on'] .wk-bar-day {
-  color: var(--sw-ink);
-  padding: 2px 8px 1px;
-  border-radius: 8px;
-  background: var(--gold, #f5c518);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  color: var(--gk-text);
+  padding: 3px 9px 4px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe873, var(--gk-gold-2));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55);
 }
 .wk-week-foot {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   padding: 0 4px;
 }
 .wk-week-total {
-  font: 800 clamp(15px, 1.2vw, 18px) / 1.2 var(--font-ui, sans-serif);
+  font: 600 clamp(18px, 1.4vw, 20px) / 1.2 var(--gk-body);
+  color: var(--gk-text);
 }
 
 /* ------------------------------------------------------------ the run list */
@@ -344,21 +399,21 @@
   bottom: 0;
   height: 26px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 233, 194, 0), var(--sw-cream-2));
+  background: linear-gradient(180deg, rgba(247, 220, 160, 0), var(--gk-cream-2));
 }
 .wk-list {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 10px;
   max-height: min(46vh, 420px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Room for the scrollbar, so a 31st run cannot crop the coins column. */
-  padding-right: 4px;
+  /* Room for the scrollbar and the rows' drop edge. */
+  padding: 0 6px 6px 2px;
 }
 .wk-list-empty {
-  font: 700 15px/1.3 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 600 17px/1.3 var(--gk-body);
+  color: var(--gk-text-soft);
   padding: 6px 4px;
 }
 .wk-list-empty[hidden] {
@@ -369,31 +424,32 @@
   grid-template-columns: minmax(0, 1.35fr) auto minmax(0, 1.5fr);
   align-items: center;
   gap: 12px;
-  padding: 9px 13px 9px 11px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  padding: 9px 12px 10px 12px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffbe9, #f7e3b0);
+  box-shadow: inset 0 3px 0 #fff, 0 3px 0 rgba(58, 31, 18, 0.5);
 }
 .wk-run[data-best='on'] {
-  background: linear-gradient(180deg, #fffbe6, #fff0b8);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 0 0 2px var(--gold, #f5c518);
+  background: linear-gradient(180deg, #fff3b0, #ffd25e);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.7), 0 3px 0 rgba(58, 31, 18, 0.5);
 }
 .wk-run-when {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 .wk-run-day {
-  font: 800 clamp(15px, 1.2vw, 17px) / 1.1 var(--font-ui, sans-serif);
+  font: 600 clamp(17px, 1.3vw, 19px) / 1.1 var(--gk-body);
+  color: var(--gk-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .wk-run-how {
-  font: 700 12px/1.1 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 500 15px/1.1 var(--gk-body);
+  color: var(--gk-text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -402,20 +458,30 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  gap: 3px;
   flex: none;
   min-width: 7ch;
 }
 .wk-run-score-num {
-  font: 700 clamp(21px, 2vw, 28px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
-  padding-top: 4px;
+  font: 400 clamp(24px, 2.1vw, 30px) / 1 var(--gk-display);
+  color: var(--gk-text);
 }
 .wk-run-score-label {
-  font: 800 10.5px/1 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 600 15px/1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .wk-run[data-best='on'] .wk-run-score-label {
-  color: #8a6400;
+  color: #7a4300;
+}
+.wk-run[data-best='on'] .wk-run-score-label::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(180deg, #fff, #ffe873);
+  clip-path: polygon(50% 2%, 62% 36%, 98% 38%, 69% 59%, 80% 94%, 50% 73%, 20% 94%, 31% 59%, 2% 38%, 38% 36%);
 }
 .wk-run-stats {
   display: grid;
@@ -426,25 +492,24 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding: 4px 4px 3px;
-  border-radius: 10px;
-  background: #f4f1fb;
+  gap: 2px;
+  padding: 4px 4px 4px;
+  border: 2px solid rgba(58, 31, 18, 0.55);
+  border-radius: 12px;
+  background: rgba(58, 31, 18, 0.1);
   min-width: 0;
 }
-.wk-run[data-best='on'] .wk-run-stat {
-  background: rgba(255, 255, 255, 0.72);
-}
 .wk-run-stat-val {
-  font: 800 clamp(13px, 1.1vw, 16px) / 1.1 var(--font-ui, sans-serif);
+  font: 600 clamp(16px, 1.2vw, 18px) / 1.1 var(--gk-body);
+  color: var(--gk-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
 .wk-run-stat-label {
-  font: 800 10px/1 var(--font-ui, sans-serif);
-  color: var(--sw-brown);
+  font: 500 15px/1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 
 /* ------------------------------------------------------------ small windows */
@@ -452,7 +517,7 @@
 @media (max-width: 900px) {
   .wk-grid {
     grid-template-columns: 1fr;
-    gap: clamp(12px, 1.6vw, 20px);
+    gap: clamp(40px, 5.4vh, 52px);
     width: min(560px, 100%);
   }
   .wk-tiles-all {
@@ -473,7 +538,7 @@
     display: none;
   }
   .wk-hero-num {
-    font-size: clamp(44px, 13vw, 64px);
+    font-size: clamp(50px, 14vw, 70px);
   }
 }
 @media (max-height: 620px) {
@@ -487,6 +552,18 @@
 
 /* ------------------------------------------------------------ keyframes */
 
+@keyframes wk-card-in {
+  from { transform: translateY(40px) scale(0.92); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes wk-rise {
+  from { translate: 0 24px; opacity: 0; }
+  to { translate: 0 0; opacity: 1; }
+}
+@keyframes wk-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
 @keyframes wk-bob {
   0%, 100% { transform: rotate(-5deg) translateY(0); }
   50% { transform: rotate(4deg) translateY(-6px); }
@@ -494,4 +571,12 @@
 @keyframes wk-flicker {
   0%, 100% { transform: scale(1) rotate(-3deg); }
   50% { transform: scale(1.12) rotate(3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-screen *,
+  .wk-screen *::before {
+    animation: none !important;
+    transition: none !important;
+  }
 }

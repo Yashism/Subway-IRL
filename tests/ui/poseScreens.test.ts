@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nextMode } from '../../src/app/flow';
 import { MSG_CALIBRATED, MSG_STEP_IN, MSG_WELCOME_BACK } from '../../src/app/flow';
-import { cameraOptions, checkIcon, messageParts, modeChipLabel, ringDash, screenCopy, warningToast } from '../../src/ui/poseScreens';
+import { cameraOptions, checkMark, messageParts, modeChipLabel, ringDash, screenCopy, warningToast } from '../../src/ui/poseScreens';
 import { isDark, isStalled, modeBadge, pipVisibleFromUrl, trackingLevel } from '../../src/ui/pip';
 
 describe('cameraOptions', () => {
@@ -45,10 +45,10 @@ describe('modeChipLabel / nextMode', () => {
 });
 
 describe('small view helpers', () => {
-  it('check icons', () => {
-    expect(checkIcon('ok')).toBe('✓');
-    expect(checkIcon('bad')).toBe('✗');
-    expect(checkIcon('pending')).toBe('…');
+  it('check marks are a distinct icon per state', () => {
+    const marks = (['ok', 'bad', 'pending'] as const).map(checkMark);
+    for (const m of marks) expect(m).toMatch(/^<svg /);
+    expect(new Set(marks).size).toBe(3);
   });
 
   it('ring dash offset empties at 0 and fills at 1, clamped', () => {

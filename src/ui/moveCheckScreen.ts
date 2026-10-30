@@ -2,6 +2,8 @@ import './moveCheck.css';
 import { MOVE_ORDER, type MoveCheckHandlers, type MoveCheckModel, type MoveCheckSummary, type MoveId, type MoveStepModel } from '../pose/moveCheckTypes';
 import { PRIMARY_KEYS } from '../pose/tuning';
 import type { PlayMode } from '../pose/types';
+import { glyph } from './glyphs';
+import { icon, type IconName } from './icons';
 
 const PRIMARY = new Set<string>(PRIMARY_KEYS);
 
@@ -73,8 +75,9 @@ const svg = (tag: string, attrs: Record<string, string>, parent: Element): SVGEl
 };
 
 /** A button that lets go of focus, so the next Enter reaches the game and not this button. */
-function button(parent: Element, cls: string, label: string, onClick: () => void): HTMLButtonElement {
+function button(parent: Element, cls: string, label: string, onClick: () => void, lead?: IconName): HTMLButtonElement {
   const b = el('button', cls, parent, label);
+  if (lead) b.insertAdjacentHTML('afterbegin', icon(lead));
   b.type = 'button';
   b.addEventListener('click', () => {
     b.blur();
@@ -131,10 +134,10 @@ function figure(parent: Element): SVGElement {
  */
 export function renderSummaryCard(summary: MoveCheckSummary, opts: { title?: string } = {}): HTMLElement {
   const card = document.createElement('div');
-  card.className = 'mc-sheet';
+  card.className = 'mc-sheet gk-panel';
   card.dataset.mode = summary.mode;
   const head = el('div', 'mc-sheet-head', card);
-  el('div', 'mc-sheet-title', head, opts.title ?? 'Your controls');
+  el('div', 'mc-sheet-title gk-ribbon', head, opts.title ?? 'Your controls');
   el('div', 'mc-sheet-mode', head, MODE_NAMES[summary.mode]);
 
   const rows = el('div', 'mc-rows', card);
@@ -145,7 +148,9 @@ export function renderSummaryCard(summary: MoveCheckSummary, opts: { title?: str
     const done = step.status === 'done';
     const row = el('div', 'mc-row', rows);
     row.dataset.status = done ? 'done' : 'skipped';
-    el('div', 'mc-row-icon', row, done ? '✓' : '–');
+    const mark = el('div', 'mc-row-icon', row);
+    if (done) mark.innerHTML = icon('check');
+    else mark.textContent = '–';
     const text = el('div', 'mc-row-text', row);
     el('div', 'mc-row-move', text, step.label);
     el('div', 'mc-row-how', text, `${step.how} — ${CONTROL_EFFECT[id]}`);
@@ -160,7 +165,7 @@ export function renderSummaryCard(summary: MoveCheckSummary, opts: { title?: str
 
   const gesture = el('div', 'mc-row mc-row-gesture', rows);
   gesture.dataset.status = 'gesture';
-  el('div', 'mc-row-icon', gesture, '✋');
+  el('div', 'mc-row-icon', gesture).innerHTML = glyph('hand');
   const gtext = el('div', 'mc-row-text', gesture);
   el('div', 'mc-row-move', gtext, 'Right hand up');
   el('div', 'mc-row-how', gtext, 'Hold it up — start the run');
@@ -168,7 +173,7 @@ export function renderSummaryCard(summary: MoveCheckSummary, opts: { title?: str
 
   if (summary.asymmetryNote) {
     const note = el('div', 'mc-note', card);
-    el('span', 'mc-note-icon', note, '⚖');
+    el('span', 'mc-note-icon', note, '!');
     el('span', 'mc-note-text', note, summary.asymmetryNote);
   }
 
@@ -255,7 +260,7 @@ export class MoveCheckScreen {
     // ---- banner + step dots
     const top = el('div', 'mc-top', root);
     const banner = el('div', 'mc-banner', top);
-    el('div', 'mc-banner-tab', banner, 'Move check');
+    el('div', 'mc-banner-tab gk-title', banner, 'Move check');
     this.sub = el('div', 'mc-banner-sub', banner);
 
     const dots = el('div', 'mc-dots', top);
@@ -267,11 +272,12 @@ export class MoveCheckScreen {
     });
 
     // ---- the active step
-    const card = el('div', 'mc-card', root);
+    const card = el('div', 'mc-card gk-panel', root);
     this.stage = el('div', 'mc-stage', card);
     figure(this.stage);
-    const CUES = { l: '\u2039\u2039', r: '\u203a\u203a', up: '\u25b2', down: '\u25bc', hands: '\u2726' };
-    for (const cue of ['l', 'r', 'up', 'down', 'hands'] as const) el('div', `mc-cue mc-cue-${cue}`, this.stage, CUES[cue]);
+    // Arrows for the direction the move goes (left and right are the up arrow turned by CSS).
+    const CUES = { l: glyph('jump'), r: glyph('jump'), up: glyph('jump'), down: glyph('duck'), hands: icon('star') };
+    for (const cue of ['l', 'r', 'up', 'down', 'hands'] as const) el('div', `mc-cue mc-cue-${cue}`, this.stage).innerHTML = CUES[cue];
 
     const body = el('div', 'mc-body', card);
     const live = el('div', 'mc-live', body);
@@ -288,7 +294,7 @@ export class MoveCheckScreen {
     const sHead = el('div', 'mc-strength-head', strength);
     el('div', 'mc-strength-title', sHead, 'How big was it');
     this.barValue = el('div', 'mc-strength-value', sHead);
-    el('div', 'mc-strength-goal', sHead, '100% IS ENOUGH');
+    el('div', 'mc-strength-goal', sHead, '100% is enough');
     this.bar = el('div', 'mc-bar', strength);
     this.bar.setAttribute('role', 'progressbar');
     this.bar.setAttribute('aria-valuemin', '0');
@@ -301,20 +307,20 @@ export class MoveCheckScreen {
 
     // ---- buttons (the row keeps its height whether or not any are shown)
     const actions = el('div', 'mc-actions', root);
-    this.skipBtn = button(actions, 'mc-btn mc-btn-alt mc-btn-skip', 'Skip this move', () => this.handlers.skipStep());
-    this.acceptBtn = button(actions, 'mc-btn mc-btn-accept', 'Use my best attempt', () => this.handlers.acceptBest());
-    this.skipAllBtn = button(actions, 'mc-btn mc-btn-ghost mc-btn-skip-all', 'Skip all', () => this.handlers.skipAll());
-    this.homeBtn = button(actions, 'mc-btn mc-btn-ghost mc-btn-home', '\u2302 Main menu', () => this.opts.onHome?.());
+    this.skipBtn = button(actions, 'mc-btn mc-btn-skip gk-btn gk-btn-cream', 'Skip this move', () => this.handlers.skipStep());
+    this.acceptBtn = button(actions, 'mc-btn mc-btn-accept gk-btn gk-btn-orange', 'Use my best attempt', () => this.handlers.acceptBest());
+    this.skipAllBtn = button(actions, 'mc-btn mc-btn-skip-all gk-btn gk-btn-wood gk-btn-sm', 'Skip all', () => this.handlers.skipAll());
+    this.homeBtn = button(actions, 'mc-btn mc-btn-home gk-btn gk-btn-wood gk-btn-sm', 'Main menu', () => this.opts.onHome?.(), 'home');
     this.homeBtn.hidden = !this.opts.onHome;
 
     // ---- summary
     const sum = el('div', 'mc-summary', root);
     this.sheetBox = el('div', 'mc-sheet-box', sum);
     const sActions = el('div', 'mc-actions mc-actions-summary', sum);
-    button(sActions, 'mc-btn mc-btn-go', 'Start playing', () => this.handlers.start());
-    button(sActions, 'mc-btn mc-btn-alt', 'Redo the check', () => this.handlers.redo());
-    button(sActions, 'mc-btn mc-btn-ghost', 'Reset to defaults', () => this.handlers.resetTuning());
-    const sHome = button(sActions, 'mc-btn mc-btn-ghost mc-btn-home', '\u2302 Main menu', () => this.opts.onHome?.());
+    button(sActions, 'mc-btn mc-btn-go gk-btn gk-btn-green gk-btn-lg', 'Start playing', () => this.handlers.start());
+    button(sActions, 'mc-btn gk-btn gk-btn-cream', 'Redo the check', () => this.handlers.redo());
+    button(sActions, 'mc-btn gk-btn gk-btn-wood gk-btn-sm', 'Reset to defaults', () => this.handlers.resetTuning());
+    const sHome = button(sActions, 'mc-btn mc-btn-home gk-btn gk-btn-wood gk-btn-sm', 'Main menu', () => this.opts.onHome?.(), 'home');
     sHome.hidden = !this.opts.onHome;
   }
 

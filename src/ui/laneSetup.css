@@ -1,14 +1,13 @@
 /*
  * Lane spots setup. The Move Check's family: the same scrim, banner, step dots and buttons
- * (moveCheck.css), a chunky cream card, 5px ink borders and hard drop shadows. What is new here is
- * the floor strip — a bird's-eye line across the room with the spots pinned on it and the player
- * sliding along it live.
+ * (moveCheck.css) and the kit's wood-framed card. What is new here is the floor strip — a
+ * bird's-eye line across the room with the spots pinned on it and the player sliding along it live.
  */
 
 .lane-setup {
-  --ls-left: var(--cyan, #29c7e0);
-  --ls-centre: var(--gold, #f5c518);
-  --ls-right: var(--magenta, #c8352e);
+  --ls-left: var(--gk-blue, #43b9f4);
+  --ls-centre: var(--gk-gold, #ffd43b);
+  --ls-right: var(--gk-red, #f4533d);
   position: fixed;
   inset: 0;
   display: none;
@@ -22,8 +21,8 @@
   pointer-events: auto;
   color: #fff;
   user-select: none;
-  font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
-  background: radial-gradient(ellipse at 50% 45%, rgba(14, 22, 36, 0.6), rgba(14, 22, 36, 0.92));
+  font-family: var(--gk-body, 'Fredoka', system-ui, sans-serif);
+  background: radial-gradient(ellipse at 50% 45%, rgba(48, 24, 10, 0.55), rgba(30, 14, 6, 0.9));
   z-index: 4;
 }
 .lane-setup[data-on='on'] {
@@ -38,11 +37,6 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   display: none !important;
 }
 
-.ls-tab {
-  text-shadow: 0 1px 10px rgba(14, 22, 36, 0.65), 0 0 2px rgba(14, 22, 36, 0.4);
-}
-.lane-setup[data-phase='summary'] .ls-tab {
-}
 .lane-setup .mc-dot {
   width: clamp(64px, 7vw, 104px);
 }
@@ -56,11 +50,7 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   width: min(1000px, 96vw);
   box-sizing: border-box;
   padding: clamp(18px, 2.4vh, 30px) clamp(18px, 2.4vw, 36px);
-  border-radius: 14px;
-  background: var(--mc-cream);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 30px 60px rgba(0, 0, 0, 0.45);
-  color: var(--mc-ink);
+  --wood-w: 12px;
   flex: none;
   animation: mc-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
@@ -75,20 +65,22 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   min-width: 0;
 }
 .ls-name {
-  font: 700 clamp(34px, 4vw, 62px) / 1 var(--font-game, sans-serif);
-  padding-top: 4px;
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font: 400 clamp(38px, 4vw, 62px) / 1 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.16em var(--gk-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.06em 0 var(--gk-ink);
 }
 .lane-setup[data-step='left'] .ls-name {
-  color: #0f7b92;
+  color: #8fdcff;
 }
 .lane-setup[data-step='right'] .ls-name {
-  color: #b01f73;
+  color: #ff9a86;
 }
 .ls-how {
-  margin-top: 8px;
-  font: 800 clamp(18px, 1.7vw, 26px) / 1.25 var(--font-ui, sans-serif);
-  color: #3f4858;
+  margin-top: 10px;
+  font: 600 clamp(18px, 1.7vw, 26px) / 1.25 var(--gk-body);
+  color: var(--gk-text);
 }
 
 /* ---- the hold ring: the same interaction as calibration */
@@ -104,8 +96,8 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   width: clamp(92px, 9vw, 124px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: var(--mc-ink);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  background: #4a2e1d;
+  box-shadow: 0 0 0 3px var(--gk-ink), inset 0 3px 0 rgba(0, 0, 0, 0.35), 0 5px 0 3px var(--gk-ink);
 }
 .ls-ring svg {
   position: absolute;
@@ -116,18 +108,18 @@ html[data-pose-screen='laneSetup'] .hud-caught {
 }
 .ls-ring-track {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.16);
+  stroke: rgba(255, 238, 194, 0.18);
   stroke-width: 8;
 }
 .ls-ring-arc {
   fill: none;
-  stroke: var(--gold, #f5c518);
+  stroke: var(--gk-gold, #ffd43b);
   stroke-width: 8;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.1s linear, stroke 0.2s;
 }
 .ls-ring[data-state='blocked'] .ls-ring-core {
-  color: var(--orange, #ff7a29);
+  color: var(--gk-orange, #ffb42e);
   font-size: clamp(30px, 3vw, 42px);
   animation: mc-nudge 1.2s ease-in-out infinite;
 }
@@ -135,7 +127,7 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   animation-direction: reverse;
 }
 .ls-ring[data-state='taken'] .ls-ring-arc {
-  stroke: var(--mc-green);
+  stroke: var(--gk-green);
 }
 .ls-ring-core {
   position: absolute;
@@ -144,17 +136,19 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   place-items: center;
   padding-top: 4px;
   box-sizing: border-box;
-  font: 700 clamp(22px, 2.2vw, 30px) / 1 var(--font-game, sans-serif);
+  font: 400 clamp(24px, 2.4vw, 32px) / 1 var(--gk-display);
   color: #fff;
+  -webkit-text-stroke: 0.14em var(--gk-ink);
+  paint-order: stroke fill;
 }
 .ls-ring[data-state='taken'] .ls-ring-core {
   font-size: clamp(40px, 4vw, 56px);
-  color: var(--mc-green);
+  color: var(--gk-green);
   animation: mc-pop 0.35s cubic-bezier(0.3, 1.8, 0.5, 1) both;
 }
 .ls-hold-label {
-  font: 800 clamp(12px, 1vw, 15px) / 1 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 clamp(15px, 1.2vw, 18px) / 1 var(--gk-body);
+  color: var(--gk-text);
   white-space: nowrap;
 }
 
@@ -168,13 +162,13 @@ html[data-pose-screen='laneSetup'] .hud-caught {
 .ls-strip {
   position: relative;
   height: clamp(140px, 18vh, 190px);
-  border-radius: 12px;
-  border: 1px solid rgba(28, 36, 51, 0.28);
+  border-radius: 20px;
+  border: 4px solid var(--gk-ink);
   background:
-    repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(255, 255, 255, 0.05) calc(10% - 2px) 10%),
-    radial-gradient(ellipse 60% 90% at 50% 100%, rgba(255, 212, 0, 0.14), transparent 70%),
-    linear-gradient(180deg, #2b3548, #1d1240);
-  box-shadow: inset 0 1px 2px rgba(14, 22, 36, 0.3), 0 1px 2px rgba(14, 22, 36, 0.3);
+    repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(255, 255, 255, 0.07) calc(10% - 2px) 10%),
+    radial-gradient(ellipse 60% 90% at 50% 100%, rgba(255, 212, 59, 0.25), transparent 70%),
+    linear-gradient(180deg, #4a82c4, #2a4a86);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.28), inset 0 -6px 0 rgba(0, 0, 0, 0.18), 0 4px 0 rgba(58, 31, 18, 0.5);
   overflow: hidden;
 }
 /* Where the player calibrated: the zero every spot is measured from. */
@@ -185,7 +179,7 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   top: 10px;
   bottom: 10px;
   width: 0;
-  border-left: 3px dotted rgba(255, 255, 255, 0.35);
+  border-left: 3px dotted rgba(255, 255, 255, 0.55);
 }
 .ls-zone {
   position: absolute;
@@ -195,21 +189,21 @@ html[data-pose-screen='laneSetup'] .hud-caught {
 .ls-zone-left {
   left: 0;
   width: var(--ls-bl, 0%);
-  background: linear-gradient(90deg, rgba(41, 199, 224, 0.3), rgba(41, 199, 224, 0.1));
+  background: linear-gradient(90deg, rgba(143, 220, 255, 0.35), rgba(143, 220, 255, 0.08));
 }
 .ls-zone-right {
   right: 0;
   width: calc(100% - var(--ls-br, 100%));
-  background: linear-gradient(270deg, rgba(229, 57, 155, 0.3), rgba(229, 57, 155, 0.1));
+  background: linear-gradient(270deg, rgba(255, 130, 110, 0.35), rgba(255, 130, 110, 0.08));
 }
 .ls-near {
   position: absolute;
   top: 0;
   bottom: 0;
   width: var(--ls-near-w, 0%);
-  background: repeating-linear-gradient(135deg, rgba(255, 122, 41, 0.22) 0 8px, transparent 8px 16px);
-  border-left: 2px solid rgba(255, 122, 41, 0.45);
-  border-right: 2px solid rgba(255, 122, 41, 0.45);
+  background: repeating-linear-gradient(135deg, rgba(255, 180, 46, 0.4) 0 8px, transparent 8px 16px);
+  border-left: 3px solid rgba(255, 180, 46, 0.8);
+  border-right: 3px solid rgba(255, 180, 46, 0.8);
   box-sizing: border-box;
 }
 .ls-near[data-on='off'] {
@@ -220,7 +214,7 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   top: 0;
   bottom: 0;
   width: 0;
-  border-left: 4px dashed rgba(255, 212, 0, 0.75);
+  border-left: 4px dashed rgba(255, 236, 130, 0.9);
   transform: translateX(-2px);
 }
 .ls-bound[data-on='off'],
@@ -242,31 +236,32 @@ html[data-pose-screen='laneSetup'] .hud-caught {
 .ls-pin-head {
   display: grid;
   place-items: center;
-  width: clamp(36px, 3.2vw, 46px);
+  width: clamp(42px, 3.4vw, 50px);
   aspect-ratio: 1;
   border-radius: 50%;
   box-sizing: border-box;
   padding-top: 3px;
-  font: 700 clamp(20px, 2vw, 28px) / 1 var(--font-game, sans-serif);
-  color: var(--mc-ink);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font: 400 clamp(22px, 2vw, 28px) / 1 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.14em var(--gk-ink);
+  paint-order: stroke fill;
+  border: 3px solid var(--gk-ink);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
 }
 .ls-pin-stem {
   width: 6px;
   height: clamp(14px, 3vh, 34px);
-  background: var(--mc-ink);
+  background: var(--gk-ink);
   border-radius: 0 0 3px 3px;
 }
 .ls-pin-left .ls-pin-head {
-  background: var(--ls-left);
+  background: linear-gradient(180deg, var(--gk-blue), var(--gk-blue-2));
 }
 .ls-pin-centre .ls-pin-head {
-  background: var(--ls-centre);
+  background: linear-gradient(180deg, #ffe873, var(--gk-gold-2));
 }
 .ls-pin-right .ls-pin-head {
-  background: var(--ls-right);
-  color: #fff;
+  background: linear-gradient(180deg, #ff735c, var(--gk-red-2));
 }
 
 /* ---- the player, live */
@@ -284,32 +279,34 @@ html[data-pose-screen='laneSetup'] .hud-caught {
 .ls-you-dot {
   display: grid;
   place-items: center;
-  width: clamp(34px, 3.2vw, 46px);
+  width: clamp(36px, 3.2vw, 46px);
   aspect-ratio: 1;
   border-radius: 50%;
   font-size: 0;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, #fff, #e6dac0);
+  border: 3px solid var(--gk-ink);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.3);
   transition: background 0.15s, box-shadow 0.15s;
 }
 .ls-you-label {
-  font: 800 clamp(11px, 0.95vw, 14px) / 1 var(--font-ui, sans-serif);
+  font: 400 clamp(15px, 1.2vw, 18px) / 1 var(--gk-display);
+  letter-spacing: 0.04em;
   color: #fff;
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  -webkit-text-stroke: 0.16em var(--gk-ink);
+  paint-order: stroke fill;
 }
 .ls-you[data-state='holding'] .ls-you-dot {
-  background: var(--gold, #f5c518);
-  box-shadow: 0 0 0 7px rgba(255, 212, 0, 0.35);
+  background: linear-gradient(180deg, #ffe873, var(--gk-gold-2));
+  box-shadow: 0 0 0 7px rgba(255, 212, 59, 0.4);
   animation: ls-hold-pulse 0.9s ease-in-out infinite;
 }
 .ls-you[data-state='blocked'] .ls-you-dot {
-  background: var(--orange, #ff7a29);
-  box-shadow: 0 0 0 6px rgba(255, 122, 41, 0.35);
+  background: linear-gradient(180deg, #ffb27a, var(--gk-orange-2));
+  box-shadow: 0 0 0 6px rgba(255, 140, 40, 0.4);
 }
 .ls-you[data-state='taken'] .ls-you-dot {
-  background: var(--mc-green);
-  box-shadow: 0 0 0 8px rgba(63, 178, 127, 0.4);
+  background: linear-gradient(180deg, var(--gk-green), var(--gk-green-2));
+  box-shadow: 0 0 0 8px rgba(111, 207, 58, 0.45);
 }
 /* Off the strip: the marker waits at the end and points the way. */
 .ls-you[data-edge='left'] .ls-you-label::before {
@@ -328,8 +325,8 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font: 800 clamp(11px, 0.95vw, 14px) / 1 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 clamp(15px, 1.1vw, 17px) / 1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .ls-scale-mid {
   text-align: center;
@@ -340,8 +337,8 @@ html[data-pose-screen='laneSetup'] .hud-caught {
 .ls-hint {
   /* Exactly one line reserved, so the hint appearing never moves the card. */
   height: 1.2em;
-  font: 800 clamp(20px, 2vw, 30px) / 1.2 var(--font-ui, sans-serif);
-  color: #b8600c;
+  font: 600 clamp(20px, 2vw, 30px) / 1.2 var(--gk-body);
+  color: #b0480a;
   text-align: center;
 }
 .ls-hint[data-on='off'] {
@@ -379,47 +376,52 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px 9px 10px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  padding: 10px 14px 10px 10px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffbe9, #f7e3b0);
+  border: 3px solid var(--gk-ink);
+  box-shadow: inset 0 3px 0 #fff, 0 3px 0 rgba(58, 31, 18, 0.5);
 }
 .ls-row-pin {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   padding-top: 3px;
   box-sizing: border-box;
-  font: 700 21px/1 var(--font-game, sans-serif);
-  border: 1px solid rgba(28, 36, 51, 0.28);
+  font: 400 24px/1 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.14em var(--gk-ink);
+  paint-order: stroke fill;
+  border: 3px solid var(--gk-ink);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
 }
 .ls-row[data-spot='left'] .ls-row-pin {
-  background: var(--ls-left);
+  background: linear-gradient(180deg, var(--gk-blue), var(--gk-blue-2));
 }
 .ls-row[data-spot='centre'] .ls-row-pin {
-  background: var(--ls-centre);
+  background: linear-gradient(180deg, #ffe873, var(--gk-gold-2));
 }
 .ls-row[data-spot='right'] .ls-row-pin {
-  background: var(--ls-right);
-  color: #fff;
+  background: linear-gradient(180deg, #ff735c, var(--gk-red-2));
 }
 .ls-row-label {
-  font: 800 clamp(16px, 1.3vw, 20px) / 1.1 var(--font-ui, sans-serif);
+  font: 600 clamp(18px, 1.4vw, 21px) / 1.1 var(--gk-body);
+  color: var(--gk-text);
 }
 .ls-row-from {
-  font: 700 clamp(12px, 1vw, 15px) / 1.2 var(--font-ui, sans-serif);
-  color: #3f4858;
+  font: 500 clamp(15px, 1.1vw, 16px) / 1.2 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .ls-row-value {
-  font: 700 clamp(24px, 2.2vw, 34px) / 1 var(--font-game, sans-serif);
+  font: 400 clamp(28px, 2.4vw, 38px) / 1 var(--gk-display);
+  color: var(--gk-text);
   padding-top: 3px;
 }
 .ls-note {
-  font: 800 clamp(12px, 1vw, 15px) / 1.35 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 clamp(15px, 1.1vw, 17px) / 1.35 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 
 /* ------------------------------------------------------------ narrow / short / wide */
@@ -471,7 +473,7 @@ html[data-pose-screen='laneSetup'] .hud-caught {
     width: min(1300px, 92vw);
   }
   .ls-name {
-    font-size: 74px;
+    font-size: 78px;
   }
   .ls-how {
     font-size: 31px;
@@ -495,7 +497,7 @@ html[data-pose-screen='laneSetup'] .hud-caught {
   .ls-note,
   .ls-scale,
   .ls-hold-label {
-    font-size: 18px;
+    font-size: 20px;
   }
 }
 

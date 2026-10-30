@@ -3,6 +3,8 @@ import './laneSetup.css';
 import type { LaneSetupHandlers } from '../app/laneSetupSession';
 import { SPOT_ORDER, type LaneSetupModel, type SpotId } from '../pose/laneSetup';
 import { MIN_SPOT_GAP, type LaneSpots } from '../pose/laneSpots';
+import { glyph } from './glyphs';
+import { icon } from './icons';
 
 // ---------------------------------------------------------------- pure view helpers
 
@@ -79,8 +81,9 @@ const svg = (tag: string, attrs: Record<string, string>, parent: Element): SVGEl
 };
 
 /** A button that lets go of focus, so the next Enter reaches the game and not this button. */
-function button(parent: Element, cls: string, label: string, onClick: () => void): HTMLButtonElement {
+function button(parent: Element, cls: string, label: string, onClick: () => void, lead?: string): HTMLButtonElement {
   const b = el('button', cls, parent, label);
+  if (lead) b.insertAdjacentHTML('afterbegin', lead);
   b.type = 'button';
   b.addEventListener('click', () => {
     b.blur();
@@ -140,7 +143,7 @@ export class LaneSetupScreen {
     // ---- banner + step dots (the move check's, so the two read as one family)
     const top = el('div', 'mc-top', root);
     const banner = el('div', 'mc-banner', top);
-    el('div', 'mc-banner-tab ls-tab', banner, 'Lane spots');
+    el('div', 'mc-banner-tab ls-tab gk-title', banner, 'Lane spots');
     this.sub = el('div', 'mc-banner-sub', banner);
     const dots = el('div', 'mc-dots', top);
     this.dots = SPOT_ORDER.map((id, i) => {
@@ -151,7 +154,7 @@ export class LaneSetupScreen {
     });
 
     // ---- the card: instruction, the floor, the hold
-    const card = el('div', 'ls-card', root);
+    const card = el('div', 'ls-card gk-panel', root);
     const head = el('div', 'ls-head', card);
     const live = el('div', 'ls-live', head);
     live.setAttribute('aria-live', 'polite');
@@ -216,12 +219,12 @@ export class LaneSetupScreen {
 
     // ---- buttons
     const actions = el('div', 'mc-actions ls-actions-steps', root);
-    this.redoBtn = button(actions, 'mc-btn mc-btn-alt', '↺ Start over', () => this.handlers.redo());
-    button(actions, 'mc-btn mc-btn-ghost', 'Cancel', () => this.handlers.cancel());
+    this.redoBtn = button(actions, 'mc-btn gk-btn gk-btn-cream', 'Start over', () => this.handlers.redo(), glyph('redo'));
+    button(actions, 'mc-btn gk-btn gk-btn-wood gk-btn-sm', 'Cancel', () => this.handlers.cancel(), icon('close'));
     const sActions = el('div', 'mc-actions ls-actions-summary', root);
-    button(sActions, 'mc-btn mc-btn-go', 'Save my spots', () => this.handlers.save());
-    button(sActions, 'mc-btn mc-btn-alt', '↺ Redo', () => this.handlers.redo());
-    button(sActions, 'mc-btn mc-btn-ghost', 'Cancel', () => this.handlers.cancel());
+    button(sActions, 'mc-btn mc-btn-go gk-btn gk-btn-green gk-btn-lg', 'Save my spots', () => this.handlers.save(), icon('check'));
+    button(sActions, 'mc-btn gk-btn gk-btn-cream', 'Redo', () => this.handlers.redo(), glyph('redo'));
+    button(sActions, 'mc-btn gk-btn gk-btn-wood gk-btn-sm', 'Cancel', () => this.handlers.cancel(), icon('close'));
   }
 
   /** Renders one model; `null` hides the whole layer. The model is mutated in place, so the per-node caches do the deduping. */

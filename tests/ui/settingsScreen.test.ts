@@ -110,7 +110,7 @@ describe('mounting', () => {
     ui.update(view());
     ui.update(view({ settings: { ...DEFAULT_SETTINGS, line: 'harbour' } }));
     expect(root.querySelectorAll('.sw-group')).toHaveLength(6);
-    expect(root.querySelectorAll('.sw-chip')).toHaveLength(17); // mode 3 + lanes 2 + line 3 + pace 3 + obstacle amount 3 + outlines 3
+    expect(root.querySelectorAll('.sw-chip')).toHaveLength(19); // mode 3 + lanes 2 + line 3 + pace 3 + obstacle amount 3 + graphics 2 + outlines 3
   });
 
   it('takes everything back down on destroy', () => {
@@ -133,7 +133,7 @@ describe('the controls', () => {
     expect(chip(root, 'Western').dataset.on).toBe('off');
     expect(chip(root, 'Beast').dataset.on).toBe('on');
     expect(chip(root, 'Small room').dataset.on).toBe('on');
-    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(6); // one per group: mode, lanes, line, pace, amount, outlines
+    expect(root.querySelectorAll('.sw-chip[data-on="on"]')).toHaveLength(7); // one per group: mode, lanes, line, pace, amount, graphics, outlines
   });
 
   it('asks for the change it was clicked for, and changes nothing itself', () => {
@@ -496,7 +496,7 @@ describe('SettingsScreen: lanes', () => {
     expect(ui.confirm?.title).toBe('Set your lane spots?');
     const yes = root.querySelector<HTMLButtonElement>('.sw-dialog-actions .sw-btn:last-child')!;
     expect(yes.textContent).toBe('Set them now');
-    expect(yes.className).toContain('sw-btn-go');
+    expect(yes.className).toContain('gk-btn-green');
     yes.click();
     expect(calls.fired).toEqual(['setLaneSpots']);
     expect(calls.change).toEqual([]);
@@ -507,7 +507,7 @@ describe('SettingsScreen: lanes', () => {
     const { root, ui, calls } = screen();
     ui.update(view());
     chip(root, 'My spots').click();
-    root.querySelector<HTMLButtonElement>('.sw-dialog-actions .sw-btn-cancel')!.click();
+    root.querySelector<HTMLButtonElement>('.sw-dialog-actions .gk-btn-cream')!.click();
     expect(calls.fired).toEqual([]);
     expect(calls.change).toEqual([]);
     expect(chip(root, 'Automatic').dataset.on).toBe('on');

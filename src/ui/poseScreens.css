@@ -1,4 +1,8 @@
-/* Webcam setup + calibration screens. Uses the HUD tokens from hud.css (--ink, --gold, fonts). */
+/*
+ * Webcam setup + calibration screens, in the game kit's toy-box look (kit.css): wood-framed cream
+ * cards with ribbon titles, glossy buttons (the .gk-btn classes are added in poseScreens.ts) and
+ * chunky ink-outlined cells. The tokens are the kit's --gk-*.
+ */
 
 .pose-ui {
   position: fixed;
@@ -7,14 +11,8 @@
   color: #fff;
   user-select: none;
   overflow: hidden;
-  font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
-  --ps-ink: var(--ink, #1c2433);
-  --ps-cream: #f6f7f4;
-  --ps-cream-2: #e9ecef;
-  --ps-brown: #5b6577;
-  --ps-green: var(--green, #3fb27f);
-  --ps-red: var(--red, #e8433a);
-  --ps-amber: #ffb020;
+  font-family: var(--gk-body, 'Fredoka', system-ui, sans-serif);
+  --ps-ink: var(--gk-ink, #3a1f12);
 }
 .pose-ui button,
 .pose-ui select,
@@ -58,63 +56,19 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 
 /* ------------------------------------------------------------ buttons */
 
-.ps-btn {
-  appearance: none;
-  cursor: pointer;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  border-radius: 8px;
-  padding: 14px 34px 10px;
-  font: 700 clamp(22px, 2.4vw, 30px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
-  letter-spacing: 0.02em;
-  color: #fff;
-  background: linear-gradient(180deg, #8d7bd6, #5b48a8);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s;
-  white-space: nowrap;
+/* The look is the kit's (.gk-btn in kit.css); this is only what the screens add to it. */
+.pose-ui .ps-btn[hidden] {
+  display: none;
 }
-.ps-btn:hover {
-  transform: translateY(-2px) scale(1.03);
-}
-.ps-btn:active {
-  transform: translateY(4px);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-}
-.ps-btn:focus-visible,
-.ps-chip:focus-visible,
-.ps-select:focus-visible {
-  outline: 2px solid var(--blue, #2c5d9e);
-  outline-offset: 2px;
+.pose-ui .gk-btn-sm {
+  min-height: 44px;
 }
 .ps-btn-go {
-  background: var(--ps-green);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  padding: 18px 48px 12px;
-  font-size: clamp(28px, 3vw, 38px);
+  min-width: 220px;
 }
-.ps-btn-alt {
-  font: 800 18px/1 var(--font-ui, sans-serif);
-  padding: 13px 24px 11px;
-  color: var(--ps-ink);
-  background: #fff;
-  border-width: 3px;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  text-shadow: none;
-}
-.ps-btn-small {
-  font: 800 15px/1 var(--font-ui, sans-serif);
-  padding: 9px 16px 8px;
-  border-width: 3px;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  text-shadow: none;
-  background: #fff;
-  color: var(--ps-ink);
-}
-.ps-btn-ghost {
-  background: rgba(28, 36, 51, 0.55);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+.ps-actions .gk-btn-lg {
+  padding-left: 1.5em;
+  padding-right: 1.5em;
 }
 
 /* ------------------------------------------------------------ menu mode card */
@@ -128,37 +82,36 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px 10px 10px;
-  border-radius: 10px;
-  background: rgba(14, 22, 36, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 10px 22px rgba(0, 0, 0, 0.25);
+  padding: 8px 10px 12px 8px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.16), 0 5px 0 var(--gk-ink), 0 14px 22px rgba(0, 0, 0, 0.3);
   animation: ps-drop 0.45s 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .ps-mode-card-icon {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 8px;
-  font-size: 26px;
-  background: var(--cyan, #29c7e0);
-  box-shadow: inset 0 0 0 3px #0e6d86, 0 1px 2px rgba(14, 22, 36, 0.3);
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  box-sizing: border-box;
+  font-size: 30px;
+  background: linear-gradient(180deg, var(--gk-blue), var(--gk-blue-2));
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -4px 0 rgba(0, 0, 0, 0.16);
 }
 .pose-ui[data-input='keyboard'] .ps-mode-card-icon {
-  background: #fff;
-  box-shadow: inset 0 0 0 3px #8a94a6, 0 1px 2px rgba(14, 22, 36, 0.3);
+  background: linear-gradient(180deg, var(--gk-orange), var(--gk-orange-2));
 }
 .ps-mode-card-title {
-  font: 700 22px/1 var(--font-game, sans-serif);
-  padding-top: 4px;
-  paint-order: stroke fill;
-  -webkit-text-stroke: 0 var(--ps-ink);
+  font-size: 22px;
 }
 .ps-mode-card-sub {
-  font: 700 14px/1.2 var(--font-ui, sans-serif);
-  color: rgba(255, 255, 255, 0.85);
-  margin-top: 2px;
+  font: 500 15px/1.2 var(--gk-body);
+  color: #ffeec2;
+  margin-top: 4px;
 }
 
 /* ------------------------------------------------------------ modal cards */
@@ -168,113 +121,111 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   justify-content: center;
   overflow-y: auto;
   pointer-events: auto;
-  padding: 46px 16px 24px;
+  padding: 78px 16px 28px;
   box-sizing: border-box;
-  background: radial-gradient(ellipse at 50% 45%, rgba(14, 22, 36, 0.45), rgba(14, 22, 36, 0.78));
+  background: radial-gradient(ellipse at 50% 45%, rgba(40, 20, 8, 0.4), rgba(30, 14, 6, 0.78));
   backdrop-filter: blur(4px);
 }
 .ps-card {
+  --wood-w: 12px;
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   width: min(640px, 100%);
-  padding: 44px 30px 22px;
-  box-sizing: border-box;
-  border-radius: 12px;
-  background: var(--ps-cream);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 30px 60px rgba(0, 0, 0, 0.45);
-  color: var(--ps-ink);
+  padding: 46px 28px 22px;
   animation: ps-card-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-  overflow: visible;
 }
+/* The ribbon straddles the card's top edge. */
 .ps-card-tab {
-  white-space: nowrap;
-  font: 700 36px/1 var(--font-game, sans-serif);
-  margin: 0 0 8px;
-  color: var(--ps-ink);
-}
-.ps-error .ps-card-tab {
-  color: var(--ps-red);
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--wood-w) - 34px);
+  translate: -50% 0;
+  font-size: 32px;
+  max-width: calc(100% + 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ps-hero {
   position: relative;
   display: grid;
   place-items: center;
-  width: 84px;
-  height: 84px;
-  margin: 2px 0 10px;
-  border-radius: 12px;
-  background: var(--cyan, #29c7e0);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 -8px 0 rgba(14, 109, 134, 0.45);
+  width: 92px;
+  height: 92px;
+  margin: 2px 0 12px;
+  box-sizing: border-box;
+  border: 4px solid var(--gk-ink);
+  border-radius: 26px;
+  font-size: 56px;
+  background: linear-gradient(180deg, var(--gk-blue), var(--gk-blue-2));
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.5), inset 0 -6px 0 rgba(0, 0, 0, 0.16), 0 6px 0 var(--gk-ink), 0 14px 18px rgba(0, 0, 0, 0.25);
   transform: rotate(-6deg);
   animation: ps-bob 2.4s ease-in-out infinite;
 }
 .ps-hero-cam {
-  font-size: 44px;
+  display: grid;
+  place-items: center;
   line-height: 1;
-  filter: drop-shadow(0 1px 2px rgba(14, 22, 36, 0.3));
 }
 .ps-hero-error {
-  background: var(--orange, #ff7a29);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), inset 0 -8px 0 rgba(163, 59, 0, 0.45);
+  background: linear-gradient(180deg, var(--gk-orange), var(--gk-orange-2));
 }
 .ps-hero-x {
   position: absolute;
-  right: -14px;
-  top: -14px;
+  right: -16px;
+  top: -16px;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  font: 700 30px/1 var(--font-game, sans-serif);
-  padding-top: 5px;
+  width: 44px;
+  height: 44px;
   box-sizing: border-box;
+  border: 3px solid var(--gk-ink);
+  border-radius: 50%;
+  font: 400 30px/1 var(--gk-display);
+  padding-top: 3px;
   color: #fff;
-  background: var(--ps-red);
-  border: 1px solid rgba(28, 36, 51, 0.28);
+  background: linear-gradient(180deg, #ff735c, var(--gk-red-2));
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), 0 3px 0 var(--gk-ink);
 }
 .ps-title {
-  font: 700 clamp(30px, 3.4vw, 40px) / 1.05 var(--font-game, sans-serif);
-  color: var(--ps-ink);
-  margin-top: 4px;
-  padding-top: 4px;
+  font-size: clamp(30px, 3.4vw, 40px);
+  line-height: 1.1;
+  margin-top: 6px;
+  padding: 0 6px;
 }
 .ps-body {
-  margin-top: 8px;
-  font: 700 18px/1.35 var(--font-ui, sans-serif);
-  color: #3f4858;
+  margin-top: 12px;
+  font: 600 18px/1.35 var(--gk-body);
+  color: var(--gk-text);
   max-width: 540px;
 }
 .ps-error-text {
-  padding: 12px 16px 10px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  color: var(--ps-ink);
-  margin-top: 12px;
+  padding: 12px 18px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f4dfae, #fff3d4);
+  box-shadow: inset 0 3px 0 rgba(58, 31, 18, 0.14);
+  margin-top: 14px;
 }
 .ps-moves {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .ps-move {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 4px 7px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  gap: 6px;
+  padding: 10px 4px 9px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffbe9, #f7e3b0);
+  box-shadow: inset 0 3px 0 #fff, 0 4px 0 var(--gk-ink);
   animation: ps-rise 0.35s ease-out both;
 }
 .ps-move:nth-child(2) { animation-delay: 0.08s; }
@@ -283,20 +234,21 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-move-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  border: 3px solid var(--gk-ink);
   border-radius: 50%;
-  font: 800 20px/1 var(--font-ui, sans-serif);
-  color: #fff;
-  background: var(--ps-green);
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  font-size: 26px;
+  background: linear-gradient(180deg, var(--gk-green), var(--gk-green-2));
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.16);
 }
-.ps-move-jog .ps-move-icon { background: #ffe1a8; }
-.ps-move-duck .ps-move-icon { background: var(--orange, #ff7a29); }
-.ps-move-step .ps-move-icon { background: var(--cyan, #29c7e0); }
+.ps-move-jog .ps-move-icon { background: linear-gradient(180deg, #ffd25e, var(--gk-orange-2)); }
+.ps-move-duck .ps-move-icon { background: linear-gradient(180deg, #ff8f6f, var(--gk-red-2)); }
+.ps-move-step .ps-move-icon { background: linear-gradient(180deg, var(--gk-blue), var(--gk-blue-2)); }
 .ps-move-label {
-  font: 800 13px/1 var(--font-ui, sans-serif);
-  color: var(--ps-brown);
+  font: 600 16px/1 var(--gk-body);
+  color: var(--gk-text);
 }
 .ps-privacy {
   display: flex;
@@ -304,53 +256,60 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   gap: 12px;
   width: 100%;
   box-sizing: border-box;
-  margin-top: 14px;
+  margin-top: 16px;
   padding: 10px 16px;
-  border-radius: 10px;
-  background: #e2f7ea;
-  border: 1.5px dashed #2a8c60;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #e7f7c9, #c8ec93);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.6);
   text-align: left;
 }
 .ps-privacy-icon {
-  font-size: 26px;
+  display: grid;
+  font-size: 30px;
 }
 .ps-privacy-text {
-  font: 800 16px/1.3 var(--font-ui, sans-serif);
-  color: #1d6b48;
+  font: 600 16px/1.3 var(--gk-body);
+  color: #2f4d12;
 }
 .ps-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 14px 16px;
-  margin-top: 18px;
+  gap: 16px 18px;
+  margin-top: 22px;
+  padding-bottom: 6px;
 }
 .ps-foot {
-  margin-top: 14px;
-  font: 700 13px/1 var(--font-ui, sans-serif);
-  color: var(--ps-brown);
+  margin-top: 12px;
+  font: 500 15px/1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .ps-spinner {
   position: relative;
   display: grid;
   place-items: center;
-  width: 110px;
-  height: 110px;
+  width: 112px;
+  height: 112px;
   margin: 6px 0 12px;
+  font-size: 48px;
 }
 .ps-spinner::before {
   content: '';
   position: absolute;
   inset: 0;
+  box-sizing: border-box;
   border-radius: 50%;
-  border: 10px solid rgba(28, 36, 51, 0.12);
-  border-top-color: var(--cyan, #29c7e0);
-  border-right-color: var(--gold, #f5c518);
+  border: 14px solid #ecd49a;
+  border-top-color: var(--gk-orange);
+  border-right-color: var(--gk-blue);
+  box-shadow: 0 0 0 3px var(--gk-ink), inset 0 0 0 3px var(--gk-ink);
   animation: ps-spin 0.9s linear infinite;
 }
 .ps-spinner-cam {
-  font-size: 46px;
+  display: grid;
+  place-items: center;
 }
 
 /* ------------------------------------------------------------ picker */
@@ -358,35 +317,49 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-picker {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   text-align: left;
 }
 .ps-picker[hidden] {
   display: none;
 }
 .ps-picker-label {
-  font: 800 12px/1 var(--font-ui, sans-serif);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 15px/1 var(--gk-body);
+  color: var(--gk-text);
+}
+.ps-picker-label .gk-icon {
+  font-size: 18px;
 }
 .ps-select {
   appearance: none;
   cursor: pointer;
   width: 100%;
-  padding: 10px 38px 9px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  font: 800 15px/1.1 var(--font-ui, sans-serif);
-  color: var(--ps-ink);
+  min-height: 44px;
+  padding: 10px 40px 9px 14px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 14px;
+  box-shadow: inset 0 3px 0 rgba(58, 31, 18, 0.14), 0 3px 0 rgba(58, 31, 18, 0.5);
+  font: 600 16px/1.1 var(--gk-body);
+  color: var(--gk-text);
   background:
-    linear-gradient(45deg, transparent 50%, var(--ps-ink) 50%) calc(100% - 20px) 55% / 7px 7px no-repeat,
-    linear-gradient(135deg, var(--ps-ink) 50%, transparent 50%) calc(100% - 14px) 55% / 7px 7px no-repeat,
-    #fff;
+    linear-gradient(45deg, transparent 50%, var(--gk-ink) 50%) calc(100% - 22px) 55% / 8px 8px no-repeat,
+    linear-gradient(135deg, var(--gk-ink) 50%, transparent 50%) calc(100% - 14px) 55% / 8px 8px no-repeat,
+    linear-gradient(180deg, #fff3d4, #fffbe9);
   text-overflow: ellipsis;
+}
+.ps-select:focus-visible {
+  outline: 4px solid #fff;
+  outline-offset: 2px;
 }
 .ps-picker-inline {
   width: 100%;
   margin-top: 16px;
-  color: var(--ps-brown);
+}
+.ps-picker-side .ps-picker-label {
+  color: #ffeec2;
 }
 
 /* ------------------------------------------------------------ calibration */
@@ -394,8 +367,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-calib {
   flex-direction: column;
   align-items: center;
-  background:
-    radial-gradient(ellipse 60% 70% at 50% 52%, rgba(14, 22, 36, 0) 40%, rgba(14, 22, 36, 0.55) 100%);
+  background: radial-gradient(ellipse 60% 70% at 50% 52%, rgba(30, 14, 6, 0) 40%, rgba(30, 14, 6, 0.55) 100%);
 }
 .ps-banner {
   position: absolute;
@@ -405,24 +377,21 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   z-index: 2;
 }
 .ps-banner-tab {
-  text-shadow: 0 1px 10px rgba(14, 22, 36, 0.65), 0 0 2px rgba(14, 22, 36, 0.4);
-  font: 700 clamp(34px, 4.4vw, 58px) / 1 var(--font-game, sans-serif);
+  font-size: clamp(36px, 4.4vw, 58px);
   white-space: nowrap;
-  padding: 0;
-  color: #fff;
-}
-.pose-ui[data-screen='ready'] .ps-banner-tab {
 }
 .ps-banner-sub {
-  font: 800 clamp(16px, 1.6vw, 20px) / 1 var(--font-ui, sans-serif);
-  padding: 8px 18px 6px;
-  border-radius: 8px;
-  background: rgba(14, 22, 36, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  font: 600 clamp(18px, 1.7vw, 22px) / 1 var(--gk-body);
+  padding: 10px 22px 11px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  color: #fff6dc;
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.16), 0 4px 0 var(--gk-ink), 0 10px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* Body outline, sized like the stage video (pip.css .pip.stage): keep the two formulas in sync. */
@@ -449,12 +418,12 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   height: 84%;
   width: 100%;
   overflow: visible;
-  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.35));
+  filter: drop-shadow(0 0 3px rgba(58, 31, 18, 0.85)) drop-shadow(0 0 14px rgba(255, 255, 255, 0.3));
 }
 .ps-sil-shape {
   fill: rgba(255, 255, 255, 0.1);
   stroke: #fff;
-  stroke-width: 3.5;
+  stroke-width: 4;
   stroke-dasharray: 10 7;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
@@ -462,18 +431,18 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   transition: stroke 0.2s, fill 0.2s;
 }
 .pose-ui[data-hint='on'][data-screen='calibrating'] .ps-sil-shape {
-  stroke: var(--ps-amber);
-  fill: rgba(255, 176, 32, 0.1);
+  stroke: var(--gk-orange);
+  fill: rgba(255, 180, 46, 0.12);
 }
 .pose-ui[data-screen='ready'] .ps-sil-shape {
-  stroke: #6ee79a;
+  stroke: #a6f06a;
   stroke-dasharray: none;
-  stroke-width: 5;
-  fill: rgba(110, 231, 154, 0.16);
+  stroke-width: 5.5;
+  fill: rgba(166, 240, 106, 0.16);
   animation: none;
 }
 .pose-ui[data-screen='ready'] .ps-silhouette {
-  filter: drop-shadow(0 0 18px rgba(110, 231, 154, 0.75));
+  filter: drop-shadow(0 0 3px rgba(58, 31, 18, 0.85)) drop-shadow(0 0 18px rgba(130, 230, 70, 0.75));
   animation: ps-glow 1.4s ease-in-out infinite alternate;
 }
 
@@ -484,136 +453,127 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  width: 250px;
+  gap: 18px;
+  width: 292px;
   z-index: 2;
 }
 .ps-checks {
+  --wood-w: 9px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 14px 16px;
+  gap: 9px;
+  padding: 12px 10px 14px;
   border-radius: 24px;
-  background: var(--ps-cream);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 18px 30px rgba(0, 0, 0, 0.3);
-  color: var(--ps-ink);
   animation: ps-slide-in 0.45s 0.1s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .ps-checks-title {
-  font: 800 13px/1 var(--font-ui, sans-serif);
-  color: var(--ps-brown);
-  margin: 0 0 2px 4px;
+  align-self: center;
+  margin: -2px 0 2px;
+  font-size: 22px;
+  padding: 0.3em 1.4em 0.4em;
 }
 .ps-check {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 10px 7px 8px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
+  padding: 7px 10px 7px 7px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffbe9, #f7e3b0);
+  box-shadow: inset 0 3px 0 #fff, 0 3px 0 rgba(58, 31, 18, 0.5);
   transition: background 0.2s;
 }
 .ps-check-icon {
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
+  box-sizing: border-box;
+  border: 3px solid var(--gk-ink);
   border-radius: 50%;
-  font: 800 22px/1 var(--font-ui, sans-serif);
+  font-size: 22px;
   color: #fff;
-  background: #bcc3cf;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  background: linear-gradient(180deg, #d9cdb4, #b3a487);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
 }
 .ps-check-label {
-  font: 800 18px/1 var(--font-ui, sans-serif);
-  padding-top: 2px;
+  font: 600 18px/1 var(--gk-body);
+  color: var(--gk-text);
 }
 .ps-check[data-state='ok'] .ps-check-icon {
-  background: var(--ps-green);
+  background: linear-gradient(180deg, var(--gk-green), var(--gk-green-2));
   animation: ps-pop 0.35s cubic-bezier(0.3, 1.8, 0.5, 1) both;
 }
 .ps-check[data-state='bad'] {
-  background: #ffe8e2;
+  background: linear-gradient(180deg, #ffe4d8, #ffc2ae);
 }
 .ps-check[data-state='bad'] .ps-check-icon {
-  background: var(--ps-red);
+  background: linear-gradient(180deg, #ff735c, var(--gk-red-2));
 }
 .ps-check[data-state='pending'] .ps-check-label {
-  color: #8a94a6;
+  color: var(--gk-text-soft);
 }
 
 .ps-tools {
+  --wood-w: 8px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 10px;
-  background: rgba(14, 22, 36, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  gap: 10px;
+  padding: 10px 8px 14px;
+  border-radius: 22px;
   animation: ps-slide-in 0.45s 0.2s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .ps-chip {
-  appearance: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   width: 100%;
-  padding: 9px 12px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  background: var(--gold, #f5c518);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  color: var(--ps-ink);
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0.35em 0.8em 0.45em 0.55em;
+  font-size: 17px;
   text-align: left;
-  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1);
-}
-.ps-chip:hover {
-  transform: scale(1.03);
-}
-.ps-chip:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .ps-chip-kicker {
-  font: 800 10px/1 var(--font-ui, sans-serif);
-  padding: 4px 7px 3px;
+  flex: none;
+  padding: 0.3em 0.55em 0.25em;
   border-radius: 8px;
-  background: var(--ps-ink);
-  color: var(--gold, #f5c518);
+  font: 400 0.62em/1 var(--gk-display);
+  letter-spacing: 0.06em;
+  color: var(--gk-gold);
+  background: var(--gk-ink);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
 }
 .ps-chip-label {
   flex: 1;
-  font: 800 16px/1 var(--font-ui, sans-serif);
-  padding-top: 2px;
-  white-space: nowrap;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .ps-chip-cycle {
-  font: 800 18px/1 var(--font-ui, sans-serif);
+  display: grid;
+  flex: none;
+  font-size: 22px;
 }
 .ps-tool-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
-.ps-recal-ready,
-.ps-movecheck-ready,
-.ps-lanes-ready {
+.ps-tool-row .gk-btn {
+  width: 100%;
+}
+.pose-ui .ps-recal-ready,
+.pose-ui .ps-movecheck-ready,
+.pose-ui .ps-lanes-ready {
   display: none;
 }
 .pose-ui[data-screen='ready'] .ps-recal-ready,
 .pose-ui[data-screen='ready'] .ps-movecheck-ready:not([hidden]),
 .pose-ui[data-screen='ready'] .ps-lanes-ready:not([hidden]) {
-  display: block;
+  display: inline-flex;
 }
 
-/* Status pill: calibration ring → start-hold ring, plus the message. */
+/* Status plank: calibration ring → start-hold ring, plus the message. */
 .ps-status {
   position: absolute;
   bottom: max(3.5vh, 16px);
@@ -624,29 +584,27 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   gap: 16px;
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
-  padding: 10px 30px 10px 10px;
-  border-radius: 8px;
-  background: rgba(14, 22, 36, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 16px 30px rgba(0, 0, 0, 0.3);
+  padding: 10px 32px 12px 12px;
+  border: 4px solid var(--gk-ink);
+  border-radius: 26px;
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.16), 0 6px 0 var(--gk-ink), 0 18px 28px rgba(0, 0, 0, 0.35);
   z-index: 2;
   animation: ps-rise 0.4s 0.15s ease-out both;
 }
 .pose-ui[data-screen='ready'] .ps-status {
-  background: linear-gradient(180deg, #2fa866, #1d6b48);
+  background: linear-gradient(180deg, var(--gk-green), var(--gk-green-2));
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.45), inset 0 -5px 0 rgba(0, 0, 0, 0.14), 0 6px 0 var(--gk-ink), 0 18px 28px rgba(0, 0, 0, 0.35);
 }
 .ps-message {
-  font: 700 clamp(22px, 2.5vw, 34px) / 1.1 var(--font-game, sans-serif);
-  padding-top: 5px;
-  paint-order: stroke fill;
-  -webkit-text-stroke: 0 var(--ps-ink);
+  font-size: clamp(24px, 2.6vw, 34px);
+  line-height: 1.1;
 }
 .pose-ui[data-hint='on'][data-screen='calibrating'] .ps-message {
-  color: var(--ps-amber);
-  font-size: clamp(26px, 3vw, 42px);
+  color: var(--gk-gold);
+  font-size: clamp(28px, 3vw, 42px);
 }
 .pose-ui[data-hint='on'][data-screen='calibrating'] .ps-status {
-  border-color: var(--ps-amber);
   animation: ps-rise 0.4s 0.15s ease-out both, ps-nudge 1.8s 0.6s ease-in-out infinite;
 }
 .ps-message:empty {
@@ -655,12 +613,12 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-msg-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 .ps-message-sub {
-  font: 800 16px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.85);
+  font: 600 17px/1 var(--gk-body);
+  letter-spacing: 0.03em;
+  color: #ffeec2;
 }
 .ps-message-sub:empty {
   display: none;
@@ -668,8 +626,11 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-ring {
   position: relative;
   flex: none;
-  width: 72px;
-  height: 72px;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #2e170b;
+  box-shadow: 0 0 0 3px var(--gk-ink), inset 0 3px 0 rgba(0, 0, 0, 0.35);
 }
 .ps-ring svg {
   position: absolute;
@@ -679,14 +640,14 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   transform: rotate(-90deg);
 }
 .ps-ring-track {
-  fill: rgba(255, 255, 255, 0.12);
-  stroke: rgba(255, 255, 255, 0.22);
-  stroke-width: 7;
+  fill: none;
+  stroke: rgba(255, 238, 194, 0.18);
+  stroke-width: 8;
 }
 .ps-ring-arc {
   fill: none;
-  stroke: var(--gold, #f5c518);
-  stroke-width: 7;
+  stroke: var(--gk-gold);
+  stroke-width: 8;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.12s linear;
 }
@@ -695,15 +656,18 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   inset: 0;
   display: grid;
   place-items: center;
-  font: 700 19px/1 var(--font-game, sans-serif);
-  padding-top: 4px;
+  font: 400 20px/1 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.14em var(--gk-ink);
+  paint-order: stroke fill;
+  padding-top: 3px;
   box-sizing: border-box;
 }
 .ps-ring-start {
   display: none;
 }
 .ps-ring-start .ps-ring-core {
-  font-size: 34px;
+  font-size: 38px;
   padding-top: 0;
 }
 .ps-ring-start .ps-ring-arc {
@@ -717,7 +681,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 }
 .pose-ui[data-screen='ready'][data-holding='off'] .ps-ring-start .ps-ring-core {
   animation: ps-wave 1.2s ease-in-out infinite;
-  transform-origin: 70% 90%;
+  transform-origin: 50% 90%;
 }
 .pose-ui[data-holding='on'] .ps-ring-start {
   transform: scale(1.12);
@@ -735,29 +699,30 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font: 700 clamp(22px, 2.6vw, 34px) / 1 var(--font-game, sans-serif);
-  padding: 16px 32px 11px;
-  border-radius: 8px;
-  color: var(--gold, #f5c518);
-  background: rgba(14, 22, 36, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 14px 28px rgba(0, 0, 0, 0.35);
+  font: 400 clamp(24px, 2.6vw, 34px) / 1 var(--gk-display);
+  padding: 14px 32px 16px;
+  border: 4px solid var(--gk-ink);
+  border-radius: 24px;
+  color: var(--gk-gold);
+  -webkit-text-stroke: 0.14em var(--gk-ink);
   paint-order: stroke fill;
-  -webkit-text-stroke: 0 var(--ps-ink);
+  text-shadow: 0 0.06em 0 var(--gk-ink);
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.16), 0 6px 0 var(--gk-ink), 0 16px 26px rgba(0, 0, 0, 0.35);
   animation: ps-rise 0.4s 0.9s ease-out both;
 }
 .ps-again:empty {
   display: none;
 }
-.ps-recal {
+.pose-ui .ps-recal {
   position: absolute;
   right: 18px;
-  bottom: max(18px, env(safe-area-inset-bottom));
+  bottom: max(22px, env(safe-area-inset-bottom));
   display: none;
 }
 .pose-ui[data-recal='on'][data-game='summary'] .ps-recal,
 .pose-ui[data-recal='on'][data-game='paused'] .ps-recal {
-  display: block;
+  display: inline-flex;
 }
 
 /* ------------------------------------------------------------ toasts */
@@ -771,13 +736,13 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   gap: 10px;
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
-  padding: 9px 20px 8px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 10px 22px rgba(0, 0, 0, 0.3);
-  color: var(--ps-ink);
-  background: var(--ps-amber);
-  transform: translate(-50%, -160%);
+  padding: 8px 22px 9px 10px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), 0 4px 0 var(--gk-ink), 0 12px 20px rgba(0, 0, 0, 0.3);
+  color: var(--gk-text);
+  background: linear-gradient(180deg, #ffd25e, var(--gk-orange));
+  transform: translate(-50%, -190%);
   opacity: 0;
   transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1), opacity 0.2s;
   z-index: 5;
@@ -788,7 +753,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   opacity: 1;
 }
 .ps-toast[data-level='stalled'] {
-  background: var(--ps-red);
+  background: linear-gradient(180deg, #ff735c, var(--gk-red-2));
   color: #fff;
 }
 .ps-toast[data-level='stalled'] .ps-toast-icon {
@@ -799,7 +764,7 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .pose-ui[data-screen='ready'] .ps-toast {
   left: max(16px, env(safe-area-inset-left));
   max-width: min(420px, calc(100vw - 32px));
-  transform: translate(0, -160%);
+  transform: translate(0, -190%);
 }
 .pose-ui[data-screen='calibrating'] .ps-toast[data-level='slow'],
 .pose-ui[data-screen='calibrating'] .ps-toast[data-level='stalled'],
@@ -811,9 +776,9 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   /* Narrow: centred again, just under the (smaller) banner. */
   .pose-ui[data-screen='calibrating'] .ps-toast,
   .pose-ui[data-screen='ready'] .ps-toast {
-    top: 64px;
+    top: 80px;
     left: 50%;
-    transform: translate(-50%, -160%);
+    transform: translate(-50%, -190%);
   }
   .pose-ui[data-screen='calibrating'] .ps-toast[data-level='slow'],
   .pose-ui[data-screen='calibrating'] .ps-toast[data-level='stalled'],
@@ -825,16 +790,13 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 .ps-toast-icon {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #fff;
-  font-size: 18px;
+  width: 34px;
+  height: 34px;
+  font-size: 28px;
   flex: none;
 }
 .ps-toast-text {
-  font: 800 17px/1.1 var(--font-ui, sans-serif);
-  padding-top: 2px;
+  font: 600 17px/1.15 var(--gk-body);
 }
 
 /* ------------------------------------------------------------ narrow screens */
@@ -845,18 +807,19 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   }
   .ps-side {
     top: auto;
-    bottom: calc(max(3.5vh, 16px) + 96px);
+    bottom: calc(max(3.5vh, 16px) + 104px);
     right: 50%;
     transform: translateX(50%);
-    width: min(420px, calc(100vw - 32px));
+    width: min(440px, calc(100vw - 32px));
   }
   .ps-checks {
+    --wood-w: 7px;
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
     gap: 6px;
     padding: 8px;
-    border-radius: 10px;
+    border-radius: 18px;
   }
   .ps-checks-title,
   .ps-tools {
@@ -864,21 +827,20 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   }
   .ps-check {
     gap: 6px;
-    padding: 4px 10px 3px 4px;
-    border-radius: 8px;
+    padding: 4px 10px 4px 4px;
   }
   .ps-check-icon {
-    width: 26px;
-    height: 26px;
-    font-size: 16px;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
   }
   .ps-check-label {
-    font-size: 14px;
+    font-size: 15px;
   }
   .ps-status {
     width: max-content;
     max-width: calc(100vw - 24px);
-    padding-right: 20px;
+    padding-right: 22px;
   }
   .ps-message {
     font-size: clamp(18px, 5vw, 26px);
@@ -901,57 +863,61 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
     gap: 4px;
   }
   .ps-banner-tab {
-    font-size: 26px;
-    padding: 10px 22px 5px;
-    border-width: 4px;
+    font-size: 28px;
   }
   .ps-banner-sub {
     display: none;
   }
   .ps-side {
-    top: 12px;
+    top: 8px;
     transform: none;
     gap: 8px;
-    width: 220px;
+    width: 232px;
   }
   .ps-checks {
     gap: 5px;
     padding: 8px 8px 10px;
   }
+  .ps-checks-title {
+    font-size: 17px;
+  }
   .ps-check {
-    padding: 4px 8px 3px 4px;
+    padding: 3px 8px 3px 3px;
   }
   .ps-check-icon {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     font-size: 16px;
   }
   .ps-check-label {
     font-size: 15px;
   }
   .ps-tools {
-    gap: 8px;
-    padding: 8px;
+    gap: 6px;
+    padding: 6px 6px 10px;
+  }
+  .ps-tool-row {
+    gap: 6px;
   }
   .ps-status {
-    bottom: 8px;
-    padding: 6px 20px 6px 6px;
+    bottom: 10px;
+    padding: 6px 22px 8px 6px;
     gap: 10px;
     border-width: 3px;
   }
   .ps-ring {
-    width: 52px;
-    height: 52px;
+    width: 54px;
+    height: 54px;
   }
   .ps-ring-start .ps-ring-core {
-    font-size: 26px;
+    font-size: 28px;
   }
   .ps-message,
   .pose-ui[data-hint='on'][data-screen='calibrating'] .ps-message {
     font-size: 22px;
   }
   .ps-message-sub {
-    font-size: 13px;
+    font-size: 15px;
   }
 }
 @media (max-height: 520px) {
@@ -971,10 +937,10 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
 }
 @media (max-width: 560px) {
   .ps-card {
-    padding: 44px 18px 20px;
+    padding: 44px 16px 20px;
   }
   .ps-card-tab {
-    font-size: 28px;
+    font-size: 24px;
   }
   .ps-moves {
     grid-template-columns: repeat(2, 1fr);
@@ -983,8 +949,8 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
     padding-right: 18px;
   }
   .ps-ring {
-    width: 56px;
-    height: 56px;
+    width: 58px;
+    height: 58px;
   }
   .ps-again,
   .ps-banner-tab {
@@ -1030,8 +996,8 @@ html[data-pose-screen='cameraStarting'] .hud-paused {
   to { stroke-dashoffset: -34; }
 }
 @keyframes ps-glow {
-  from { filter: drop-shadow(0 0 10px rgba(110, 231, 154, 0.5)); }
-  to { filter: drop-shadow(0 0 26px rgba(110, 231, 154, 0.95)); }
+  from { filter: drop-shadow(0 0 3px rgba(58, 31, 18, 0.85)) drop-shadow(0 0 10px rgba(130, 230, 70, 0.5)); }
+  to { filter: drop-shadow(0 0 3px rgba(58, 31, 18, 0.85)) drop-shadow(0 0 26px rgba(130, 230, 70, 0.95)); }
 }
 @keyframes ps-nudge {
   0%, 100% { scale: 1; }

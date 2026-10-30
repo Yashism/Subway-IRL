@@ -350,7 +350,7 @@ describe('ShopScreen', () => {
     document.body.append(other);
     const shop = new ShopScreen(other, { buy: vi.fn(), equip: vi.fn(), close });
     shop.update(model());
-    (other.querySelector('.sh-actions .ms-btn') as HTMLButtonElement).click();
+    (other.querySelector('.sh-actions .sh-back') as HTMLButtonElement).click();
     expect(close).toHaveBeenCalledOnce();
   });
 

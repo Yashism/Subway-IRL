@@ -7,12 +7,13 @@
  * Calories are always labelled a rough estimate and always name the weight they assumed; the game
  * never asks anyone to weigh themselves to look at their own runs.
  */
-import './settings.css';
 import './workout.css';
 import { ASSUMED_WEIGHT_KG, activeMinutes, calories, formatCount, formatDistance, formatDuration, relativeDay, workoutStats, type RecentRun, type WorkoutStats } from '../app/stats';
 import { dayKey, type Profile } from '../app/profile';
 import { MODE_NAMES } from '../app/settings';
 import { button, el } from './settings';
+import { glyph } from './glyphs';
+import { icon } from './icons';
 
 // ---------------------------------------------------------------- pure view helpers
 
@@ -100,21 +101,21 @@ export class WorkoutScreen {
     if (this.mounted) return;
     this.mounted = true;
     const root = this.root;
-    root.classList.add('sw-screen', 'wk-screen');
+    root.classList.add('wk-screen');
     this.attr(root, 'data-on', 'off');
     this.attr(root, 'data-empty', 'no');
 
-    const top = el('div', 'sw-top', root);
-    el('div', 'sw-tab wk-tab', top, 'Your runs');
-    el('div', 'sw-tab-sub', top, 'Everything you have actually moved');
+    const top = el('div', 'wk-top', root);
+    el('div', 'wk-tab gk-title', top, 'Your runs');
+    el('div', 'wk-tab-sub', top, 'Everything you have actually moved');
 
     // ---- the first-run invitation (shown instead of everything below)
-    const invite = el('div', 'wk-invite', root);
-    el('div', 'wk-invite-icon', invite, '🏃');
-    el('div', 'wk-invite-title', invite, 'Nothing here yet');
+    const invite = el('div', 'wk-invite gk-panel', root);
+    el('div', 'wk-invite-icon', invite).innerHTML = glyph('run');
+    el('div', 'wk-invite-title gk-title', invite, 'Nothing here yet');
     el('div', 'wk-invite-body', invite, 'Jog in place to keep the train moving. One run and this page fills up: minutes, steps, distance, a streak to keep.');
-    const inviteActions = el('div', 'sw-actions wk-invite-actions', invite);
-    button(inviteActions, 'sw-btn sw-btn-go sw-btn-wide', 'Run your first', () => this.handlers.startRun());
+    const inviteActions = el('div', 'wk-invite-actions', invite);
+    this.btn(inviteActions, 'gk-btn gk-btn-green gk-btn-lg', 'Run your first', () => this.handlers.startRun(), icon('play'));
 
     /*
      * Two columns that each start at the top: "now" on the left (today, this week) and the record
@@ -126,7 +127,7 @@ export class WorkoutScreen {
     const record = el('div', 'wk-col', grid);
 
     // ---- today
-    const today = this.card(now, 'wk-card-today', 'Today');
+    const today = this.card(now, 'wk-card-today', 'Today', 'green');
     const hero = el('div', 'wk-hero', today);
     this.todayMinutes = el('div', 'wk-hero-num', hero);
     const heroText = el('div', 'wk-hero-text', hero);
@@ -141,10 +142,10 @@ export class WorkoutScreen {
     };
 
     // ---- this week
-    const week = this.card(now, 'wk-card-week', 'This week');
+    const week = this.card(now, 'wk-card-week', 'This week', 'gold');
     const streak = el('div', 'wk-streak', week);
     const flame = el('div', 'wk-streak-badge', streak);
-    el('span', 'wk-streak-flame', flame, '🔥');
+    el('span', 'wk-streak-flame', flame).innerHTML = glyph('flame');
     this.streakNum = el('span', 'wk-streak-num', flame);
     const streakText = el('div', 'wk-streak-text', streak);
     this.streakLine = el('div', 'wk-streak-words', streakText);
@@ -165,7 +166,7 @@ export class WorkoutScreen {
     this.weekCals = el('div', 'wk-cals', weekFoot);
 
     // ---- all time
-    const all = this.card(record, 'wk-card-all', 'All time');
+    const all = this.card(record, 'wk-card-all', 'All time', 'blue');
     const allTiles = el('div', 'wk-tiles wk-tiles-all', all);
     this.allTiles = {
       runs: this.tile(allTiles, 'Runs'),
@@ -180,17 +181,17 @@ export class WorkoutScreen {
     };
 
     // ---- recent runs
-    const recent = this.card(record, 'wk-card-recent', 'Recent runs');
+    const recent = this.card(record, 'wk-card-recent', 'Recent runs', 'red');
     this.list = el('div', 'wk-list', recent);
     this.listEmpty = el('div', 'wk-list-empty', recent, 'No runs yet.');
 
     // ---- footer
-    const foot = el('div', 'sw-foot', root);
+    const foot = el('div', 'wk-foot', root);
     // Hidden when the screen is empty: the invitation card already owns the call to action there,
     // and "Run again" is the wrong word for someone who has not run once.
-    button(foot, 'sw-btn sw-btn-go sw-btn-wide wk-foot-run', 'Run again', () => this.handlers.startRun());
-    button(foot, 'sw-btn sw-btn-ghost', '⚙ Settings', () => this.handlers.openSettings());
-    button(foot, 'sw-btn sw-btn-ghost', 'Done', () => this.handlers.close());
+    this.btn(foot, 'gk-btn gk-btn-green gk-btn-lg wk-foot-run', 'Run again', () => this.handlers.startRun(), icon('play'));
+    this.btn(foot, 'gk-btn gk-btn-blue', 'Settings', () => this.handlers.openSettings(), icon('gear'));
+    this.btn(foot, 'gk-btn gk-btn-cream', 'Done', () => this.handlers.close(), icon('check'));
   }
 
   /** Renders one view; `open: false` (or null) hides the layer. */
@@ -218,7 +219,7 @@ export class WorkoutScreen {
     this.root.replaceChildren();
     this.lastText.clear();
     this.attrs.clear();
-    this.root.classList.remove('sw-screen', 'wk-screen');
+    this.root.classList.remove('wk-screen');
     delete this.root.dataset.on;
     delete this.root.dataset.empty;
     this.mounted = false;
@@ -303,9 +304,17 @@ export class WorkoutScreen {
     }
   }
 
-  private card(parent: Element, cls: string, title: string): HTMLElement {
-    const c = el('div', `wk-card ${cls}`, parent);
-    el('div', 'wk-card-title', c, title);
+  /** A kit button (`wk-btn` so the screen can find it), with an icon in front of the label. */
+  private btn(parent: Element, cls: string, label: string, onClick: () => void, lead: string): HTMLButtonElement {
+    const b = button(parent, `wk-btn ${cls}`, label, onClick);
+    b.insertAdjacentHTML('afterbegin', lead);
+    return b;
+  }
+
+  /** A wood-framed card; its ribbon title straddles the top edge. */
+  private card(parent: Element, cls: string, title: string, ribbon: 'red' | 'blue' | 'green' | 'gold'): HTMLElement {
+    const c = el('div', `wk-card gk-panel ${cls}`, parent);
+    el('div', `wk-card-title gk-ribbon${ribbon === 'red' ? '' : ` gk-ribbon-${ribbon}`}`, c, title);
     return el('div', 'wk-card-body', c);
   }
 

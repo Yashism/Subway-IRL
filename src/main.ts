@@ -218,6 +218,7 @@ const hud = new Hud(document.getElementById('hud')!, {
   onPlay: () => loop.dispatch({ type: 'startPressed' }),
   onSettings: () => setOverlay('settings'),
   onWorkout: () => setOverlay('workout'),
+  onShop: () => setOverlay('shop'),
   onToggleSound: () => toggleSound(),
   onWander: () => void enterWander(),
 });
@@ -241,6 +242,31 @@ const laneLayer = new LaneSetupScreen(laneRoot, lanes.handlers);
 const pip = new PosePip(pipRoot, { visible: pipVisibleFromUrl(location.search) });
 pip.attachToggleKey(window);
 runtime.sampleLuma = (t) => pip.sampleLuma(t);
+// Frame budget. On a 120 Hz screen the world would be drawn twice per game step at twice the GPU
+// cost, on the same iGPU the pose model runs on, so "Balanced" caps at ~60 fps and lowers the render
+// resolution when frames run long. "High quality" (Settings > Picture > Graphics) turns both off.
+// ?fps=N / ?fps=0 and ?scale=off still override either choice for a session.
+const fpsParam = Number(params.get('fps'));
+const fpsOverride = params.has('fps') && Number.isFinite(fpsParam) ? (fpsParam > 0 ? 1000 / fpsParam - 3 : 0) : null;
+const scaleOverride = params.has('scale') ? flagOn('scale') : null;
+const limiter = new FrameLimiter(13);
+const renderScale = new RenderScale();
+let adaptiveScale = true;
+
+/** Puts the Graphics setting in force: the frame cap and whether the resolution adapts. */
+function applyQuality(q: GameSettings['quality']): void {
+  const high = q === 'high';
+  limiter.setMinMs(fpsOverride ?? (high ? 0 : 13));
+  const adaptive = scaleOverride ?? !high;
+  if (adaptive !== adaptiveScale) {
+    // Either way the picture starts again from full sharpness: leaving the adaptive mode must not
+    // leave it soft, and re-entering it must not resume from a stale step.
+    renderScale.reset();
+    world.setRenderScale(1);
+    adaptiveScale = adaptive;
+  }
+}
+
 applySettings(settings);
 
 // ---------------------------------------------------------------- progression, missions, the shop
@@ -254,7 +280,6 @@ const runs = new RunSession({ progression, profile, saveRuns });
 
 const missionBoard = new MissionBoard(hud.menuPanel, {
   onPlayDaily: () => startDaily(),
-  onShop: () => setOverlay('shop'),
 });
 
 // ---------------------------------------------------------------- full-screen overlays
@@ -416,6 +441,7 @@ function exportData(): void {
 function applySettings(next: GameSettings): void {
   settings = next;
   setOutlineStrength(next.outlines);
+  applyQuality(next.quality);
   applyLiveSettings(
     // A recorded session replays with the sensitivity, and the track, it was played with.
     {
@@ -1055,12 +1081,6 @@ function skippedMoves(): string[] {
 // ---------------------------------------------------------------- frame loop
 
 let last = performance.now();
-// On a 120 Hz screen the world would be drawn twice as often as the game steps, at twice the GPU
-// cost, on the same iGPU the pose model runs on. ?fps=0 draws every refresh; ?scale=off keeps the
-// render resolution fixed.
-const fpsParam = Number(params.get('fps'));
-const limiter = new FrameLimiter(params.has('fps') && Number.isFinite(fpsParam) ? (fpsParam > 0 ? 1000 / fpsParam - 3 : 0) : 13);
-const renderScale = flagOn('scale') || !params.has('scale') ? new RenderScale() : null;
 function frame(now: number): void {
   if (!limiter.accept(now)) {
     requestAnimationFrame(frame);
@@ -1068,8 +1088,8 @@ function frame(now: number): void {
   }
   const dt = Math.max(0, (now - last) / 1000);
   last = now;
-  const scaled = renderScale?.update(dt * 1000);
-  if (scaled !== null && scaled !== undefined) world.setRenderScale(scaled);
+  const scaled = adaptiveScale ? renderScale.update(dt * 1000) : null;
+  if (scaled !== null) world.setRenderScale(scaled);
   if (wander?.active) {
     wanderFrame(now, dt);
     requestAnimationFrame(frame);

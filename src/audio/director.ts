@@ -455,7 +455,8 @@ export class Director {
     this.state = frame.state;
     switch (frame.state) {
       case 'countdown':
-        this.beepAt = 4;
+        // No beeps: the run starts after a beat, not a 3-2-1 (the "go" still lands on the state change).
+        this.beepAt = 0;
         break;
       case 'playing':
         if (from === 'countdown') this.emit('go', 0.85, 1);

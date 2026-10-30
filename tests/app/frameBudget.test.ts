@@ -47,6 +47,14 @@ describe('FrameLimiter', () => {
     expect(fastest).toBeGreaterThanOrEqual(13);
   });
 
+  it('can be switched to draw every frame, and back, while running', () => {
+    const l = new FrameLimiter();
+    l.setMinMs(0);
+    expect(drawn(l, 4, 50)).toBe(50);
+    l.setMinMs(13);
+    expect(drawn(new FrameLimiter(13), 1000 / 120, 120)).toBe(60);
+  });
+
   it('draws everything when switched off, and survives a clock that goes backwards', () => {
     expect(drawn(new FrameLimiter(0), 4, 100)).toBe(100);
     const l = new FrameLimiter();
@@ -113,6 +121,15 @@ describe('RenderScale', () => {
     // The first probe waited 8 s; the next one must wait longer than that.
     expect(run(s, 16.7, 12)).toEqual([]);
     expect(run(s, 16.7, 12).length).toBe(1);
+  });
+
+  it('goes back to full resolution, with no history, on reset', () => {
+    const s = new RenderScale();
+    run(s, 30, 4);
+    expect(s.scale).toBeLessThan(1);
+    s.reset();
+    expect(s.scale).toBe(1);
+    expect(run(s, 16.7, 20)).toEqual([]);
   });
 
   it('ignores nonsense', () => {

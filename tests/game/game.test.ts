@@ -11,6 +11,8 @@ const EMPTY: ChunkDef[] = [{ id: 'empty', tier: 0, obstacles: [], coins: [] }];
 const KEYBOARD: ActivityStatus = { tracksJogging: false, msSinceStep: Infinity, cadenceSpm: 0, steps: 0, squatting: false, lost: false };
 const STILL: ActivityStatus = { ...KEYBOARD, tracksJogging: true };
 const JOGGING: ActivityStatus = { ...STILL, msSinceStep: 0, cadenceSpm: 150 };
+/** Frames between pressing start and the first step of play. */
+const COUNTDOWN_STEPS = Math.round(TUNING.countdownSeconds * TUNING.stepHz);
 
 function steps(g: Game, n: number, cmds: GameCommand[] = [], a: ActivityStatus = KEYBOARD): GameEvent[] {
   const events: GameEvent[] = [];
@@ -21,7 +23,7 @@ function steps(g: Game, n: number, cmds: GameCommand[] = [], a: ActivityStatus =
 function playing(opts: Partial<GameOptions> = {}, a: ActivityStatus = KEYBOARD): Game {
   const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY, ...opts });
   steps(g, 1, [{ type: 'start' }], a);
-  steps(g, 180, [], a);
+  steps(g, COUNTDOWN_STEPS, [], a);
   expect(g.state).toBe('playing');
   return g;
 }
@@ -39,14 +41,14 @@ function stepTo(g: Game, s: number, a: ActivityStatus = KEYBOARD) {
 }
 
 describe('Game states', () => {
-  it('goes from menu through a 3 s countdown into play', () => {
+  it('goes from menu through a short countdown into play', () => {
     const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
     expect(g.state).toBe('menu');
     steps(g, 10);
     expect(g.state).toBe('menu');
     const ev = steps(g, 1, [{ type: 'start' }]);
     expect(ev).toContainEqual({ type: 'state', state: 'countdown' });
-    steps(g, 179);
+    steps(g, COUNTDOWN_STEPS - 1);
     expect(g.state).toBe('countdown');
     steps(g, 1);
     expect(g.state).toBe('playing');
@@ -63,7 +65,7 @@ describe('Game states', () => {
     expect(g.state).toBe('paused');
     steps(g, 1);
     expect(g.state).toBe('countdown');
-    steps(g, 180);
+    steps(g, COUNTDOWN_STEPS);
     expect(g.state).toBe('playing');
   });
 

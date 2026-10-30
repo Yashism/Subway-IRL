@@ -1,7 +1,8 @@
 /*
- * Move Check — the guided move rehearsal.
- * Same visual language as poseScreens.css: chunky cream cards, 5px ink borders, hard drop
- * shadows, Luckiest Guy headings. Tokens come from hud.css (--ink, --gold, --font-game…).
+ * Move Check — the guided move rehearsal, in the game kit's look (kit.css): a warm scrim, big
+ * outlined lettering, a wood-framed cream card, a chunky strength bar and glossy buttons (the
+ * .gk-btn classes are added in moveCheckScreen.ts). The lane-spots setup (laneSetup.css) builds
+ * on the same classes.
  */
 
 /*
@@ -9,13 +10,10 @@
  * the pause screen shows as "Controls", and outside this layer it would otherwise have no colours.
  */
 :root {
-  --mc-ink: var(--ink, #1c2433);
-  --mc-cream: #f6f7f4;
-  --mc-cream-2: #e9ecef;
-  --mc-brown: #5b6577;
-  --mc-green: var(--green, #3fb27f);
-  --mc-amber: #ffb020;
-  --mc-grey: #bcc3cf;
+  --mc-ink: var(--gk-ink, #3a1f12);
+  --mc-cream: var(--gk-cream, #fff3d4);
+  --mc-brown: var(--gk-text-soft, #8a5a36);
+  --mc-green: var(--gk-green, #6fcf3a);
 }
 
 .move-check {
@@ -27,13 +25,13 @@
   justify-content: safe center;
   gap: clamp(10px, 1.8vh, 22px);
   box-sizing: border-box;
-  padding: clamp(12px, 2.4vh, 34px) 16px clamp(12px, 2vh, 26px);
+  padding: clamp(12px, 2.4vh, 34px) 16px clamp(14px, 2.4vh, 30px);
   overflow-y: auto;
   pointer-events: auto;
   color: #fff;
   user-select: none;
-  font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
-  background: radial-gradient(ellipse at 50% 45%, rgba(14, 22, 36, 0.6), rgba(14, 22, 36, 0.92));
+  font-family: var(--gk-body, 'Fredoka', system-ui, sans-serif);
+  background: radial-gradient(ellipse at 50% 45%, rgba(48, 24, 10, 0.55), rgba(30, 14, 6, 0.9));
   z-index: 4;
 }
 .move-check[data-on='on'] {
@@ -42,59 +40,23 @@
 
 /* ------------------------------------------------------------ buttons */
 
-.mc-btn {
-  appearance: none;
-  cursor: pointer;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  border-radius: 8px;
-  padding: 13px 28px 10px;
-  font: 800 clamp(15px, 1.2vw, 19px) / 1 var(--font-ui, sans-serif);
-  color: var(--mc-ink);
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-  transition: transform 0.12s cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 0.12s;
-  white-space: nowrap;
-}
+/* The look is the kit's (.gk-btn); this is only the row they sit in. */
 .mc-btn[hidden] {
   display: none;
-}
-.mc-btn:hover {
-  transform: translateY(-2px) scale(1.03);
-}
-.mc-btn:active {
-  transform: translateY(4px);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-}
-.mc-btn:focus-visible {
-  outline: 2px solid var(--blue, #2c5d9e);
-  outline-offset: 2px;
-}
-.mc-btn-accept {
-  color: var(--mc-ink);
-  background: var(--gold, #f5c518);
-}
-.mc-btn-ghost {
-  color: #fff;
-  background: rgba(14, 22, 36, 0.55);
-  border-color: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
-}
-.mc-btn-go {
-  color: #fff;
-  font: 700 clamp(24px, 2.4vw, 34px) / 1 var(--font-game, 'Barlow Condensed', sans-serif);
-  padding: 16px 40px 11px;
-  background: var(--mc-green);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
 }
 .mc-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 12px 14px;
+  gap: 14px 18px;
   /* Reserved: the skip buttons appear mid-step and must not shove the card. */
-  min-height: 62px;
+  min-height: 66px;
+  padding-bottom: 6px;
   flex: none;
+}
+.mc-actions .gk-btn-sm {
+  min-height: 44px;
 }
 
 /* ------------------------------------------------------------ banner + step dots */
@@ -110,23 +72,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 .mc-banner-tab {
-  text-shadow: 0 1px 10px rgba(14, 22, 36, 0.65), 0 0 2px rgba(14, 22, 36, 0.4);
-  font: 700 clamp(28px, 3.4vw, 50px) / 1 var(--font-game, sans-serif);
+  font-size: clamp(34px, 3.8vw, 54px);
   white-space: nowrap;
-  padding: 0;
-  color: #fff;
-}
-.move-check[data-phase='summary'] .mc-banner-tab {
 }
 .mc-banner-sub {
-  font: 800 clamp(14px, 1.4vw, 19px) / 1 var(--font-ui, sans-serif);
-  padding: 8px 18px 6px;
-  border-radius: 8px;
-  background: rgba(14, 22, 36, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  font: 600 clamp(17px, 1.5vw, 21px) / 1 var(--gk-body);
+  padding: 9px 20px 10px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  color: #fff6dc;
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.16), 0 4px 0 var(--gk-ink), 0 10px 16px rgba(0, 0, 0, 0.3);
 }
 
 .mc-dots {
@@ -140,38 +99,40 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  width: clamp(52px, 6.4vw, 92px);
+  gap: 7px;
+  width: clamp(58px, 6.4vw, 92px);
 }
 .mc-dot-mark {
   display: grid;
   place-items: center;
-  width: clamp(32px, 2.6vw, 44px);
-  height: clamp(32px, 2.6vw, 44px);
+  width: clamp(38px, 3vw, 48px);
+  height: clamp(38px, 3vw, 48px);
+  border: 3px solid var(--gk-ink);
   border-radius: 50%;
   box-sizing: border-box;
-  font: 800 clamp(15px, 1.3vw, 20px) / 1 var(--font-ui, sans-serif);
-  color: var(--mc-ink);
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  padding-top: 2px;
+  font: 400 clamp(18px, 1.5vw, 23px) / 1 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.14em var(--gk-ink);
+  paint-order: stroke fill;
+  background: linear-gradient(180deg, #8a6a52, #5b3a24);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), 0 3px 0 var(--gk-ink);
   transition: background 0.2s, transform 0.2s;
 }
 .mc-dot-label {
-  font: 800 clamp(10px, 0.8vw, 13px) / 1.1 var(--font-ui, sans-serif);
+  font: 600 clamp(14px, 1vw, 16px) / 1.1 var(--gk-body);
   text-align: center;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 238, 194, 0.7);
+  text-shadow: 0 2px 0 var(--gk-ink);
 }
 .mc-dot[data-status='done'] .mc-dot-mark {
-  background: var(--mc-green);
-  color: #fff;
+  background: linear-gradient(180deg, var(--gk-green), var(--gk-green-2));
 }
 .mc-dot[data-status='skipped'] .mc-dot-mark {
-  background: var(--mc-grey);
-  color: #fff;
+  background: linear-gradient(180deg, #d9cdb4, #a89878);
 }
 .mc-dot[data-status='active'] .mc-dot-mark {
-  background: var(--gold, #f5c518);
+  background: linear-gradient(180deg, #ffe873, var(--gk-orange-2));
   transform: scale(1.18);
   animation: mc-pulse 1.4s ease-in-out infinite;
 }
@@ -183,17 +144,13 @@
 /* ------------------------------------------------------------ the active step card */
 
 .mc-card {
+  --wood-w: 12px;
   display: flex;
   align-items: stretch;
   gap: clamp(16px, 2.4vw, 36px);
   width: min(980px, 96vw);
   box-sizing: border-box;
   padding: clamp(18px, 2.4vh, 30px) clamp(18px, 2.2vw, 34px);
-  border-radius: 14px;
-  background: var(--mc-cream);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 30px 60px rgba(0, 0, 0, 0.45);
-  color: var(--mc-ink);
   flex: none;
   animation: mc-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
@@ -214,15 +171,16 @@
   gap: clamp(10px, 1.6vh, 20px);
 }
 .mc-move-name {
-  font: 700 clamp(30px, 3.6vw, 56px) / 1.02 var(--font-game, sans-serif);
-  padding-top: 4px;
-  color: var(--mc-ink);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font: 400 clamp(36px, 3.8vw, 58px) / 1.02 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.16em var(--gk-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.06em 0 var(--gk-ink);
 }
 .mc-how {
-  margin-top: 6px;
-  font: 800 clamp(16px, 1.5vw, 23px) / 1.3 var(--font-ui, sans-serif);
-  color: #3f4858;
+  margin-top: 8px;
+  font: 600 clamp(18px, 1.5vw, 24px) / 1.3 var(--gk-body);
+  color: var(--gk-text);
 }
 
 .mc-jog {
@@ -234,23 +192,26 @@
   display: none;
 }
 .mc-jog-count {
-  font: 800 clamp(13px, 1.1vw, 16px) / 1 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 clamp(15px, 1.2vw, 18px) / 1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .mc-jog-pips {
   display: flex;
-  gap: 7px;
+  gap: 8px;
 }
 .mc-jog-pip {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 3px solid var(--gk-ink);
   border-radius: 50%;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
+  background: linear-gradient(180deg, #c9b693, #e8dac0);
+  box-shadow: inset 0 2px 0 rgba(58, 31, 18, 0.2);
   transition: background 0.2s;
 }
 .mc-jog-pip[data-on='on'] {
-  background: var(--mc-green);
+  background: linear-gradient(180deg, var(--gk-green), var(--gk-green-2));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5);
   animation: mc-pop 0.3s cubic-bezier(0.3, 1.8, 0.5, 1) both;
 }
 
@@ -263,47 +224,61 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 .mc-strength-title,
 .mc-strength-goal {
-  font: 800 clamp(11px, 0.9vw, 14px) / 1 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 clamp(15px, 1.1vw, 17px) / 1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .mc-strength-value {
   margin-right: auto;
-  font: 700 clamp(18px, 1.7vw, 26px) / 1 var(--font-game, sans-serif);
-  color: var(--mc-ink);
+  font: 400 clamp(22px, 1.9vw, 30px) / 1 var(--gk-display);
+  color: var(--gk-text);
 }
 .mc-bar {
   position: relative;
-  height: clamp(24px, 2.6vh, 36px);
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: inset 0 1px 2px rgba(14, 22, 36, 0.3);
+  box-sizing: border-box;
+  height: clamp(30px, 3.2vh, 40px);
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #c9b693, #e8dac0);
+  box-shadow: inset 0 3px 0 rgba(58, 31, 18, 0.22), 0 3px 0 rgba(58, 31, 18, 0.45);
 }
 .mc-bar-fill {
+  position: relative;
   width: 0;
   height: 100%;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #ffc8a8, var(--orange, #ff7a29) 60%, #c24e00);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffb27a, var(--gk-orange-2));
+  box-shadow: inset 0 0 0 2px rgba(58, 31, 18, 0.35);
   transition: width 0.18s ease-out, background 0.2s;
 }
+/* The gloss along the top of the fill. */
+.mc-bar-fill::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  height: 32%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
+}
 .mc-bar[data-level='near'] .mc-bar-fill {
-  background: var(--gold, #f5c518);
+  background: linear-gradient(180deg, #ffe873, var(--gk-gold-2));
 }
 .mc-bar[data-level='full'] .mc-bar-fill {
-  background: var(--mc-green);
+  background: linear-gradient(180deg, #92e15a, var(--gk-green-2));
 }
 .mc-bar-goal {
   position: absolute;
   right: -3px;
-  top: -9px;
-  bottom: -9px;
+  top: -10px;
+  bottom: -10px;
   width: 6px;
   border-radius: 3px;
-  background: repeating-linear-gradient(180deg, var(--mc-ink) 0 6px, transparent 6px 11px);
+  background: repeating-linear-gradient(180deg, var(--gk-ink) 0 6px, transparent 6px 11px);
 }
 .mc-strength-foot {
   display: flex;
@@ -311,12 +286,12 @@
   justify-content: space-between;
   gap: 12px;
   /* Reserved so a near-miss hint appearing never moves the bar. */
-  min-height: clamp(22px, 2.4vh, 30px);
-  margin-top: 7px;
+  min-height: clamp(26px, 2.8vh, 34px);
+  margin-top: 10px;
 }
 .mc-hint {
-  font: 800 clamp(14px, 1.2vw, 19px) / 1.2 var(--font-ui, sans-serif);
-  color: #b8600c;
+  font: 600 clamp(17px, 1.3vw, 21px) / 1.2 var(--gk-body);
+  color: #b0480a;
 }
 .mc-hint[data-on='off'] {
   visibility: hidden;
@@ -326,8 +301,8 @@
 }
 .mc-peak {
   flex: none;
-  font: 800 clamp(11px, 0.95vw, 14px) / 1.4 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 clamp(15px, 1.1vw, 17px) / 1.4 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 
 /* ------------------------------------------------------------ the mime figure */
@@ -338,15 +313,16 @@
   width: clamp(150px, 15vw, 215px);
   aspect-ratio: 220 / 300;
   align-self: center;
-  border-radius: 12px;
+  border: 4px solid var(--gk-ink);
+  border-radius: 22px;
   box-sizing: border-box;
-  border: 1px solid rgba(28, 36, 51, 0.28);
   background:
-    radial-gradient(ellipse 70% 55% at 50% 78%, rgba(255, 212, 0, 0.16), transparent 70%),
-    linear-gradient(180deg, #2b3548, #1d1240);
-  box-shadow: inset 0 1px 2px rgba(14, 22, 36, 0.3), 0 1px 2px rgba(14, 22, 36, 0.3);
+    radial-gradient(ellipse 70% 55% at 50% 78%, rgba(255, 212, 59, 0.28), transparent 70%),
+    linear-gradient(180deg, #4a82c4, #2a4a86);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.3), inset 0 -6px 0 rgba(0, 0, 0, 0.18), 0 5px 0 var(--gk-ink);
   overflow: hidden;
 }
+
 .mc-fig {
   position: absolute;
   inset: 0;
@@ -406,36 +382,38 @@
   stroke-width: 27;
 }
 .mc-fig-body {
-  filter: drop-shadow(0 1px 2px rgba(14, 22, 36, 0.3));
+  filter: drop-shadow(0 3px 0 rgba(58, 31, 18, 0.35));
 }
+
 
 /* Cues: the direction the move goes. */
 .mc-cue {
   position: absolute;
   display: none;
-  font: 700 clamp(24px, 2.6vw, 40px) / 1 var(--font-game, sans-serif);
-  color: var(--gold, #f5c518);
-  text-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font-size: clamp(30px, 3vw, 46px);
+  line-height: 1;
 }
 .mc-cue-l {
-  left: 5%;
-  bottom: 7%;
+  left: 6%;
+  bottom: 8%;
+  rotate: -90deg;
 }
 .mc-cue-r {
-  right: 5%;
-  bottom: 7%;
+  right: 6%;
+  bottom: 8%;
+  rotate: 90deg;
 }
 .mc-cue-up {
   top: 7%;
-  left: 5%;
+  left: 7%;
 }
 .mc-cue-down {
-  bottom: 7%;
-  left: 5%;
+  bottom: 8%;
+  left: 7%;
 }
 .mc-cue-hands {
   top: 7%;
-  left: 5%;
+  left: 7%;
 }
 .move-check[data-move='left'] .mc-cue-l,
 .move-check[data-move='right'] .mc-cue-r,
@@ -553,6 +531,7 @@
   animation: mc-bob-small 1.1s ease-in-out infinite;
 }
 
+
 /* ------------------------------------------------------------ summary / cheat sheet */
 
 .mc-summary {
@@ -563,118 +542,130 @@
   width: 100%;
 }
 .mc-sheet {
+  --wood-w: 12px;
   width: min(1020px, 96vw);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.2vh, 14px);
-  padding: clamp(16px, 2.2vh, 28px) clamp(16px, 2vw, 30px);
-  border-radius: 12px;
-  background: var(--mc-cream);
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3), 0 30px 60px rgba(0, 0, 0, 0.45);
-  color: var(--mc-ink);
+  gap: clamp(9px, 1.3vh, 14px);
+  padding: clamp(14px, 2vh, 24px) clamp(16px, 2vw, 30px) clamp(16px, 2.2vh, 26px);
+  color: var(--gk-text);
   animation: mc-card-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .mc-sheet-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
 }
 .mc-sheet-title {
-  font: 700 clamp(26px, 2.8vw, 42px) / 1 var(--font-game, sans-serif);
-  padding-top: 4px;
+  font-size: clamp(26px, 2.6vw, 38px);
 }
 .mc-sheet-mode {
-  font: 800 clamp(12px, 1vw, 15px) / 1 var(--font-ui, sans-serif);
-  padding: 7px 14px 6px;
-  border-radius: 8px;
-  color: #fff;
-  background: var(--mc-ink);
+  font: 600 clamp(15px, 1.2vw, 18px) / 1 var(--gk-body);
+  padding: 8px 16px 9px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  color: #fff6dc;
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16), 0 3px 0 var(--gk-ink);
 }
 .mc-rows {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 .mc-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 8px 14px 7px 9px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  padding: 8px 14px 8px 8px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffbe9, #f7e3b0);
+  box-shadow: inset 0 3px 0 #fff, 0 3px 0 rgba(58, 31, 18, 0.5);
 }
 .mc-row[data-status='skipped'] {
-  background: #f2eff8;
+  background: linear-gradient(180deg, #eee4cc, #d9ccaa);
 }
 .mc-row-icon {
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 3px solid var(--gk-ink);
   border-radius: 50%;
-  font: 800 20px/1 var(--font-ui, sans-serif);
+  font: 400 24px/1 var(--gk-display);
   color: #fff;
-  background: var(--mc-green);
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  -webkit-text-stroke: 0.14em var(--gk-ink);
+  paint-order: stroke fill;
+  background: linear-gradient(180deg, var(--gk-green), var(--gk-green-2));
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
 }
 .mc-row[data-status='skipped'] .mc-row-icon {
-  background: var(--mc-grey);
+  background: linear-gradient(180deg, #d9cdb4, #b3a487);
 }
 .mc-row[data-status='gesture'] .mc-row-icon {
-  background: var(--cyan, #29c7e0);
-  font-size: 18px;
+  background: linear-gradient(180deg, var(--gk-blue), var(--gk-blue-2));
 }
 .mc-row-move {
-  font: 800 clamp(15px, 1.2vw, 19px) / 1.1 var(--font-ui, sans-serif);
+  font: 600 clamp(17px, 1.3vw, 20px) / 1.1 var(--gk-body);
 }
 .mc-row-how {
-  font: 700 clamp(12px, 1vw, 15px) / 1.25 var(--font-ui, sans-serif);
-  color: #3f4858;
+  font: 500 clamp(15px, 1.1vw, 16px) / 1.25 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .mc-row-meas {
   text-align: right;
   min-width: 56px;
 }
 .mc-row-peak {
-  font: 700 clamp(17px, 1.4vw, 22px) / 1 var(--font-game, sans-serif);
+  font: 400 clamp(20px, 1.6vw, 25px) / 1 var(--gk-display);
 }
 .mc-row-peak-label {
-  font: 800 9px/1 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 13px/1 var(--gk-body);
+  color: var(--gk-text-soft);
   margin-top: 3px;
 }
 .mc-row-skipped {
-  font: 800 12px/1 var(--font-ui, sans-serif);
-  color: #8a94a6;
+  font: 600 15px/1 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .mc-note {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px 9px;
-  border-radius: 10px;
-  background: #fff3d6;
-  border: 1.5px dashed #c98a12;
+  padding: 10px 16px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffe9a8, #ffd25e);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.55);
 }
 .mc-note-icon {
-  font-size: 24px;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 50%;
+  box-sizing: border-box;
+  padding-top: 2px;
+  font: 400 20px/1 var(--gk-display);
+  color: #fff;
+  background: linear-gradient(180deg, #ff735c, var(--gk-red-2));
 }
 .mc-note-text {
-  font: 800 clamp(13px, 1.1vw, 17px) / 1.3 var(--font-ui, sans-serif);
-  color: #8a5a06;
+  font: 600 clamp(16px, 1.2vw, 18px) / 1.3 var(--gk-body);
+  color: var(--gk-text);
 }
 .mc-tuned {
-  font: 800 clamp(12px, 1vw, 15px) / 1.3 var(--font-ui, sans-serif);
-  color: var(--mc-brown);
+  font: 600 clamp(15px, 1.1vw, 17px) / 1.3 var(--gk-body);
+  color: var(--gk-text-soft);
 }
 .mc-keys {
   display: flex;
@@ -682,13 +673,15 @@
   gap: 14px;
   flex-wrap: wrap;
   padding: 10px 14px;
-  border-radius: 10px;
-  background: rgba(14, 22, 36, 0.9);
-  border: 1px solid rgba(28, 36, 51, 0.28);
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.14);
 }
 .mc-keys-title {
-  font: 800 11px/1 var(--font-ui, sans-serif);
-  color: var(--gold, #f5c518);
+  font: 400 16px/1 var(--gk-display);
+  letter-spacing: 0.04em;
+  color: var(--gk-gold);
 }
 .mc-keys-list {
   display: flex;
@@ -698,24 +691,24 @@
 .mc-key {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 .mc-key-caps {
   display: flex;
   gap: 4px;
 }
 .mc-cap {
-  font: 800 12px/1 var(--font-ui, sans-serif);
-  padding: 6px 9px 5px;
-  border-radius: 8px;
-  color: var(--mc-ink);
-  background: #fff;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.3);
+  font: 600 15px/1 var(--gk-body);
+  padding: 6px 10px 7px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 9px;
+  color: var(--gk-text);
+  background: linear-gradient(180deg, #fffbe9, #f1d899);
+  box-shadow: 0 3px 0 var(--gk-ink);
 }
 .mc-key-does {
-  font: 700 13px/1 var(--font-ui, sans-serif);
-  color: rgba(255, 255, 255, 0.85);
+  font: 500 16px/1 var(--gk-body);
+  color: #ffeec2;
 }
 
 /* ------------------------------------------------------------ narrow / short windows */
@@ -749,7 +742,7 @@
     padding: clamp(14px, 2vh, 22px) clamp(14px, 2vw, 24px);
   }
   .mc-dot {
-    width: clamp(44px, 13vw, 64px);
+    width: clamp(48px, 13vw, 64px);
   }
 }
 @media (max-width: 560px) {
@@ -757,20 +750,18 @@
     display: none;
   }
   .mc-banner-tab {
-    font-size: 26px;
-    padding: 10px 20px 5px;
+    font-size: 30px;
   }
 }
 @media (max-height: 720px) {
   .mc-banner-sub {
-    padding: 6px 14px 5px;
+    padding: 6px 14px 7px;
   }
   .mc-stage {
     width: clamp(130px, 13vw, 180px);
   }
   .mc-card {
     row-gap: 8px;
-    border-radius: 12px;
   }
 }
 @media (max-height: 600px) {
@@ -789,26 +780,24 @@
   }
   .mc-sheet {
     gap: 7px;
-    padding: 12px 14px;
-    border-radius: 24px;
+    padding: 10px 14px 12px;
   }
   .mc-row {
-    padding: 5px 10px 4px 6px;
+    padding: 5px 10px 5px 6px;
   }
   .mc-row-icon {
-    width: 28px;
-    height: 28px;
-    font-size: 17px;
+    width: 34px;
+    height: 34px;
+    font-size: 20px;
   }
   .mc-note {
-    padding: 7px 12px 6px;
+    padding: 7px 12px;
   }
   .mc-actions {
-    min-height: 52px;
+    min-height: 56px;
   }
   .mc-banner-tab {
-    font-size: clamp(22px, 3vw, 30px);
-    padding: 9px 20px 5px;
+    font-size: clamp(26px, 3vw, 34px);
   }
   .mc-keys {
     display: none;
@@ -828,7 +817,7 @@
     width: min(300px, 16vw);
   }
   .mc-banner-tab {
-    font-size: 62px;
+    font-size: 66px;
   }
   .mc-banner-sub {
     font-size: 23px;
@@ -837,84 +826,76 @@
     width: 112px;
   }
   .mc-dot-mark {
-    width: 54px;
-    height: 54px;
-    font-size: 25px;
+    width: 56px;
+    height: 56px;
+    font-size: 27px;
   }
   .mc-dot-label {
-    font-size: 15px;
+    font-size: 18px;
   }
   .mc-move-name {
-    font-size: 66px;
+    font-size: 70px;
   }
   .mc-how {
-    font-size: 28px;
+    font-size: 29px;
   }
   .mc-strength-title,
   .mc-strength-goal {
-    font-size: 17px;
+    font-size: 19px;
   }
   .mc-strength-value {
-    font-size: 32px;
+    font-size: 36px;
   }
   .mc-bar {
-    height: 42px;
+    height: 46px;
   }
   .mc-hint {
-    font-size: 23px;
+    font-size: 25px;
   }
   .mc-peak,
   .mc-jog-count {
-    font-size: 17px;
+    font-size: 19px;
   }
   .mc-jog-pip {
-    width: 20px;
-    height: 20px;
-  }
-  .mc-btn {
-    font-size: 23px;
-    padding: 17px 36px 13px;
-  }
-  .mc-btn-go {
-    font-size: 42px;
-    padding: 20px 52px 14px;
+    width: 26px;
+    height: 26px;
   }
   .mc-actions {
-    min-height: 78px;
+    min-height: 90px;
   }
   .mc-sheet-title {
-    font-size: 50px;
+    font-size: 48px;
   }
   .mc-sheet-mode {
-    font-size: 18px;
+    font-size: 21px;
   }
   .mc-rows {
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   }
   .mc-row-move {
-    font-size: 23px;
+    font-size: 24px;
   }
   .mc-row-how {
-    font-size: 18px;
+    font-size: 19px;
   }
   .mc-row-peak {
-    font-size: 27px;
+    font-size: 30px;
   }
   .mc-row-icon {
-    width: 42px;
-    height: 42px;
-    font-size: 25px;
+    width: 48px;
+    height: 48px;
+    font-size: 28px;
   }
   .mc-note-text,
   .mc-tuned {
-    font-size: 20px;
+    font-size: 21px;
   }
   .mc-cap,
   .mc-key-does {
-    font-size: 17px;
+    font-size: 19px;
   }
   .mc-keys-title {
-    font-size: 14px;
+    font-size: 19px;
   }
 }
 

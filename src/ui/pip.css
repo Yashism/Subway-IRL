@@ -1,4 +1,4 @@
-/* Camera preview card (PosePip). Uses the HUD tokens from hud.css. */
+/* Camera preview card (PosePip): a wood-framed window, in the game kit's look (kit.css). */
 
 .pip-root {
   position: fixed;
@@ -8,23 +8,29 @@
 }
 
 .pip {
-  --pip-ink: var(--ink, #1c2433);
+  --pip-ink: var(--gk-ink, #3a1f12);
   position: absolute;
   left: 18px;
-  bottom: max(18px, env(safe-area-inset-bottom));
+  bottom: max(22px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
   width: 220px;
   height: 165px;
-  border-radius: 10px;
+  border: 6px solid transparent;
+  border-radius: 22px;
   overflow: hidden;
+  /* The wood is the border: the picture's backdrop is painted on the padding box only. */
   background:
-    radial-gradient(circle at 50% 40%, rgba(88, 64, 160, 0.55), rgba(14, 22, 36, 0) 70%),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 22px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 22px),
-    #1c2433;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+    radial-gradient(circle at 50% 40%, rgba(88, 100, 190, 0.5), rgba(14, 22, 36, 0) 70%) padding-box,
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 22px) padding-box,
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 22px) padding-box,
+    linear-gradient(180deg, #2b3a5c, #1a2236) padding-box,
+    repeating-linear-gradient(90deg, rgba(58, 31, 18, 0.07) 0 2px, transparent 2px 16px) border-box,
+    linear-gradient(180deg, #d68c43, #9c5622) border-box;
   box-shadow:
-    0 7px 0 3px rgba(14, 22, 36, 0.6),
-    0 16px 30px rgba(0, 0, 0, 0.35);
+    inset 0 0 0 3px var(--gk-ink, #3a1f12),
+    0 0 0 3px var(--gk-ink, #3a1f12),
+    0 7px 0 3px var(--gk-ink, #3a1f12),
+    0 18px 30px rgba(0, 0, 0, 0.35);
   transition:
     left 0.45s cubic-bezier(0.2, 1.1, 0.3, 1),
     bottom 0.45s cubic-bezier(0.2, 1.1, 0.3, 1),
@@ -49,8 +55,8 @@
   bottom: calc(49% - var(--stage-h) / 2);
   width: calc(var(--stage-h) * 4 / 3);
   height: var(--stage-h);
-  border-radius: 14px;
-  border-width: 5px;
+  border-radius: 26px;
+  border-width: 9px;
 }
 
 .pip-video,
@@ -84,21 +90,23 @@
 .pip-mode {
   display: flex;
   align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 8px;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px 1px;
+  border: 2px solid var(--gk-ink, #3a1f12);
   border-radius: 999px;
-  background: rgba(14, 22, 36, 0.78);
-  font: 800 11px/1 var(--font-ui, sans-serif);
-  letter-spacing: 0.08em;
-  color: #fff;
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
+  font: 600 13px/1 var(--gk-body, 'Fredoka', sans-serif);
+  letter-spacing: 0.06em;
+  color: #fff6dc;
 }
 .pip-dot {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--gk-ink, #3a1f12);
   border-radius: 50%;
   background: #ff4d3a;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 .pip[data-level='ok'] .pip-dot {
   background: #3ee07a;
@@ -117,16 +125,16 @@
   color: #ffd27a;
 }
 .pip-fps {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 238, 194, 0.75);
   font-variant-numeric: tabular-nums;
 }
 .pip-fps:empty {
   display: none;
 }
 .pip-mode {
-  background: var(--gold, #f5c518);
-  color: var(--pip-ink);
-  box-shadow: inset 0 0 0 2px var(--pip-ink);
+  background: linear-gradient(180deg, #ffe873, var(--gk-gold-2, #f2a20c));
+  color: var(--gk-text, #4a2a16);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55);
 }
 
 .pip-jog {
@@ -136,10 +144,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 30px;
-  padding: 0 9px 0 4px;
+  height: 34px;
+  padding: 0 11px 0 5px;
+  border: 3px solid var(--gk-ink, #3a1f12);
   border-radius: 999px;
-  background: rgba(14, 22, 36, 0.78);
+  background: linear-gradient(180deg, #6b4630, #4a2e1d);
   opacity: 0.55;
   filter: grayscale(1);
   transition: opacity 0.2s, filter 0.2s;
@@ -147,8 +156,8 @@
 .pip-jog.on {
   opacity: 1;
   filter: none;
-  background: linear-gradient(180deg, #4fd08a, #2a8c60);
-  box-shadow: inset 0 0 0 2px var(--pip-ink);
+  background: linear-gradient(180deg, var(--gk-green, #6fcf3a), var(--gk-green-2, #3f9a1b));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45);
 }
 .pip-jog-icon {
   display: grid;
@@ -158,11 +167,11 @@
   font-size: 17px;
 }
 .pip-cadence {
-  font: 700 15px/1 var(--font-game, sans-serif);
-  padding-top: 3px;
+  font: 400 18px/1 var(--gk-display, 'Lilita One', sans-serif);
+  padding-top: 2px;
   color: #fff;
   paint-order: stroke fill;
-  -webkit-text-stroke: 0 var(--pip-ink);
+  -webkit-text-stroke: 0.14em var(--pip-ink);
 }
 .pip-cadence:empty {
   display: none;
@@ -171,9 +180,9 @@
   position: absolute;
   left: 8px;
   bottom: 10px;
-  font: 800 10px/1 var(--font-ui, sans-serif);
+  font: 600 12px/1 var(--gk-body, 'Fredoka', sans-serif);
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 238, 194, 0.7);
   text-transform: uppercase;
 }
 .pip.stage .pip-key,
@@ -190,7 +199,7 @@
 }
 
 @keyframes pip-live {
-  50% { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 0 6px rgba(62, 224, 122, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(62, 224, 122, 0.4); }
 }
 @keyframes pip-blink {
   50% { opacity: 0.3; }

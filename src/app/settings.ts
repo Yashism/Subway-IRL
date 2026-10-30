@@ -28,6 +28,13 @@ export const SENSITIVITY_STEP = 0.05;
 export const LINES: readonly LineId[] = ['western', 'central', 'harbour'];
 export const DIFFICULTIES: readonly Difficulty[] = ['chill', 'cardio', 'beast'];
 export const MODE_CHOICES: readonly ModeChoice[] = ['auto', 'full', 'small'];
+export type Quality = 'balanced' | 'high';
+export const QUALITY_CHOICES: readonly Quality[] = ['balanced', 'high'];
+export const QUALITY_NAMES: Record<Quality, string> = { balanced: 'Balanced', high: 'High quality' };
+export const QUALITY_BLURBS: Record<Quality, string> = {
+  balanced: 'Up to 60 fps, softens the picture if your laptop struggles',
+  high: 'Every frame your screen can show, always sharp. Needs a strong laptop',
+};
 export const OUTLINE_CHOICES: readonly OutlineStrength[] = ['off', 'thin', 'bold'];
 export const OUTLINE_NAMES: Record<OutlineStrength, string> = { off: 'Off', thin: 'Thin', bold: 'Bold' };
 export const OUTLINE_BLURBS: Record<OutlineStrength, string> = {
@@ -60,6 +67,12 @@ export interface GameSettings {
   obstacleLevel: number;
   /** How busy the track is. */
   obstacleAmount: ObstacleAmount;
+  /**
+   * Graphics. 'balanced' draws at most ~60 frames a second and softens the picture when the laptop
+   * struggles; 'high' draws every frame the screen can show at full sharpness, for a machine that
+   * can afford it.
+   */
+  quality: Quality;
   /** How heavy the ink line round every model is. */
   outlines: OutlineStrength;
   /** Cuts screen shake and speed lines: comfort, and a cheap win on a weak GPU. */
@@ -82,6 +95,7 @@ export const DEFAULT_SETTINGS: GameSettings = Object.freeze({
   difficulty: 'cardio',
   obstacleLevel: DEFAULT_OBSTACLES.level,
   obstacleAmount: DEFAULT_OBSTACLES.amount,
+  quality: 'balanced',
   outlines: 'thin',
   reducedMotion: false,
   reducedEffects: false,
@@ -182,6 +196,7 @@ export function cleanSettings(raw: unknown): GameSettings {
     difficulty: pick(o.difficulty, DIFFICULTIES, DEFAULT_SETTINGS.difficulty),
     obstacleLevel: cleanObstacleLevel(o.obstacleLevel),
     obstacleAmount: pick(o.obstacleAmount, OBSTACLE_AMOUNTS, DEFAULT_SETTINGS.obstacleAmount),
+    quality: pick(o.quality, QUALITY_CHOICES, DEFAULT_SETTINGS.quality),
     outlines: pick(o.outlines, OUTLINE_CHOICES, DEFAULT_SETTINGS.outlines),
     reducedMotion: bool(o.reducedMotion, DEFAULT_SETTINGS.reducedMotion),
     reducedEffects: bool(o.reducedEffects, DEFAULT_SETTINGS.reducedEffects),
@@ -212,6 +227,8 @@ export function applyUrlFlags(settings: GameSettings, search: string): GameSetti
   if (amount !== null) out.obstacleAmount = pick(amount, OBSTACLE_AMOUNTS, out.obstacleAmount);
   const lanes = params.get('lanes');
   if (lanes !== null) out.lanes = pick(lanes, LANE_CHOICES, out.lanes);
+  const quality = params.get('quality');
+  if (quality !== null) out.quality = pick(quality, QUALITY_CHOICES, out.quality);
   const outlines = params.get('outlines');
   if (outlines !== null) out.outlines = pick(outlines, OUTLINE_CHOICES, out.outlines);
   const sens = params.get('sens');

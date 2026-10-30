@@ -2,6 +2,8 @@ import './poseScreens.css';
 import { nextMode, type CheckState, type FlowInput, type FlowScreen, type ModeChoice, type ScreenModel } from '../app/flow';
 import { isIrCamera, type CameraInfo } from '../pose/camera';
 import type { PlayMode } from '../pose/types';
+import { glyph } from './glyphs';
+import { icon } from './icons';
 
 // ---------------------------------------------------------------- pure view helpers
 
@@ -26,7 +28,8 @@ export function modeChipLabel(choice: ModeChoice, detected: PlayMode | null): st
   return detected ? `Auto · ${MODE_NAMES[detected]}` : 'Auto';
 }
 
-export const checkIcon = (s: CheckState): string => (s === 'ok' ? '✓' : s === 'bad' ? '✗' : '…');
+/** The checklist mark for a state: a tick, a cross, or three dots while it is still being judged. */
+export const checkMark = (s: CheckState): string => (s === 'ok' ? icon('check') : s === 'bad' ? icon('close') : glyph('dots'));
 
 /** stroke-dashoffset for a ring of the given circumference at progress p (0 = empty). */
 export function ringDash(p: number, circumference: number): string {
@@ -111,6 +114,13 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent: 
   e.className = cls;
   if (text !== undefined) e.textContent = text;
   parent.append(e);
+  return e;
+};
+
+/** An element holding one of the fixed icon / glyph SVGs (static markup, so innerHTML is safe). */
+const ico = (cls: string, parent: HTMLElement, markup: string): HTMLElement => {
+  const e = el('div', cls, parent);
+  e.innerHTML = markup;
   return e;
 };
 
@@ -206,62 +216,62 @@ export class PoseScreens {
     const mcard = el('div', 'ps-mode-card', menu);
     this.menuIcon = el('div', 'ps-mode-card-icon', mcard);
     const mtext = el('div', 'ps-mode-card-text', mcard);
-    this.menuTitle = el('div', 'ps-mode-card-title', mtext);
+    this.menuTitle = el('div', 'ps-mode-card-title gk-title', mtext);
     this.menuSub = el('div', 'ps-mode-card-sub', mtext);
-    this.menuSwitch = this.button(mcard, 'ps-btn ps-btn-small', '', () =>
+    this.menuSwitch = this.button(mcard, 'ps-btn gk-btn gk-btn-sm gk-btn-cream', '', () =>
       this.emit({ type: this.last?.input === 'keyboard' ? 'useWebcam' : 'useKeyboard' }),
     );
 
     // ---- camera prompt
-    const prompt = this.modal('ps-prompt', COPY.cameraPrompt.tab);
+    const prompt = this.modal('ps-prompt', COPY.cameraPrompt.tab, 'blue');
     const hero = el('div', 'ps-hero', prompt);
-    el('div', 'ps-hero-cam', hero, '📷');
-    el('div', 'ps-title', prompt, COPY.cameraPrompt.title);
+    ico('ps-hero-cam', hero, icon('camera'));
+    el('div', 'ps-title gk-title', prompt, COPY.cameraPrompt.title);
     el('div', 'ps-body', prompt, 'Your webcam watches you move — that is how you play.');
     const moves = el('div', 'ps-moves', prompt);
-    for (const [icon, label, cls] of [
-      ['🏃', 'Jog', 'jog'],
-      ['⤴', 'Jump', 'jump'],
-      ['⤵', 'Duck', 'duck'],
-      ['⇆', 'Step', 'step'],
-    ]) {
+    for (const [mark, label, cls] of [
+      ['run', 'Jog', 'jog'],
+      ['jump', 'Jump', 'jump'],
+      ['duck', 'Duck', 'duck'],
+      ['step', 'Step', 'step'],
+    ] as const) {
       const m = el('div', `ps-move ps-move-${cls}`, moves);
-      el('div', 'ps-move-icon', m, icon);
+      ico('ps-move-icon', m, glyph(mark));
       el('div', 'ps-move-label', m, label);
     }
     const privacy = el('div', 'ps-privacy', prompt);
-    el('span', 'ps-privacy-icon', privacy, '🔒');
+    ico('ps-privacy-icon', privacy, glyph('lock'));
     el('span', 'ps-privacy-text', privacy, COPY.cameraPrompt.body);
     const pActions = el('div', 'ps-actions', prompt);
-    this.button(pActions, 'ps-btn ps-btn-go', 'Use webcam', () => this.emit({ type: 'startPressed' }));
-    this.button(pActions, 'ps-btn ps-btn-alt', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
+    this.button(pActions, 'ps-btn ps-btn-go gk-btn gk-btn-green gk-btn-lg', 'Use webcam', () => this.emit({ type: 'startPressed' }));
+    this.button(pActions, 'ps-btn ps-btn-alt gk-btn gk-btn-cream', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
     el('div', 'ps-foot', prompt, 'Your browser will ask for camera permission.');
 
     // ---- camera starting
-    const starting = this.modal('ps-starting', COPY.cameraStarting.tab);
+    const starting = this.modal('ps-starting', COPY.cameraStarting.tab, 'gold');
     const spin = el('div', 'ps-spinner', starting);
-    el('div', 'ps-spinner-cam', spin, '📷');
-    el('div', 'ps-title', starting, COPY.cameraStarting.title);
+    ico('ps-spinner-cam', spin, icon('camera'));
+    el('div', 'ps-title gk-title', starting, COPY.cameraStarting.title);
     el('div', 'ps-body', starting, COPY.cameraStarting.body);
     const sActions = el('div', 'ps-actions', starting);
-    this.button(sActions, 'ps-btn ps-btn-alt', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
+    this.button(sActions, 'ps-btn ps-btn-alt gk-btn gk-btn-cream', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
 
     // ---- camera error
-    const error = this.modal('ps-error', COPY.cameraError.tab);
+    const error = this.modal('ps-error', COPY.cameraError.tab, 'red');
     const eh = el('div', 'ps-hero ps-hero-error', error);
-    el('div', 'ps-hero-cam', eh, '📷');
+    ico('ps-hero-cam', eh, icon('camera'));
     el('div', 'ps-hero-x', eh, '!');
-    el('div', 'ps-title', error, COPY.cameraError.title);
+    el('div', 'ps-title gk-title', error, COPY.cameraError.title);
     this.errorText = el('div', 'ps-body ps-error-text', error);
     this.picker(error, 'ps-picker-inline');
     const eActions = el('div', 'ps-actions', error);
-    this.button(eActions, 'ps-btn ps-btn-go', 'Retry', () => this.emit({ type: 'retry' }));
-    this.button(eActions, 'ps-btn ps-btn-alt', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
+    this.button(eActions, 'ps-btn ps-btn-go gk-btn gk-btn-green gk-btn-lg', 'Retry', () => this.emit({ type: 'retry' }));
+    this.button(eActions, 'ps-btn ps-btn-alt gk-btn gk-btn-cream', 'Play with keyboard', () => this.emit({ type: 'useKeyboard' }));
 
     // ---- calibration / ready
     const cal = el('div', 'ps-layer ps-calib', root);
     const banner = el('div', 'ps-banner', cal);
-    this.calTab = el('div', 'ps-banner-tab', banner);
+    this.calTab = el('div', 'ps-banner-tab gk-title', banner);
     this.calTitle = el('div', 'ps-banner-sub', banner);
 
     const fig = el('div', 'ps-figure', cal);
@@ -270,49 +280,49 @@ export class PoseScreens {
     svg('path', { class: 'ps-sil-shape', d: BODY_PATH }, this.silhouette);
 
     const side = el('div', 'ps-side', cal);
-    const list = el('div', 'ps-checks', side);
-    el('div', 'ps-checks-title', list, 'Checklist');
+    const list = el('div', 'ps-checks gk-panel', side);
+    el('div', 'ps-checks-title gk-ribbon gk-ribbon-blue', list, 'Checklist');
     const check = (label: string): CheckRow => {
       const row = el('div', 'ps-check', list);
-      const icon = el('div', 'ps-check-icon', row);
+      const mark = el('div', 'ps-check-icon', row);
       el('div', 'ps-check-label', row, label);
-      return { row, icon };
+      return { row, icon: mark };
     };
     this.checks = { body: check('Body in view'), distance: check('Distance'), light: check('Light') };
-    const tools = el('div', 'ps-tools', side);
-    this.modeChip = this.button(tools, 'ps-chip', '', () => this.emit({ type: 'chooseMode', mode: nextMode(this.modeChoice) }));
+    const tools = el('div', 'ps-tools gk-panel gk-panel-dark', side);
+    this.modeChip = this.button(tools, 'ps-chip gk-btn gk-btn-sm gk-btn-orange', '', () => this.emit({ type: 'chooseMode', mode: nextMode(this.modeChoice) }));
     el('span', 'ps-chip-kicker', this.modeChip, 'MODE');
     this.modeLabel = el('span', 'ps-chip-label', this.modeChip);
-    el('span', 'ps-chip-cycle', this.modeChip, '⟳');
+    ico('ps-chip-cycle', this.modeChip, glyph('redo'));
     this.picker(tools, 'ps-picker-side');
     const toolRow = el('div', 'ps-tool-row', tools);
     // Spec: after the first check the moves are still offered in one click, without recalibrating.
-    this.moveCheckBtn = this.button(toolRow, 'ps-btn ps-btn-small ps-movecheck-ready', 'Check my moves', () =>
+    this.moveCheckBtn = this.button(toolRow, 'ps-btn gk-btn gk-btn-sm gk-btn-cream ps-movecheck-ready', 'Check my moves', () =>
       this.emit({ type: 'checkMoves' }),
     );
     // Full body only: small-room mode leans to change lane, so it has no spots to stand on.
-    this.laneBtn = this.button(toolRow, 'ps-btn ps-btn-small ps-lanes-ready', 'Set my lane spots', () => this.emit({ type: 'setLanes' }));
-    this.button(toolRow, 'ps-btn ps-btn-small ps-recal-ready', 'Recalibrate', () => this.emit({ type: 'recalibrate' }));
-    this.button(toolRow, 'ps-btn ps-btn-small ps-btn-ghost', 'Use keyboard', () => this.emit({ type: 'useKeyboard' }));
+    this.laneBtn = this.button(toolRow, 'ps-btn gk-btn gk-btn-sm gk-btn-cream ps-lanes-ready', 'Set my lane spots', () => this.emit({ type: 'setLanes' }));
+    this.button(toolRow, 'ps-btn gk-btn gk-btn-sm gk-btn-cream ps-recal-ready', 'Recalibrate', () => this.emit({ type: 'recalibrate' }));
+    this.button(toolRow, 'ps-btn gk-btn gk-btn-sm gk-btn-wood', 'Use keyboard', () => this.emit({ type: 'useKeyboard' }));
     // Never stuck in the camera flow: the same way out Esc gives, spelled out.
-    this.button(toolRow, 'ps-btn ps-btn-small ps-btn-ghost', '\u2302 Main menu', () => this.emit({ type: 'home' }));
+    this.button(toolRow, 'ps-btn gk-btn gk-btn-sm gk-btn-wood', 'Main menu', () => this.emit({ type: 'home' }), icon('home'));
 
     const status = el('div', 'ps-status', cal);
     this.calRing = ring(status, 'ps-ring-cal');
     this.startRing = ring(status, 'ps-ring-start');
-    this.startRing.core.textContent = '✋';
+    this.startRing.core.innerHTML = glyph('hand');
     const msg = el('div', 'ps-msg-text', status);
-    this.message = el('div', 'ps-message', msg);
+    this.message = el('div', 'ps-message gk-title', msg);
     this.messageSub = el('div', 'ps-message-sub', msg);
 
     // ---- playing
     const play = el('div', 'ps-layer ps-play', root);
     this.playAgain = el('div', 'ps-again', play);
-    this.button(play, 'ps-btn ps-btn-small ps-recal', '⟳ Recalibrate', () => this.emit({ type: 'recalibrate' }));
+    this.button(play, 'ps-btn gk-btn gk-btn-sm gk-btn-cream ps-recal', 'Recalibrate', () => this.emit({ type: 'recalibrate' }), glyph('redo'));
 
     // ---- toasts (any screen)
     this.toast = el('div', 'ps-toast', root);
-    el('span', 'ps-toast-icon', this.toast, '📷');
+    ico('ps-toast-icon', this.toast, icon('camera'));
     this.toastText = el('span', 'ps-toast-text', this.toast);
   }
 
@@ -330,7 +340,7 @@ export class PoseScreens {
 
     if (m.screen === 'menu') {
       const cam = m.input === 'webcam';
-      this.text(this.menuIcon, cam ? '📷' : '⌨️');
+      this.setMarkup(this.menuIcon, cam ? 'camera' : 'keyboard', cam ? icon('camera') : glyph('keyboard'));
       this.text(this.menuTitle, cam ? 'Webcam mode' : 'Keyboard mode');
       this.text(this.menuSub, cam ? 'Enter or raise your right hand' : 'Enter to start');
       this.text(this.menuSwitch, cam ? 'Use keyboard' : 'Use webcam');
@@ -350,7 +360,7 @@ export class PoseScreens {
       for (const k of ['body', 'distance', 'light'] as const) {
         const s = m.checks[k];
         this.attr(this.checks[k].row, 'data-state', s);
-        this.text(this.checks[k].icon, checkIcon(s));
+        this.mark(this.checks[k].icon, s);
       }
       this.text(this.modeLabel, modeChipLabel(m.modeChoice, m.detectedMode));
       const small = (m.modeChoice === 'auto' ? m.detectedMode : m.modeChoice) === 'small';
@@ -404,15 +414,16 @@ export class PoseScreens {
     this.handlers.onInput(i);
   }
 
-  private modal(cls: string, tab: string): HTMLElement {
+  private modal(cls: string, tab: string, ribbon: 'red' | 'blue' | 'gold'): HTMLElement {
     const layer = el('div', `ps-layer ps-modal ${cls}`, this.root);
-    const card = el('div', 'ps-card', layer);
-    el('div', 'ps-card-tab', card, tab);
+    const card = el('div', 'ps-card gk-panel', layer);
+    el('div', `ps-card-tab gk-ribbon${ribbon === 'red' ? '' : ` gk-ribbon-${ribbon}`}`, card, tab);
     return card;
   }
 
-  private button(parent: HTMLElement, cls: string, label: string, onClick: () => void): HTMLButtonElement {
+  private button(parent: HTMLElement, cls: string, label: string, onClick: () => void, lead?: string): HTMLButtonElement {
     const b = el('button', cls, parent, label);
+    if (lead) b.insertAdjacentHTML('afterbegin', lead);
     b.type = 'button';
     b.addEventListener('click', () => {
       // Drop focus so a later Enter goes to the game's key handler, not this button.
@@ -424,7 +435,8 @@ export class PoseScreens {
 
   private picker(parent: HTMLElement, cls: string): void {
     const box = el('label', `ps-picker ${cls}`, parent);
-    el('span', 'ps-picker-label', box, '📷 Camera');
+    const label = el('span', 'ps-picker-label', box, 'Camera');
+    label.insertAdjacentHTML('afterbegin', icon('camera'));
     const select = el('select', 'ps-select', box);
     // Keys typed into the dropdown must not reach the game's window key handler. Enter and Escape
     // close it, and a select that keeps focus would swallow every later key (Enter, V, M) for the
@@ -465,6 +477,17 @@ export class PoseScreens {
     if (this.lastText.get(e) === value) return;
     this.lastText.set(e, value);
     e.textContent = value;
+  }
+
+  /** Swaps the SVG inside `e`, only when it changed. The markup is the fixed set in icons.ts / glyphs.ts. */
+  private setMarkup(e: Element, key: string, markup: string): void {
+    if (this.lastText.get(e) === key) return;
+    this.lastText.set(e, key);
+    e.innerHTML = markup;
+  }
+
+  private mark(e: Element, s: CheckState): void {
+    this.setMarkup(e, s, checkMark(s));
   }
 
   private readonly attrs = new Map<Element, Map<string, string>>();

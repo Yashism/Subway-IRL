@@ -1,0 +1,372 @@
+/*
+ * The game UI kit: the handful of pieces every screen is built from, so a button on the menu, in
+ * Settings and on the run summary is the same button.
+ *
+ * The look is a toy-box one: thick dark-brown outlines, glossy bevelled buttons that sink when
+ * pressed, wood-framed cream panels, ribbon titles and bold outlined lettering. Everything is
+ * drawn with gradients and shadows (no images), and the ink colour is one token so the whole set
+ * can be re-tinted in one place.
+ *
+ *   .gk-btn            a button.  Colours: -green -blue -orange -red -wood.  Sizes: -sm -lg -xl.  -round for icon buttons.
+ *   .gk-panel          a wood-framed cream panel (the border *is* the wood).
+ *   .gk-ribbon         a red title plaque, usually straddling a panel's top edge.
+ *   .gk-chip           a small status pill (coins, level).
+ *   .gk-title          big outlined lettering.
+ *   .gk-toggle / .gk-range   the switch and the slider.
+ *   .gk-icon           an inline SVG icon (see icons.ts).
+ */
+
+:root {
+  --gk-ink: #3a1f12;
+  --gk-ink-2: #5a3420;
+  --gk-cream: #fff3d4;
+  --gk-cream-2: #f7dca0;
+  --gk-wood: #c9803a;
+  --gk-wood-2: #9c5622;
+  --gk-text: #4a2a16;
+  --gk-text-soft: #8a5a36;
+  --gk-gold: #ffd43b;
+  --gk-gold-2: #f2a20c;
+  --gk-green: #6fcf3a;
+  --gk-green-2: #3f9a1b;
+  --gk-blue: #43b9f4;
+  --gk-blue-2: #1d83c8;
+  --gk-orange: #ffb42e;
+  --gk-orange-2: #ee7d0a;
+  --gk-red: #f4533d;
+  --gk-red-2: #c22d1b;
+  --gk-display: 'Lilita One', 'Luckiest Guy', 'Arial Black', system-ui, sans-serif;
+  --gk-body: 'Fredoka', 'Baloo 2', system-ui, sans-serif;
+}
+
+/* ------------------------------------------------------------ lettering */
+
+/* White (or gold) lettering with a thick ink outline and a hard drop: the signature look. */
+.gk-title {
+  font-family: var(--gk-display);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fff;
+  -webkit-text-stroke: 0.2em var(--gk-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.07em 0 var(--gk-ink), 0 0.12em 0.1em rgba(0, 0, 0, 0.35);
+}
+.gk-title-gold {
+  color: var(--gk-gold);
+}
+
+/* ------------------------------------------------------------ icons */
+
+.gk-icon {
+  display: block;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  overflow: visible;
+  filter: drop-shadow(0 0.04em 0 rgba(58, 31, 18, 0.55));
+}
+
+/* ------------------------------------------------------------ buttons */
+
+.gk-btn {
+  --b1: var(--gk-green);
+  --b2: var(--gk-green-2);
+  --edge: #27600e;
+  appearance: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0.5em 1.3em 0.58em;
+  border: 3px solid var(--gk-ink);
+  border-radius: 16px;
+  cursor: pointer;
+  pointer-events: auto;
+  font: 400 22px/1 var(--gk-display);
+  letter-spacing: 0.02em;
+  color: #fff;
+  -webkit-text-stroke: 0.13em var(--gk-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.06em 0 var(--gk-ink);
+  white-space: nowrap;
+  background: linear-gradient(180deg, var(--b1), var(--b2));
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.16),
+    0 5px 0 var(--edge),
+    0 5px 0 3px var(--gk-ink),
+    0 12px 14px rgba(0, 0, 0, 0.28);
+  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, filter 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+/* A soft gloss across the top half. */
+.gk-btn::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 4px;
+  height: 36%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+.gk-btn:hover:not(:disabled) {
+  filter: brightness(1.08) saturate(1.05);
+}
+.gk-btn:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.2),
+    0 1px 0 var(--edge),
+    0 1px 0 3px var(--gk-ink),
+    0 4px 6px rgba(0, 0, 0, 0.28);
+}
+.gk-btn:focus-visible {
+  outline: 4px solid #fff;
+  outline-offset: 3px;
+}
+.gk-btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.85) brightness(0.95);
+  opacity: 0.6;
+}
+
+.gk-btn-blue { --b1: var(--gk-blue); --b2: var(--gk-blue-2); --edge: #0f4f80; }
+.gk-btn-orange { --b1: var(--gk-orange); --b2: var(--gk-orange-2); --edge: #8d4604; }
+.gk-btn-red { --b1: var(--gk-red); --b2: var(--gk-red-2); --edge: #7c170b; }
+.gk-btn-wood { --b1: #d79a52; --b2: #a8601f; --edge: #5f3410; }
+.gk-btn-cream {
+  --b1: #fffbe9;
+  --b2: #f1d899;
+  --edge: #a07a34;
+  color: var(--gk-text);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+.gk-btn-sm { min-height: 40px; font-size: 17px; border-radius: 13px; padding: 0.4em 1em 0.5em; }
+.gk-btn-lg { min-height: 62px; font-size: 30px; border-radius: 20px; }
+.gk-btn-xl { min-height: 84px; font-size: 44px; border-radius: 26px; padding: 0.4em 1.6em 0.5em; border-width: 4px; }
+
+/* Round icon buttons: a glyph on a glossy disc. */
+.gk-btn-round {
+  width: 64px;
+  height: 64px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 34px;
+}
+.gk-btn-round.gk-btn-sm { width: 46px; height: 46px; font-size: 24px; }
+.gk-btn-round.gk-btn-lg { width: 84px; height: 84px; font-size: 46px; }
+.gk-btn-round::before {
+  left: 14%;
+  right: 14%;
+  top: 5px;
+}
+.gk-btn-round .gk-icon {
+  position: relative;
+}
+
+/* ------------------------------------------------------------ chips */
+
+.gk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 42px;
+  padding: 0 16px 0 5px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5b3a24, #3a2113);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18), 0 3px 0 var(--gk-ink), 0 8px 12px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font: 400 24px/1 var(--gk-display);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.gk-coin {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff7b0 0 12%, #ffd84a 38%, #f5a900 74%, #c77800 100%);
+  box-shadow: inset 0 0 0 2.5px #b86e00, 0 1px 0 rgba(0, 0, 0, 0.4);
+  color: #8a5200;
+  font: 400 17px/1 var(--gk-display);
+}
+
+/* A star, for levels: drawn once here so a badge anywhere can use it. */
+.gk-star {
+  width: 1em;
+  height: 1em;
+  background: linear-gradient(180deg, #ffe873, #f5a400);
+  clip-path: polygon(50% 2%, 62% 36%, 98% 38%, 69% 59%, 80% 94%, 50% 73%, 20% 94%, 31% 59%, 2% 38%, 38% 36%);
+  filter: drop-shadow(0 0.04em 0 var(--gk-ink));
+}
+
+/* ------------------------------------------------------------ panels */
+
+/*
+ * The wood is the border: a transparent 12px border over a border-box gradient, with the cream
+ * painted on the padding box. Three rings of ink (outer, inner and the drop) frame it.
+ */
+.gk-panel {
+  --wood-w: 12px;
+  position: relative;
+  box-sizing: border-box;
+  border: var(--wood-w) solid transparent;
+  border-radius: 26px;
+  color: var(--gk-text);
+  font-family: var(--gk-body);
+  background:
+    linear-gradient(180deg, var(--gk-cream), var(--gk-cream-2)) padding-box,
+    repeating-linear-gradient(90deg, rgba(58, 31, 18, 0.07) 0 2px, transparent 2px 16px) border-box,
+    linear-gradient(180deg, #d68c43, var(--gk-wood-2)) border-box;
+  box-shadow:
+    inset 0 0 0 3px var(--gk-ink),
+    0 0 0 3px var(--gk-ink),
+    0 8px 0 3px var(--gk-ink),
+    0 22px 36px rgba(0, 0, 0, 0.38);
+}
+.gk-panel-dark {
+  background:
+    linear-gradient(180deg, #6b4630, #4a2e1d) padding-box,
+    repeating-linear-gradient(90deg, rgba(58, 31, 18, 0.07) 0 2px, transparent 2px 16px) border-box,
+    linear-gradient(180deg, #d68c43, var(--gk-wood-2)) border-box;
+  color: #fff6dc;
+}
+
+.gk-ribbon {
+  display: inline-block;
+  position: relative;
+  box-sizing: border-box;
+  padding: 0.42em 1.7em 0.5em;
+  border: 3px solid var(--gk-ink);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ff735c, var(--gk-red-2));
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -4px 0 rgba(0, 0, 0, 0.16), 0 5px 0 var(--gk-ink), 0 12px 16px rgba(0, 0, 0, 0.3);
+  font: 400 34px/1 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.13em var(--gk-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.06em 0 var(--gk-ink);
+  white-space: nowrap;
+}
+.gk-ribbon-blue { background: linear-gradient(180deg, #6fd0ff, var(--gk-blue-2)); }
+.gk-ribbon-green { background: linear-gradient(180deg, #92e15a, var(--gk-green-2)); }
+.gk-ribbon-gold { background: linear-gradient(180deg, #ffd25e, var(--gk-orange-2)); }
+
+/* ------------------------------------------------------------ switch and slider */
+
+.gk-toggle {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 84px;
+  height: 42px;
+  padding: 0;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #b9a58b, #d9c8ad);
+  box-shadow: inset 0 4px 0 rgba(0, 0, 0, 0.22), 0 3px 0 rgba(58, 31, 18, 0.45);
+  transition: background-color 0.15s;
+}
+.gk-toggle[data-on='on'] {
+  background: linear-gradient(180deg, #4aa31f, #7ed84a);
+}
+.gk-toggle .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #fff, #e6dac0);
+  box-shadow: inset 0 2px 0 #fff, 0 2px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease-out;
+}
+.gk-toggle[data-on='on'] .knob {
+  transform: translateX(42px);
+}
+.gk-toggle .word {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  font: 400 15px/1 var(--gk-display);
+  color: #fff;
+  -webkit-text-stroke: 0.14em var(--gk-ink);
+  paint-order: stroke fill;
+  padding: 0 11px;
+  justify-items: end;
+}
+.gk-toggle[data-on='on'] .word {
+  justify-items: start;
+}
+
+.gk-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.gk-range::-webkit-slider-runnable-track {
+  height: 16px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #c9b693, #e8dac0);
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.2);
+}
+.gk-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  margin-top: -9px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 14%, #ffd25e 40%, var(--gk-orange-2));
+  box-shadow: 0 3px 0 rgba(58, 31, 18, 0.5);
+}
+.gk-range::-moz-range-track {
+  height: 10px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 999px;
+  background: #e0d1b3;
+}
+.gk-range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--gk-ink);
+  border-radius: 50%;
+  background: var(--gk-orange);
+}
+.gk-range:focus-visible {
+  outline: 3px solid var(--gk-blue-2);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------ motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .gk-btn,
+  .gk-toggle,
+  .gk-toggle .knob {
+    transition: none;
+  }
+}

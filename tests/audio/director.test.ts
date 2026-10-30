@@ -91,14 +91,12 @@ const setup = (over?: Partial<DirectorFrame>, random = () => 0.5) => {
 };
 
 describe('countdown', () => {
-  it('beeps on each whole second and lands GO on the state change', () => {
-    const { sink, d, f } = setup({ state: 'countdown', countdown: 3 });
-    run(d, f, 3, (fr, i) => {
-      fr.countdown = 3 - i * fr.dt;
+  it('is silent while it waits (there is no 3-2-1) and lands GO on the state change', () => {
+    const { sink, d, f } = setup({ state: 'countdown', countdown: 0.4 });
+    run(d, f, 1, (fr, i) => {
+      fr.countdown = 0.4 - i * fr.dt;
     });
-    expect(sink.named('countdown')).toHaveLength(3);
-    // The last beep is the high one.
-    expect(sink.named('countdown')[2].rate).toBeGreaterThan(1);
+    expect(sink.named('countdown')).toHaveLength(0);
     expect(sink.named('go')).toHaveLength(0);
 
     f.state = 'playing';

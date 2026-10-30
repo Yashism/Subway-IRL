@@ -19,10 +19,10 @@ describe('hudModel', () => {
     expect(m.hoverboards).toBe(3);
   });
 
-  it('counts down, then shows score, coins and power-ups', () => {
+  it('has only a short beat of countdown, then shows score, coins and power-ups', () => {
     const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
     g.step(1 / 60, [{ type: 'start' }], KB);
-    expect(hudModel(g).center).toBe('3');
+    expect(hudModel(g).center).toBe('1');
     for (let i = 0; i < 240; i++) g.step(1 / 60, [], KB);
     g.powerups.activate('magnet');
     g.stats.coins = 4;
@@ -36,7 +36,7 @@ describe('hudModel', () => {
   it('warns when the player stops jogging and summarises a caught run', () => {
     const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
     g.step(1 / 60, [{ type: 'start' }], STILL);
-    for (let i = 0; i < 180 + 70; i++) g.step(1 / 60, [], STILL);
+    for (let i = 0; i < Math.round(TUNING.countdownSeconds * TUNING.stepHz) + 70; i++) g.step(1 / 60, [], STILL);
     expect(hudModel(g).center).toBe('Bhaago!');
     expect(hudModel(g).danger).toBe(true);
     for (let i = 0; i < 60 && g.state === 'playing'; i++) g.step(1 / 60, [], STILL);
@@ -120,7 +120,7 @@ describe('hudModel', () => {
   it('exposes depleting power-up timers, the josh multiplier and a GO flash', () => {
     const g = new Game({ seed: 1, difficulty: 'cardio', chunks: EMPTY });
     g.step(1 / 60, [{ type: 'start' }], KB);
-    for (let i = 0; i < 181; i++) g.step(1 / 60, [], KB);
+    for (let i = 0; i < Math.round(TUNING.countdownSeconds * TUNING.stepHz) + 1; i++) g.step(1 / 60, [], KB);
     expect(hudModel(g).go).toBe(true);
     for (let i = 0; i < 60; i++) g.step(1 / 60, [], KB);
     expect(hudModel(g).go).toBe(false);

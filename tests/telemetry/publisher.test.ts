@@ -194,13 +194,14 @@ describe('TelemetryPublisher throttling', () => {
     expect(snaps.length).toBeGreaterThanOrEqual(9);
     expect(snaps.length).toBeLessThanOrEqual(11);
     const g = snaps.at(-1)!.game;
-    expect(g.state).toBe('countdown');
+    // The run is a beat of countdown away from starting, so a second in it is already underway.
+    expect(g.state).toBe('playing');
     expect(g.idleMs).toBe(420);
     expect(g.powerups.hoverboardsLeft).toBeGreaterThan(0);
     expect(g).toMatchObject({ lane: 0, rolling: false, airborne: false, caughtReason: null, pausedByLoss: false });
     expect(g.josh).toEqual({ value: 0, active: false });
     // Snapshots are cloned on send, so earlier ones are not overwritten by later ones.
-    expect(snaps[0].game.countdown).toBeGreaterThan(g.countdown);
+    expect(snaps[0].game.time).toBeLessThan(g.time);
   });
 
   it('sends events and commands as they happen, skipping empty batches', () => {

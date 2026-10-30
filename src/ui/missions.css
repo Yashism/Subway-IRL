@@ -11,17 +11,17 @@
  * the summary and the HUD show on their own, and outside the board they would have no colours.
  */
 :root {
-  --ms-ink: var(--ink, #1c2433);
-  --ms-sub: #5b6577;
-  --ms-line: rgba(28, 36, 51, 0.12);
-  --ms-track: #e3e7ec;
-  --ms-green: var(--green, #2f8f62);
-  --ms-fill: var(--blue, #2c5d9e);
+  --ms-ink: var(--gk-text, #4a2a16);
+  --ms-sub: var(--gk-text-soft, #8a5a36);
+  --ms-line: rgba(58, 31, 18, 0.2);
+  --ms-track: #e9d6a8;
+  --ms-green: #4aa31f;
+  --ms-fill: #ffa51e;
   /* Names the shop and the workout screen still read. */
-  --ms-cream: #f6f7f4;
-  --ms-cream-2: #e9ecef;
-  --ms-brown: #5b6577;
-  --ms-grey: #bcc3cf;
+  --ms-cream: #fff3d4;
+  --ms-cream-2: #f7dca0;
+  --ms-brown: #8a5a36;
+  --ms-grey: #cdb88e;
 }
 
 /* ------------------------------------------------------------ sections */
@@ -29,8 +29,8 @@
 .ms-card {
   box-sizing: border-box;
   width: 100%;
-  padding: 14px 0 0;
-  border-top: 1px solid var(--ms-line);
+  padding: 12px 0 0;
+  border-top: 3px dotted var(--ms-line);
   color: var(--ms-ink);
   text-align: left;
   font-family: var(--font-ui, 'Barlow', system-ui, sans-serif);
@@ -59,12 +59,12 @@
 .ms-head-title {
   flex: 1;
   min-width: 0;
-  font: 600 17px / 1.1 var(--font-game, sans-serif);
-  letter-spacing: 0.01em;
+  font: 400 21px / 1.1 var(--font-game, sans-serif);
+  letter-spacing: 0.02em;
   color: var(--ms-ink);
 }
 .ms-head-note {
-  font: 500 13px / 1 var(--font-ui, sans-serif);
+  font: 600 13px / 1 var(--font-ui, sans-serif);
   color: var(--ms-sub);
   white-space: nowrap;
 }
@@ -73,20 +73,34 @@
 
 .ms-bar {
   position: relative;
-  height: 6px;
-  border-radius: 3px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 3px solid var(--gk-ink, #3a1f12);
+  border-radius: 999px;
   background: var(--ms-track);
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.14);
   overflow: hidden;
 }
 .ms-bar-big {
-  height: 8px;
+  height: 20px;
 }
 .ms-bar-fill {
+  position: relative;
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: var(--ms-fill);
+  background: linear-gradient(180deg, #ffd25e, var(--ms-fill) 55%, #ee7d0a);
   transition: width 0.25s ease-out;
+}
+.ms-bar-fill::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 1px;
+  height: 30%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
 }
 
 /* ------------------------------------------------------------ a mission row */
@@ -106,20 +120,20 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
   border-radius: 50%;
-  border: 1.5px solid #aab2c0;
+  border: 3px solid var(--gk-ink, #3a1f12);
+  background: #fffbe9;
   box-sizing: border-box;
 }
 .ms-row-glyph {
-  font: 700 12px / 1 var(--font-ui, sans-serif);
+  font: 700 14px / 1 var(--font-ui, sans-serif);
   color: transparent;
 }
 .ms-row[data-state='done'] .ms-row-icon {
-  background: var(--ms-green);
-  border-color: var(--ms-green);
+  background: linear-gradient(180deg, #92e15a, var(--ms-green));
 }
 .ms-row[data-state='done'] .ms-row-glyph {
   color: #fff;
@@ -143,11 +157,11 @@
 .ms-row-label {
   flex: 1;
   min-width: 0;
-  font: 500 15px / 1.25 var(--font-ui, sans-serif);
+  font: 600 16px / 1.2 var(--font-ui, sans-serif);
   color: var(--ms-ink);
 }
 .ms-row-count {
-  font: 500 12.5px / 1 var(--font-ui, sans-serif);
+  font: 600 13px / 1 var(--font-ui, sans-serif);
   color: var(--ms-sub);
   font-variant-numeric: tabular-nums;
 }
@@ -156,7 +170,7 @@
 }
 .ms-row[data-state='done'] .ms-bar-fill,
 .ms-daily[data-state='done'] .ms-bar-fill {
-  background: var(--ms-green);
+  background: linear-gradient(180deg, #92e15a, var(--ms-green) 55%, #3f9a1b);
 }
 
 /* The reward: a small yellow tag, the way a fare is printed on a ticket. */
@@ -166,11 +180,13 @@
   align-items: baseline;
   gap: 2px;
   flex: none;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: var(--gold, #f5c518);
-  font: 600 13px / 1.2 var(--font-ui, sans-serif);
-  color: var(--ms-ink);
+  padding: 2px 9px 3px;
+  border: 2.5px solid var(--gk-ink, #3a1f12);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe873, #f5a400);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5);
+  font: 400 15px / 1.1 var(--font-game, sans-serif);
+  color: var(--gk-ink, #3a1f12);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -184,6 +200,7 @@
 .ms-row-reward[data-claimed='yes'] {
   background: var(--ms-track);
   color: var(--ms-sub);
+  box-shadow: none;
 }
 .ms-empty {
   padding: 6px 0;
@@ -199,11 +216,11 @@
   gap: 4px;
 }
 .ms-daily-title {
-  font: 600 22px / 1.1 var(--font-game, sans-serif);
+  font: 400 24px / 1.1 var(--font-game, sans-serif);
   color: var(--ms-ink);
 }
 .ms-daily-goal {
-  font: 400 14px / 1.3 var(--font-ui, sans-serif);
+  font: 500 15px / 1.3 var(--font-ui, sans-serif);
   color: var(--ms-sub);
   margin-bottom: 4px;
 }
@@ -247,8 +264,19 @@
 .ms-level-text {
   flex: 1;
   min-width: 0;
-  font: 600 22px / 1 var(--font-game, sans-serif);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 24px / 1 var(--font-game, sans-serif);
   color: var(--ms-ink);
+}
+.ms-level-text::before {
+  content: '';
+  width: 26px;
+  height: 26px;
+  flex: none;
+  background: linear-gradient(180deg, #ffe873, #f5a400);
+  clip-path: polygon(50% 2%, 62% 36%, 98% 38%, 69% 59%, 80% 94%, 50% 73%, 20% 94%, 31% 59%, 2% 38%, 38% 36%);
 }
 .ms-level-sub {
   margin-top: 6px;
@@ -263,32 +291,33 @@
   appearance: none;
   cursor: pointer;
   flex: none;
-  border: 1px solid rgba(28, 36, 51, 0.28);
-  border-radius: 6px;
-  padding: 7px 14px;
-  font: 600 14px / 1.1 var(--font-ui, sans-serif);
-  color: var(--ms-ink);
-  background: #fff;
-  transition: background-color 0.12s, border-color 0.12s;
+  padding: 6px 16px 8px;
+  border: 3px solid var(--gk-ink, #3a1f12);
+  border-radius: 13px;
+  font: 400 17px / 1 var(--font-game, sans-serif);
+  letter-spacing: 0.02em;
+  color: #fff;
+  -webkit-text-stroke: 0.13em var(--gk-ink, #3a1f12);
+  paint-order: stroke fill;
+  text-shadow: 0 0.06em 0 var(--gk-ink, #3a1f12);
+  background: linear-gradient(180deg, #ffd25e, #ee7d0a);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.15), 0 3px 0 var(--gk-ink, #3a1f12);
   white-space: nowrap;
+  transition: transform 0.08s, box-shadow 0.08s;
 }
 .ms-btn:hover {
-  background: #eef0f3;
+  filter: brightness(1.08);
 }
 .ms-btn:active {
-  background: #e3e7ec;
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 0 0 var(--gk-ink, #3a1f12);
 }
 .ms-btn:focus-visible {
-  outline: 2px solid var(--blue, #2c5d9e);
+  outline: 3px solid var(--gk-blue-2, #1d83c8);
   outline-offset: 2px;
 }
 .ms-btn-go {
-  color: #fff;
-  background: var(--ms-green);
-  border-color: transparent;
-}
-.ms-btn-go:hover {
-  background: #278055;
+  background: linear-gradient(180deg, #92e15a, #3f9a1b);
 }
 .ms-btn-shop {
   align-self: center;
@@ -300,16 +329,17 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 16px;
-  border-radius: 8px;
-  background: #f6f7f4;
-  box-shadow: 0 1px 2px rgba(14, 22, 36, 0.25), 0 8px 24px rgba(14, 22, 36, 0.28);
+  padding: 8px 18px 9px;
+  border: 3px solid var(--gk-ink, #3a1f12);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff3d4, #f7dca0);
+  box-shadow: inset 0 2px 0 #fff, 0 4px 0 var(--gk-ink, #3a1f12), 0 10px 18px rgba(0, 0, 0, 0.3);
   color: var(--ms-ink);
   font-family: var(--font-ui, sans-serif);
   animation: ms-toast-in 0.3s ease-out both;
 }
 .ms-toast[data-state='done'] {
-  background: var(--gold, #f5c518);
+  background: linear-gradient(180deg, #ffe873, #f5a400);
 }
 .ms-toast-icon {
   display: none;
@@ -320,7 +350,7 @@
   gap: 2px;
 }
 .ms-toast-label {
-  font: 600 15px / 1.1 var(--font-ui, sans-serif);
+  font: 600 16px / 1.1 var(--font-ui, sans-serif);
 }
 .ms-toast-count {
   font: 500 12.5px / 1.1 var(--font-ui, sans-serif);
@@ -328,7 +358,7 @@
   font-variant-numeric: tabular-nums;
 }
 .ms-toast[data-state='done'] .ms-toast-count {
-  color: #4a3a00;
+  color: #6a3f00;
 }
 @keyframes ms-toast-in {
   from {
@@ -343,4 +373,40 @@
   .ms-bar-fill {
     transition: none;
   }
+}
+
+/*
+ * On the title screen the board is a wide, flat plaque in the empty sky: the level and the daily
+ * challenge on the left, the missions on the right, so nothing stands in front of the runner.
+ */
+.hud-menu-rail.ms-board[data-on='on'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 0 22px;
+}
+.hud-menu-rail .ms-level {
+  grid-column: 1;
+  grid-row: 1;
+  padding-top: 0;
+  border-top: 0;
+}
+.hud-menu-rail .ms-daily {
+  grid-column: 1;
+  grid-row: 2;
+}
+.hud-menu-rail .ms-list {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding-top: 0;
+  border-top: 0;
+  padding-left: 22px;
+  padding-right: 8px;
+  border-left: 3px dotted var(--ms-line);
+}
+.hud-menu-rail .ms-row .ms-bar {
+  display: none;
+}
+.hud-menu-rail .ms-rows {
+  gap: 10px;
 }

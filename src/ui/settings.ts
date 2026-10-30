@@ -24,6 +24,9 @@ import {
   OUTLINE_BLURBS,
   OUTLINE_CHOICES,
   OUTLINE_NAMES,
+  QUALITY_BLURBS,
+  QUALITY_CHOICES,
+  QUALITY_NAMES,
   MODE_NAMES,
   OBSTACLE_AMOUNT_BLURBS,
   OBSTACLE_AMOUNT_NAMES,
@@ -39,6 +42,7 @@ import {
 import { OBSTACLE_AMOUNTS, obstacleLevel } from '../game/config';
 import type { LaneSpots } from '../pose/laneSpots';
 import type { CameraOption } from './poseScreens';
+import { icon } from './icons';
 
 // ---------------------------------------------------------------- DOM helpers (shared with workout.ts)
 
@@ -175,6 +179,7 @@ export class SettingsScreen {
   private obstaclesValue!: HTMLElement;
   private obstaclesWords!: HTMLElement;
   private amountChips!: Map<string, HTMLButtonElement>;
+  private qualityChips!: Map<string, HTMLButtonElement>;
   private outlineChips!: Map<string, HTMLButtonElement>;
   private camSelect!: HTMLSelectElement;
   private camKey = '';
@@ -208,9 +213,12 @@ export class SettingsScreen {
     this.attr(root, 'data-on', 'off');
 
     const top = el('div', 'sw-top', root);
-    el('div', 'sw-tab', top, 'Settings');
+    el('div', 'sw-tab gk-ribbon', top, 'Settings');
     el('div', 'sw-tab-sub', top, 'Changes apply straight away.');
 
+    const close = button(top, 'sw-close gk-btn gk-btn-round gk-btn-red gk-btn-sm', '', () => this.handlers.close());
+    close.innerHTML = icon('close');
+    close.setAttribute('aria-label', 'Close settings');
     const body = el('div', 'sw-grid', root);
     // Two columns, filled by hand so the panels end at about the same height.
     const left = el('div', 'sw-col', body);
@@ -240,9 +248,9 @@ export class SettingsScreen {
     this.laneNote = el('div', 'sw-note sw-lanes-note', moveBody);
 
     const moveActions = el('div', 'sw-actions', moveBody);
-    this.checkBtn = button(moveActions, 'sw-btn sw-btn-go', 'Redo the move check', () => this.handlers.redoMoveCheck());
-    this.laneBtn = button(moveActions, 'sw-btn', 'Set my lane spots', () => this.handlers.setLaneSpots());
-    this.tuningBtn = button(moveActions, 'sw-btn sw-btn-warn', 'Reset my tuning', () =>
+    this.checkBtn = button(moveActions, 'sw-btn gk-btn gk-btn-green gk-btn-sm', 'Redo the move check', () => this.handlers.redoMoveCheck());
+    this.laneBtn = button(moveActions, 'sw-btn gk-btn gk-btn-cream gk-btn-sm', 'Set my lane spots', () => this.handlers.setLaneSpots());
+    this.tuningBtn = button(moveActions, 'sw-btn gk-btn gk-btn-orange gk-btn-sm', 'Reset my tuning', () =>
       this.ask({
         title: 'Reset your tuning?',
         body: 'The move check measured how big your moves are. Resetting puts every move back to the shipped defaults for this play mode. You can run the check again any time.',
@@ -298,6 +306,11 @@ export class SettingsScreen {
 
     // ---- picture
     const picture = this.group(right, 'Picture', 'How the game looks, and how hard it works your laptop');
+    // First in its column: it is the one a player with a strong laptop comes looking for.
+    right.prepend(picture.parentElement as HTMLElement);
+    this.qualityChips = this.chips(picture, 'Graphics', QUALITY_CHOICES, QUALITY_NAMES, QUALITY_BLURBS, (v) =>
+      this.handlers.change({ quality: v as GameSettings['quality'] }),
+    );
     this.outlineChips = this.chips(picture, 'Outlines', OUTLINE_CHOICES, OUTLINE_NAMES, OUTLINE_BLURBS, (v) =>
       this.handlers.change({ outlines: v as GameSettings['outlines'] }),
     );
@@ -323,8 +336,8 @@ export class SettingsScreen {
     }
 
     const dataActions = el('div', 'sw-actions', data);
-    button(dataActions, 'sw-btn', 'Export my data', () => this.handlers.exportData());
-    button(dataActions, 'sw-btn sw-btn-danger', 'Clear my history', () =>
+    button(dataActions, 'sw-btn gk-btn gk-btn-cream gk-btn-sm', 'Export my data', () => this.handlers.exportData());
+    button(dataActions, 'sw-btn gk-btn gk-btn-red gk-btn-sm', 'Clear my history', () =>
       this.ask({
         title: 'Clear everything?',
         body: 'This erases every run, your day streak, your best score and your lifetime totals. Your coins, level, missions and shop are not touched. It cannot be undone — export your data first if you want to keep it.',
@@ -336,8 +349,8 @@ export class SettingsScreen {
 
     // ---- footer
     const foot = el('div', 'sw-foot', root);
-    button(foot, 'sw-btn sw-btn-go sw-btn-wide', 'Done', () => this.handlers.close());
-    button(foot, 'sw-btn sw-btn-ghost', 'Your runs', () => this.handlers.openWorkout());
+    button(foot, 'sw-btn gk-btn gk-btn-green gk-btn-lg', 'Done', () => this.handlers.close());
+    button(foot, 'sw-btn gk-btn gk-btn-wood gk-btn-sm', 'Your runs', () => this.handlers.openWorkout());
 
     // ---- confirm dialog
     this.dialog = el('div', 'sw-dialog', root);
@@ -348,8 +361,8 @@ export class SettingsScreen {
     const dlgActions = el('div', 'sw-actions sw-dialog-actions', box);
     // Backing out comes first and stays plain: green is this game's "go" colour everywhere else,
     // and spending it on Cancel would make the safe choice look like the action being asked for.
-    button(dlgActions, 'sw-btn sw-btn-cancel', 'Cancel', () => this.setConfirm(null));
-    this.dlgYes = button(dlgActions, 'sw-btn sw-btn-danger', 'Yes', () => {
+    button(dlgActions, 'sw-btn gk-btn gk-btn-cream gk-btn-sm', 'Cancel', () => this.setConfirm(null));
+    this.dlgYes = button(dlgActions, 'sw-btn gk-btn gk-btn-red gk-btn-sm', 'Yes', () => {
       const p = this.pending;
       this.setConfirm(null);
       p?.onYes();
@@ -384,6 +397,7 @@ export class SettingsScreen {
     // Obstacles are laid when a run starts, so say when a change lands.
     this.text(this.obstaclesWords, `${OBSTACLE_LEVEL_BLURBS[level]}. Applies from your next run.`);
     this.select(this.amountChips, s.obstacleAmount);
+    this.select(this.qualityChips, s.quality);
     this.select(this.outlineChips, s.outlines);
 
     this.setToggle(this.mirrorBtn, s.mirror);
@@ -470,7 +484,7 @@ export class SettingsScreen {
   }
 
   private slider(parent: Element, min: number, max: number, step: number, onInput: (v: number) => void): HTMLInputElement {
-    const i = el('input', 'sw-slider', parent);
+    const i = el('input', 'sw-slider gk-range', parent);
     i.type = 'range';
     i.min = String(min);
     i.max = String(max);
@@ -572,7 +586,7 @@ export class SettingsScreen {
     this.text(this.dlgTitle, c.title);
     this.text(this.dlgBody, c.body);
     this.text(this.dlgYes, c.yes);
-    this.dlgYes.className = c.go ? 'sw-btn sw-btn-go' : c.danger ? 'sw-btn sw-btn-danger' : 'sw-btn sw-btn-warn';
+    this.dlgYes.className = c.go ? 'sw-btn gk-btn gk-btn-green gk-btn-sm' : c.danger ? 'sw-btn gk-btn gk-btn-red gk-btn-sm' : 'sw-btn gk-btn gk-btn-orange gk-btn-sm';
   }
 
   private text(e: Element, value: string): void {

@@ -33,7 +33,7 @@ describe('cleaning', () => {
   it('keeps a good record verbatim', () => {
     const good = {
       sensitivity: 1.1, mode: 'small', lanes: 'spots', mirror: false, line: 'harbour', difficulty: 'beast',
-      obstacleLevel: 5, obstacleAmount: 'lots', outlines: 'bold', reducedMotion: true, reducedEffects: true, weightKg: 82,
+      obstacleLevel: 5, obstacleAmount: 'lots', quality: 'high', outlines: 'bold', reducedMotion: true, reducedEffects: true, weightKg: 82,
     };
     expect(cleanSettings(good)).toEqual(good);
   });

@@ -6,9 +6,9 @@
  * Render-only: it draws a `ShopModel` (src/app/progression.ts) and calls back. It owns no state.
  */
 
-import './missions.css';
 import './shop.css';
 import type { ShopItemView, ShopKind, ShopModel } from '../app/progression';
+import { icon } from './icons';
 import { missionButton, pct } from './missionCard';
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent: ParentNode, text?: string): HTMLElementTagNameMap[K] => {
@@ -25,10 +25,10 @@ export interface ShopHandlers {
   close?(): void;
 }
 
-const SECTIONS: readonly { kind: ShopKind; title: string; note: string }[] = [
-  { kind: 'character', title: 'Runners', note: 'Same moves, different kid' },
-  { kind: 'board', title: 'Hoverboards', note: 'Recolours of the flying carpet' },
-  { kind: 'consumable', title: 'Boosts', note: 'One run each' },
+const SECTIONS: readonly { kind: ShopKind; title: string; note: string; ribbon: 'blue' | 'green' | 'gold' }[] = [
+  { kind: 'character', title: 'Runners', note: 'Same moves, different kid', ribbon: 'blue' },
+  { kind: 'board', title: 'Hoverboards', note: 'Recolours of the flying carpet', ribbon: 'green' },
+  { kind: 'consumable', title: 'Boosts', note: 'One run each', ribbon: 'gold' },
 ];
 // A section with nothing in it is skipped below, so an item held back (ShopItem.unreleased) takes
 // its whole group off the storefront without anything here needing to know about it.
@@ -37,19 +37,19 @@ const SECTIONS: readonly { kind: ShopKind; title: string; note: string }[] = [
 export function buttonFor(it: ShopItemView): { label: string; action: 'buy' | 'equip' | 'none'; cls: string } {
   switch (it.state) {
     case 'equipped':
-      return { label: 'Equipped', action: 'none', cls: 'sh-btn sh-btn-on' };
+      return { label: 'Equipped', action: 'none', cls: 'sh-btn sh-btn-on gk-btn gk-btn-sm gk-btn-cream' };
     case 'owned':
-      return { label: 'Equip', action: 'equip', cls: 'sh-btn sh-btn-equip' };
+      return { label: 'Equip', action: 'equip', cls: 'sh-btn sh-btn-equip gk-btn gk-btn-sm gk-btn-green' };
     case 'afford':
-      return { label: it.price === 0 ? 'Take it' : `Buy ${it.priceText}`, action: 'buy', cls: 'sh-btn sh-btn-buy' };
+      return { label: it.price === 0 ? 'Take it' : `Buy ${it.priceText}`, action: 'buy', cls: 'sh-btn sh-btn-buy gk-btn gk-btn-sm gk-btn-orange' };
     default:
-      return { label: `${it.short.toLocaleString('en-IN')} more`, action: 'none', cls: 'sh-btn sh-btn-locked' };
+      return { label: `${it.short.toLocaleString('en-IN')} more`, action: 'none', cls: 'sh-btn sh-btn-locked gk-btn gk-btn-sm gk-btn-wood' };
   }
 }
 
 function renderItem(it: ShopItemView, h: ShopHandlers): HTMLElement {
   const card = document.createElement('div');
-  card.className = 'sh-item';
+  card.className = 'sh-item gk-panel';
   card.dataset.state = it.state;
   card.dataset.kind = it.kind;
 
@@ -66,12 +66,13 @@ function renderItem(it: ShopItemView, h: ShopHandlers): HTMLElement {
 
   const foot = el('div', 'sh-foot', body);
   const price = el('div', 'sh-price', foot);
-  el('span', 'ms-coin', price, '🪙');
+  el('span', 'gk-coin sh-coin', price, '₹');
   el('span', 'sh-price-n', price, it.priceText);
 
   const b = buttonFor(it);
   if (b.action === 'none') {
     const dead = el('button', b.cls, foot, b.label);
+    if (it.state === 'equipped') dead.insertAdjacentHTML('afterbegin', icon('check'));
     dead.type = 'button';
     dead.disabled = true;
   } else {
@@ -110,17 +111,17 @@ export class ShopScreen {
 
     // ---- header: the title, the purse and the level bar
     const top = el('div', 'sh-top', frag);
-    el('div', 'sh-title', top, 'SHOP');
-    const purse = el('div', 'sh-purse', top);
-    el('span', 'ms-coin', purse, '🪙');
+    el('div', 'sh-title gk-title', top, 'Shop');
+    const purse = el('div', 'sh-purse gk-chip', top);
+    el('span', 'gk-coin', purse, '₹');
     el('span', 'sh-purse-n', purse, m.balanceText);
 
-    const lvl = el('div', 'sh-level', frag);
+    const lvl = el('div', 'sh-level gk-panel', frag);
     const lhead = el('div', 'sh-level-head', lvl);
     el('div', 'sh-level-text', lhead, m.levelText);
     el('div', 'sh-level-sub', lhead, m.levelSub);
-    const bar = el('div', 'ms-bar', lvl);
-    el('div', 'ms-bar-fill', bar).style.width = pct(m.levelFrac);
+    const bar = el('div', 'sh-bar', lvl);
+    el('div', 'sh-bar-fill', bar).style.width = pct(m.levelFrac);
     el('div', 'sh-level-note', lvl, 'Levels only pay out coins — nothing is ever locked behind one.');
 
     // ---- the sections
@@ -130,7 +131,7 @@ export class ShopScreen {
       if (!items.length) continue;
       const sec = el('div', 'sh-section', body);
       const head = el('div', 'sh-section-head', sec);
-      el('div', 'sh-section-title', head, s.title);
+      el('div', `sh-section-title gk-ribbon gk-ribbon-${s.ribbon}`, head, s.title);
       el('div', 'sh-section-note', head, s.note);
       const grid = el('div', 'sh-grid', sec);
       for (const it of items) grid.append(renderItem(it, this.handlers));
@@ -138,7 +139,8 @@ export class ShopScreen {
 
     if (this.handlers.close) {
       const actions = el('div', 'sh-actions', frag);
-      missionButton(actions, 'ms-btn', '⌂ Back', () => this.handlers.close?.());
+      const back = missionButton(actions, 'sh-back gk-btn gk-btn-blue', 'Back', () => this.handlers.close?.());
+      back.insertAdjacentHTML('afterbegin', icon('home'));
     }
     this.root.replaceChildren(frag);
   }

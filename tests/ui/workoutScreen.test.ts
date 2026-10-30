@@ -110,13 +110,13 @@ describe('the empty state', () => {
     ui.update(view({ profile: emptyProfile() }));
     expect(root.dataset.empty).toBe('yes');
     expect(root.querySelector('.wk-invite-title')!.textContent).toMatch(/Nothing here yet/i);
-    expect(byText(root, '.sw-btn', 'Run your first')).toBeTruthy();
+    expect(byText(root, '.wk-btn', 'Run your first')).toBeTruthy();
   });
 
   it('starts a run from the invitation', () => {
     const { root, ui, fired } = screen();
     ui.update(view({ profile: emptyProfile() }));
-    byText(root, '.sw-btn', 'Run your first')!.click();
+    byText(root, '.wk-btn', 'Run your first')!.click();
     expect(fired).toEqual(['start']);
   });
 
@@ -298,9 +298,9 @@ describe('the frame', () => {
   it('reports each footer button', () => {
     const { root, ui, fired } = screen();
     ui.update(view());
-    byText(root, '.sw-btn', 'Run again')!.click();
-    byText(root, '.sw-btn', '⚙ Settings')!.click();
-    byText(root, '.sw-btn', 'Done')!.click();
+    byText(root, '.wk-btn', 'Run again')!.click();
+    byText(root, '.wk-btn', 'Settings')!.click();
+    byText(root, '.wk-btn', 'Done')!.click();
     expect(fired).toEqual(['start', 'settings', 'close']);
   });
 });

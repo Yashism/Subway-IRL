@@ -17,6 +17,10 @@ export class FrameLimiter {
   /** `minMs` between drawn frames; 0 draws every frame. */
   constructor(private minMs = 13) {}
 
+  setMinMs(minMs: number): void {
+    this.minMs = minMs;
+  }
+
   /** True when this animation frame should be drawn. `now` is the rAF timestamp. */
   accept(now: number): boolean {
     if (this.minMs <= 0 || now < this.last || now - this.last >= this.minMs) {
@@ -67,6 +71,16 @@ export class RenderScale {
     this.calmMs = o.calmMs ?? 17.8;
     this.slowForMs = o.slowForMs ?? 1500;
     this.baseProbeMs = this.probeMs = o.probeMs ?? 8000;
+  }
+
+  /** Back to full resolution with no history, as if just started. */
+  reset(): void {
+    this.index = 0;
+    this.ema = 0;
+    this.slowFor = 0;
+    this.calmFor = 0;
+    this.probeMs = this.baseProbeMs;
+    this.lastUp = -Infinity;
   }
 
   get scale(): number {

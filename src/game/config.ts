@@ -108,7 +108,8 @@ export const TUNING = {
   idleCaughtMs: 2000,
   squatIdleCreditMs: 1000,
   catchSeconds: 5,
-  countdownSeconds: 3,
+  /** A beat between pressing play and the first step, so the camera settles. There is no on-screen 3-2-1. */
+  countdownSeconds: 0.4,
   // power-ups
   hoverboardsPerRun: 3,
   /**
