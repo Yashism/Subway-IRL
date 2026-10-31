@@ -36,9 +36,10 @@ Free, open source, and it runs entirely on your device: your video never leaves 
 
 <br />
 
-<img src="docs/media/gameplay.gif" alt="Gameplay: the runner dodges obstacles along a Mumbai railway line" width="640" />
+<a href="docs/media/demo.mp4"><img src="docs/media/demo-preview.webp" alt="A whole short run: the kid pastes a poster on a train, the TT shouts OY, the run, and Pakda gaya" width="720" /></a>
 
-<sub>The autopilot bot playing a run. Prefer video? <a href="docs/media/gameplay.mp4">gameplay.mp4</a></sub>
+<sub>A whole short run, from the poster-pasting intro to <b>Pakda gaya!</b>, played by the built-in bot.<br />
+This preview is trimmed to 30 fps to stay light; <a href="docs/media/demo.mp4"><b>watch the full 1080p, 120 fps video</b></a>.</sub>
 
 </div>
 
@@ -64,19 +65,24 @@ minutes, steps, a rough calorie estimate and a streak).
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/media/menu.jpg" alt="Title screen" /><br /><sub><b>Title screen.</b> Play, Wander, daily challenge and missions.</sub></td>
-    <td width="50%"><img src="docs/media/gameplay.jpg" alt="Running along the tracks" /><br /><sub><b>The run.</b> Dodge, jump, roll and collect coins.</sub></td>
+    <td width="50%"><img src="docs/media/title.jpg" alt="Title screen" /><br /><sub><b>Title screen.</b> Play, Wander, your runs and the shop.</sub></td>
+    <td width="50%"><img src="docs/media/intro.jpg" alt="The intro cinematic: pasting a poster on a Mumbai local" /><br /><sub><b>The intro.</b> The first run of each session opens with a short cinematic.</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/media/wander.jpg" alt="Wander mode in a Mumbai street" /><br /><sub><b>Wander mode.</b> A relaxed free-roam walk through the city. No obstacles, no inspector.</sub></td>
+    <td><img src="docs/media/intro-oy.jpg" alt="The ticket inspector shouts OY" /><br /><sub><b>OY!</b> The TT has spotted you. Bhaago.</sub></td>
+    <td><img src="docs/media/run.jpg" alt="Running past a station" /><br /><sub><b>The run.</b> Dodge, jump, roll and collect coins past real station names.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/caught.jpg" alt="Pakda gaya!" /><br /><sub><b>Pakda gaya!</b> Crash, or stop jogging, and the TT catches you.</sub></td>
     <td><img src="docs/media/summary.jpg" alt="Run summary" /><br /><sub><b>Run summary.</b> Score, stats, missions and your best.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/wander.jpg" alt="Wander mode in a Mumbai street" /><br /><sub><b>Wander mode.</b> A relaxed walk through the city. No obstacles, no inspector.</sub></td>
+    <td><img src="docs/media/settings.jpg" alt="Settings" /><br /><sub><b>Settings.</b> Sensitivity, lanes, pace, difficulty and graphics quality.</sub></td>
   </tr>
   <tr>
     <td><img src="docs/media/calibration.jpg" alt="Camera calibration" /><br /><sub><b>Calibration.</b> Stand in the outline and the game learns your body.</sub></td>
     <td><img src="docs/media/move-check.jpg" alt="Move check" /><br /><sub><b>Move check.</b> Six guided moves tune the thresholds to <i>you</i>.</sub></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="docs/media/settings.jpg" alt="Settings" width="70%" /><br /><sub><b>Settings.</b> Sensitivity, lanes, pace, obstacle difficulty, graphics quality and more.</sub></td>
   </tr>
 </table>
 
@@ -240,6 +246,22 @@ Camera-free harness pages for developing without a webcam: `debug.html` (pose), 
 `moveCheck-harness.html`, `laneSetup-harness.html`, `settings-harness.html`, `missions-harness.html`,
 `intro-harness.html`, `audio-lab.html` (renders every sound cue offline and draws its waveform) and
 `monitor-harness.html`. Add `?autopilot` to the game to watch the bot play.
+
+<details>
+<summary><b>Re-record the demo video</b></summary>
+
+`scripts/record-demo.mjs` renders a whole run frame by frame on a virtual clock, so even a slow laptop produces a true
+120 fps clip. It needs Node 22+ and a local Chrome, and has no dependencies:
+
+```bash
+npm run build && npx vite preview --port 4173          # terminal 1
+node scripts/record-demo.mjs "http://127.0.0.1:4173/?autopilot&intro=always&quality=high" demo-frames   # terminal 2
+ffmpeg -framerate 120 -i demo-frames/f%06d.jpg -c:v libx264 -crf 24 -pix_fmt yuv420p demo.mp4
+```
+
+It takes about a second of real time per frame, so a 30 second clip is a long coffee break.
+
+</details>
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 
