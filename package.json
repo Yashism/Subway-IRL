@@ -2,6 +2,30 @@
   "name": "subway-irl",
   "private": true,
   "version": "0.1.0",
+  "description": "An endless runner you play with your body: jog in place in front of your webcam to run through Mumbai. Browser-based, open source, runs entirely on your device.",
+  "license": "MIT",
+  "author": "Yash (https://github.com/Yashism)",
+  "homepage": "https://yashism.github.io/Subway-IRL/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yashism/Subway-IRL.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Yashism/Subway-IRL/issues"
+  },
+  "keywords": [
+    "game",
+    "endless-runner",
+    "pose-estimation",
+    "mediapipe",
+    "webcam",
+    "threejs",
+    "typescript",
+    "vite",
+    "fitness",
+    "exergame",
+    "mumbai"
+  ],
   "type": "module",
   "scripts": {
     "predev": "node scripts/fetch-mediapipe.mjs",
@@ -28,5 +52,8 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }

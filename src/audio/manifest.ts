@@ -25,8 +25,8 @@
 import type { BufferShape } from './voices';
 import type { CueName } from './types';
 
-/** Where the files are served from. */
-export const AUDIO_BASE = '/audio/';
+/** Where the files are served from: `audio/` under wherever the game is hosted (a sub-path on GitHub Pages). */
+export const AUDIO_BASE = `${typeof import.meta.env === 'undefined' ? '/' : import.meta.env.BASE_URL}audio/`;
 
 /** In preference order; the loader picks the first the browser admits to playing. */
 export const AUDIO_FORMATS = [

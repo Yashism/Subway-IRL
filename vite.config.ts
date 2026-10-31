@@ -10,6 +10,8 @@ import { resolve } from 'node:path';
 const lanCert = process.env.SUBWAY_LAN_CERT_DIR;
 
 export default defineConfig({
+  // `VITE_BASE=/Subway-IRL/` for GitHub Pages; the game is served from `/` everywhere else.
+  base: process.env.VITE_BASE ?? '/',
   server: lanCert
     ? { https: { key: readFileSync(resolve(lanCert, 'lan-key.pem')), cert: readFileSync(resolve(lanCert, 'lan-cert.pem')) } }
     : undefined,

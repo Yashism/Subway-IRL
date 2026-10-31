@@ -1,0 +1,44 @@
+name: Bug report
+description: Something is broken, or a move does not register
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: input
+    attributes:
+      label: How were you playing?
+      options:
+        - Webcam, full body
+        - Webcam, small room
+        - Keyboard
+        - Wander mode
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 130 on Windows 11
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Laptop / GPU (if it is about speed)
+      placeholder: Intel Arc iGPU, 120 Hz screen
+  - type: textarea
+    id: recording
+    attributes:
+      label: Recorded session (best for "my move did not register")
+      description: Open the live monitor (press M, in a separate window), press Record session, reproduce the problem, and drag the JSON file here.
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors, screenshots or clips

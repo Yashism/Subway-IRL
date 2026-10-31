@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a question or share a run
+    url: https://github.com/Yashism/Subway-IRL/discussions
+    about: Questions, ideas and show-and-tell are welcome in Discussions.

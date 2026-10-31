@@ -737,7 +737,7 @@ body {
   --wood-w: 12px;
   width: min(480px, calc(100vw - 40px));
   margin-top: 26px;
-  padding: 40px 22px 18px;
+  padding: 56px 22px 18px;
   text-align: center;
   animation: hud-card-in 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
@@ -877,7 +877,7 @@ body {
 /* Short screens (laptops with browser chrome): keep the whole card on screen. */
 @media (max-height: 760px) {
   .hud-summary { padding-top: 14px; box-sizing: border-box; }
-  .hud-card { padding: 34px 20px 12px; }
+  .hud-card { padding: 48px 20px 12px; }
   .hud-card-score { font-size: 62px; margin: 4px 0 2px; }
   .hud-card-best { margin-bottom: 8px; }
   .hud-tile { padding: 6px 4px 6px; }
@@ -1101,6 +1101,9 @@ html[data-pose-screen='moveCheck'] .hud[data-state='menu'] .hud-menu {
 html[data-overlay='settings'] .hud-screen:not(.hud-paused),
 html[data-overlay='workout'] .hud-screen:not(.hud-paused),
 html[data-overlay='shop'] .hud-screen:not(.hud-paused),
+html[data-overlay='settings'] .pose-ui[data-screen='menu'] .ps-menu,
+html[data-overlay='workout'] .pose-ui[data-screen='menu'] .ps-menu,
+html[data-overlay='shop'] .pose-ui[data-screen='menu'] .ps-menu,
 html[data-overlay='settings'] .hud-menu-rail,
 html[data-overlay='workout'] .hud-menu-rail,
 html[data-overlay='shop'] .hud-menu-rail {
@@ -1109,7 +1112,7 @@ html[data-overlay='shop'] .hud-menu-rail {
 
 /* The summary card carries a mission panel, so on shorter windows it tightens first. */
 @media (max-height: 1040px) {
-  .hud-summary .hud-card { padding-top: 34px; padding-bottom: 12px; }
+  .hud-summary .hud-card { padding-top: 52px; padding-bottom: 12px; }
   .hud-summary .hud-card-score { font-size: 62px; margin: 4px 0 2px; }
   .hud-summary .hud-card-best { margin-bottom: 8px; }
   .hud-summary .hud-tile { padding: 6px 4px; }

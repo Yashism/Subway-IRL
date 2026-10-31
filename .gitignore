@@ -3,7 +3,7 @@ dist/
 public/mediapipe/
 *.log
 
-# Third-party character rips supplied by the user: local use only, never commit
+# Local-only reference files: never committed, never used by the game
 assets/
 .worktrees/
 .cert/
