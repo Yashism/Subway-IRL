@@ -37,10 +37,6 @@ Free, open source, and it runs entirely on your device: your video never leaves 
 <br />
 
 <a href="docs/media/demo.mp4"><img src="docs/media/demo-preview.webp" alt="A whole short run: the kid pastes a poster on a train, the TT shouts OY, the run, and Pakda gaya" width="720" /></a>
-
-<sub>A whole short run, from the poster-pasting intro to <b>Pakda gaya!</b>, played by the built-in bot.<br />
-This preview is trimmed to 30 fps to stay light; <a href="docs/media/demo.mp4"><b>watch the full 1080p, 120 fps video</b></a>.</sub>
-
 </div>
 
 ---
