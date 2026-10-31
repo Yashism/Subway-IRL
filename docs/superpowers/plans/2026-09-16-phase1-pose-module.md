@@ -70,7 +70,7 @@
 - [ ] **Step 1: Initialise the package and install dependencies**
 
 ```bash
-cd /home/yash/Projects/SSRealLife
+cd <repo>
 npm init -y
 npm install @mediapipe/tasks-vision@1.0.1
 npm install -D vite typescript vitest tsx @types/node
@@ -3481,7 +3481,7 @@ Expected: no type errors, all tests pass, and the build writes `dist/index.html`
 - [ ] **Step 6: Check the page visually with replay**
 
 ```bash
-cd /home/yash/Projects/SSRealLife
+cd <repo>
 npx vite --port 5173 --strictPort > /tmp/claude-vite.log 2>&1 &   # or run via run_in_background
 SHOT=$SCRATCH/debug-full.png
 shoot "http://localhost:5173/debug.html?replay=synth-full" "$SHOT" \

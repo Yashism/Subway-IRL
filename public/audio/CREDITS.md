@@ -99,4 +99,4 @@ Kept here so nobody repeats the search.
 | Station PA announcements (Kassel, Baltimore Penn, Cantù, El Palomar) | All public-domain-marked and all usable, but every one of them is SPEECH, in German, English, Italian or Spanish. A German platform announcement in a Mumbai station is worse than the synthesised chime. |
 | Freesound direct downloads | The API needs a token and the site needs a login; nothing there is reachable anonymously. |
 | Mixkit | Free for commercial use, but its licence forbids redistributing a sound as a stand-alone file, which is exactly what committing it to this repo would be. |
-| The `assets/` folder in this repo | Third-party rips supplied for local reference only. Gitignored, never used, never shipped. |
+| A local `assets/` folder (not part of this repository) | Reference material kept off the repo. Gitignored, never used, never shipped. |

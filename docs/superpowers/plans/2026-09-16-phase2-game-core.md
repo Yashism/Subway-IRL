@@ -4222,7 +4222,7 @@ Expected: everything passes, and `dist/index.html` plus `dist/debug.html` are pr
 
 Start the dev server in the background, if one isn't already serving the project on 5173:
 ```bash
-cd /home/yash/Projects/SSRealLife && (npx vite --port 5173 --strictPort > "$SCRATCH/vite.log" 2>&1 &)
+cd <repo> && (npx vite --port 5173 --strictPort > "$SCRATCH/vite.log" 2>&1 &)
 ```
 `$SCRATCH` is the session scratchpad directory, which the dispatch names.
 

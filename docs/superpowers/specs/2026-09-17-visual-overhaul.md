@@ -8,7 +8,7 @@
 ## Goals
 
 - **Look:** chunky, saturated, toon-lit 3D with a curved horizon. The Subway Surfers feel, but every design is original and Mumbai-themed.
-- **Assets:** every asset is generated in code (procedural geometry plus canvas-drawn textures), or is a free CC0/CC-BY model. The user's ripped Subway Surfers and Brawl Stars files in `assets/` are local-only and gitignored. They are never the default, and never committed.
+- **Assets:** every asset is generated in code (procedural geometry plus canvas-drawn textures), or is a free CC0/CC-BY model. Any local-only reference material kept in `assets/` is gitignored: it is never used by the game and never committed.
 - **Gameplay stays authoritative:** visuals must match the collision shapes in `src/game/obstacles.ts` and `TUNING`, and must never change game behaviour.
 - **Performance:** 60 fps on an Intel Arc 140T iGPU. The pixel ratio stays at or below 1.25, with at most about 150 draw calls and 500k triangles.
 

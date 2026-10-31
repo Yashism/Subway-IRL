@@ -338,4 +338,4 @@ The user produces the AI-generated and Mixamo assets. The code and pipeline are 
 
 ## 11. Notes
 
-- "Subway IRL" is used as a personal, local-only project name. Before any public release, the name should be reconsidered, because "Subway" and "Subway Surfers" are existing trademarks.
+- "Subway IRL" began as a personal working title. For the public release the repository keeps the name, with an explicit not-affiliated disclaimer in the README; "Subway" and "Subway Surfers" are existing trademarks, so the name may change if that is ever requested.
