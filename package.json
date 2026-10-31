@@ -41,7 +41,7 @@
     "fixtures:synth": "tsx scripts/make-synth-fixtures.ts"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "^1.0.1",
+    "@mediapipe/tasks-vision": "^1.2.0",
     "three": "^0.186.0"
   },
   "devDependencies": {
