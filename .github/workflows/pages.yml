@@ -28,7 +28,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       # The site lives at /<repo>/, so the build needs that base path.
       - run: npm run build
         env:
