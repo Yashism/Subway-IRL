@@ -122,6 +122,8 @@ keyboard.jogEnabled = params.has('jog');
 let detachKeyboard: (() => void) | null = keyboard.attach(window);
 const autopilotOn = flagOn('autopilot');
 const autopilot = autopilotOn ? new Autopilot(game) : null;
+// Reachable from the page so a demo recording can take the bot off the wheel (`subwayBot.enabled = false`).
+if (autopilot) (window as unknown as { subwayBot?: Autopilot }).subwayBot = autopilot;
 
 // ---------------------------------------------------------------- pose pipeline
 
@@ -1164,7 +1166,7 @@ function frame(now: number): void {
     // cinematic, and drawing the world on that one frame would put the game's own runner back on
     // screen beside the cinematic's kid for the rest of it.
     if (intro.playing) intro.draw();
-    else world.render(game, dt, loop.frameEvents);
+    else world.render(game, dt, loop.frameEvents, stepper.remainderSec);
   }
   hud.update(game);
   if (perf && dt > 0) {

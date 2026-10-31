@@ -9,6 +9,11 @@ export class FixedStepper {
     readonly maxFrameSec = 0.25,
   ) {}
 
+  /** Seconds the accumulator holds past the last step: how far into the next step this frame is. */
+  get remainderSec(): number {
+    return this.acc;
+  }
+
   advance(frameSec: number): number {
     this.acc += Math.min(Math.max(frameSec, 0), this.maxFrameSec);
     const n = Math.floor(this.acc / this.stepSec + 1e-9);

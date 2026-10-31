@@ -36,6 +36,8 @@ export function liveSpecs(obstacles: readonly Obstacle[], runnerS: number, speed
 
 /** A bot player for demos and integration tests: plans with the solver and always "jogs". */
 export class Autopilot implements CommandSource {
+  /** False hands the run back to fate: the bot stops steering and stops pressing start. */
+  enabled = true;
   private queue: GameCommand[] = [];
   private actions: PlanAction[] = [];
   private plannedAt = -Infinity;
@@ -44,6 +46,10 @@ export class Autopilot implements CommandSource {
   constructor(private readonly game: Game) {}
 
   drain(): GameCommand[] {
+    if (!this.enabled) {
+      this.queue = [];
+      return [];
+    }
     const q = this.queue;
     this.queue = [];
     return q;
@@ -62,6 +68,7 @@ export class Autopilot implements CommandSource {
 
   /** Call once before every game step. */
   tick(): void {
+    if (!this.enabled) return;
     const g = this.game;
     if (g.state === 'menu' || g.state === 'summary') {
       this.queue.push({ type: 'start' });

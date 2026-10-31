@@ -284,6 +284,8 @@ export class WorldView {
 
   private track: Track | null = null;
   private trackS = 0;
+  /** Where along the track this frame is drawn: the simulation's `s`, plus the sub-step extrapolation. */
+  private sView = 0;
   private stamp = 0;
   private clock = 0;
   private stumbleLeft = 0;
@@ -564,7 +566,13 @@ export class WorldView {
     this.renderer.setSize(width, height, false);
   }
 
-  render(g: Game, dtSec: number, events: readonly GameEvent[] = NO_EVENTS): void {
+  /**
+   * `subStepSec` is how far past the last simulation step this frame is. On a screen faster than the
+   * 60 Hz simulation (a 120 Hz laptop), every other frame has no new step, so the world is drawn a
+   * little further down the track instead of standing still: that is what makes the scroll smooth.
+   */
+  render(g: Game, dtSec: number, events: readonly GameEvent[] = NO_EVENTS, subStepSec = 0): void {
+    this.sView = g.s + (g.state === 'playing' && subStepSec > 0 ? g.speed * Math.min(subStepSec, 0.05) : 0);
     const dt = Number.isFinite(dtSec) ? Math.min(Math.max(dtSec, 0), 0.1) : 0;
     const animDt = g.state === 'paused' ? 0 : dt;
     this.clock += animDt;
@@ -605,10 +613,10 @@ export class WorldView {
     this.sky.position.copy(cam.position);
     this.skyline.position.copy(cam.position);
 
-    this.trackS = g.s;
-    this.bed.update(g.s);
-    this.ohe.update(g.s);
-    this.side.update(g.s);
+    this.trackS = this.sView;
+    this.bed.update(this.sView);
+    this.ohe.update(this.sView);
+    this.side.update(this.sView);
     this.updateObstacles(g);
     this.updateCoins(g);
     this.updatePickups(g);
@@ -784,7 +792,7 @@ export class WorldView {
   }
 
   private updateObstacles(g: Game): void {
-    const s = g.s;
+    const s = this.sView;
     const stamp = this.stamp;
     for (const o of g.track.obstacles) {
       const z = -(o.front - s);
@@ -831,7 +839,7 @@ export class WorldView {
     let n = 0;
     for (const c of g.track.coins) {
       if (c.taken) continue;
-      const ahead = c.s - g.s;
+      const ahead = c.s - this.sView;
       if (ahead > VIEW_AHEAD || ahead < -VIEW_BEHIND) continue;
       if (n >= MAX_COINS) break;
       let x = laneX(c.lane);
@@ -858,7 +866,7 @@ export class WorldView {
     const stamp = this.stamp;
     for (const p of g.track.pickups) {
       if (p.taken) continue;
-      const ahead = p.s - g.s;
+      const ahead = p.s - this.sView;
       if (ahead > VIEW_AHEAD || ahead < -VIEW_BEHIND) continue;
       let a = this.pickups.get(p.id);
       if (!a) {

@@ -124,3 +124,15 @@ describe('Autopilot', () => {
     expect(g.state).toBe('playing');
   }, 180_000);
 });
+
+describe('Autopilot.enabled', () => {
+  it('stops steering and stops pressing start when switched off', () => {
+    const g = new Game({ seed: 1, difficulty: 'cardio' });
+    const bot = new Autopilot(g);
+    bot.tick();
+    expect(bot.drain()).toEqual([{ type: 'start' }]); // in the menu the bot presses start
+    bot.enabled = false;
+    bot.tick();
+    expect(bot.drain()).toEqual([]);
+  });
+});
